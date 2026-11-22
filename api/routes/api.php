@@ -6,6 +6,7 @@ use App\Http\Controllers\Public\HealthController;
 use App\Http\Controllers\Files\PlayerPhotoController;
 use App\Http\Controllers\Me\MeController;
 use App\Http\Controllers\Pc\CatalogController;
+use App\Http\Controllers\Pc\EventController;
 use App\Http\Controllers\Pc\InvitationController;
 use App\Http\Controllers\Public\InvitationAcceptController;
 use App\Http\Controllers\Pc\MemberController;
@@ -83,6 +84,15 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::patch('players/{player}', [PlayerController::class, 'update']);
         Route::delete('players/{player}', [PlayerController::class, 'destroy']);
         Route::post('players/{player}/photo', [PlayerController::class, 'photo'])->middleware('throttle:codes');
+
+        Route::get('events', [EventController::class, 'index']);
+        Route::post('events', [EventController::class, 'store'])->middleware('idempotent');
+        Route::get('events/{event}', [EventController::class, 'show']);
+        Route::patch('events/{event}', [EventController::class, 'update']);
+        Route::delete('events/{event}', [EventController::class, 'destroy']);
+        Route::put('events/{event}/callups', [EventController::class, 'callups'])->middleware('idempotent');
+        Route::put('events/{event}/attendance', [EventController::class, 'attendance'])->middleware('idempotent');
+        Route::put('events/{event}/match-sheet', [EventController::class, 'matchSheet'])->middleware('idempotent');
 
         Route::get('invitations', [InvitationController::class, 'index']);
         Route::post('invitations', [InvitationController::class, 'store'])->middleware(['throttle:invites', 'idempotent']);

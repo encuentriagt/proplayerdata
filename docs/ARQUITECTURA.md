@@ -1,0 +1,200 @@
+# ppd (ProPlayer Data) — Arquitectura v1
+
+Versión 1 · 2026-11-21 · Autor: agente de backend (dirige el proyecto)
+Este documento es la fuente de verdad para TODOS los agentes (web, Flutter, diseño, panel).
+Si algo aquí cambia, se cambia primero en este archivo.
+
+---
+
+## 1. Qué es ppd
+
+Plataforma multideporte para colegios y equipos (de cualquier deporte), con marca blanca.
+
+| Nombre corto | Qué es | Quién lo usa | Dónde |
+|---|---|---|---|
+| **ppd** | El producto completo (ProPlayer Data) | — | ppdguate.com |
+| **PC** | Plataforma Coach (web): eje del sistema | Coach, director deportivo, admin de organización | pc.ppdguate.com |
+| **Panel** | Panel de administración de ppd | Super admin (dueño de ppd) | admin.ppdguate.com |
+| **App** | App de padres (Android e iOS, Flutter) | Padres / encargados | Google Play y App Store |
+| **API** | Backend Laravel, único punto de datos | Todos los anteriores | api.ppdguate.com |
+
+Slogan: "En vivo". Idioma: español de Guatemala, trato de **usted** en todos los textos.
+
+---
+
+## 2. Roles y permisos
+
+| Rol | Dónde entra | Puede |
+|---|---|---|
+| `super_admin` | Panel | Crear/editar/suspender organizaciones, su marca blanca, sus admins, sus cupos de planes; asignar planes Pro/Premium a cualquier padre; ver todo; auditoría. |
+| `org_admin` | PC | Administrar SU organización: equipos, deportes, temporadas, coaches, directores, jugadores, padres, asignar planes dentro de su cupo, editar su marca (si el super admin lo permite). |
+| `director` | PC | Ver TODOS los deportes y equipos de su organización (lectura + reportes). Puede registrar lo mismo que un coach. |
+| `coach` | PC | Ver y trabajar SOLO en los equipos que la organización le asignó (y por lo tanto solo esos deportes). |
+| `guardian` (padre) | App | Ver la información de SUS hijos según su plan (Gratis / Pro / Premium). |
+
+Reglas:
+- Un usuario puede tener roles en varias organizaciones (tabla `organization_members`).
+- Un coach puede tener varios equipos; un equipo puede tener varios coaches (`team_staff`).
+- Un padre puede tener varios hijos, incluso en organizaciones distintas.
+- TODA consulta de la API filtra por organización y por asignación. Nunca confiar en lo que mande el cliente.
+- Organización suspendida → nadie de esa organización entra (ni PC ni App); se muestra "Su organización no está activa. Comuníquese con su institución."
+
+---
+
+## 3. Planes de los padres (Gratis / Pro / Premium)
+
+| Plan | Alcance |
+|---|---|
+| **Gratis** | Todas las funciones, con límites (ver `config/plans.php`, valores por definir). |
+| **Pro** | Todo sin límites, para **1 hijo** (el padre elige cuál; cambio limitado). |
+| **Premium** | Todo sin límites, todos sus hijos. |
+
+- El plan es **por padre**.
+- **Nadie paga dentro de la app.** El dueño de ppd cobra a la organización por fuera; la organización cobra a las familias como quiera.
+- Quién asigna planes: **ambos**
+  - `super_admin` desde el Panel (a cualquier padre, sin consumir cupo, o consumiendo el de una organización).
+  - `org_admin` desde PC, dentro del **cupo** que el super admin le dio a su organización (ej. 40 Premium, 25 Pro).
+- Base legal en tiendas: Apple 3.1.3(c) (servicio vendido a organizaciones para sus estudiantes). Por eso:
+  - **En la App NO puede aparecer**: precios, "comprar", "suscribirse", "mejorar plan", enlaces a pagos, ni mención de que se cobra.
+  - La App solo muestra: "Plan Premium — asignado por <Organización>". En Gratis, al tocar un límite: "Esta función tiene un límite en su plan actual. Consulte con su institución." (sin más).
+  - Los mensajes del servidor (push, correo) tampoco mencionan cobros.
+- Tabla `plan_grants` (idea copiada de `premium_grants` de Trafidoc): un solo lugar (`PlanService::effectivePlan($user)`) decide el plan vigente.
+
+---
+
+## 4. Marca blanca
+
+Cada organización tiene: nombre, `slug`, logo (PNG/SVG), escudo opcional, color primario, color secundario, color de texto sobre primario, imagen de portada opcional.
+
+- **PC**: `pc.ppdguate.com/<slug>` muestra el login con la marca de la organización; adentro, toda la interfaz con sus colores y logo.
+- **App**: UNA sola app "ppd" en tiendas. Tras el login se pinta con la marca de la organización del hijo seleccionado. Si hay hijos en varias organizaciones, selector arriba.
+- ppd aparece discreto: "Powered by ppd" en login y pie.
+- No se publican apps separadas por colegio (Apple 4.2.6 rechaza apps de plantilla no publicadas por el dueño del contenido). Si un colegio lo exige, servicio aparte y con SU cuenta de Apple.
+- Endpoint público: `GET /api/public/orgs/{slug}/branding` → nombre, logo_url, colores.
+- Archivos de marca en `storage/app/public/orgs/{id}/` (públicos, sin datos personales).
+
+---
+
+## 5. Deportes (multideporte)
+
+Catálogo administrado desde el Panel (no código):
+- `sports`: fútbol, fútbol sala, básquetbol, voleibol, fútbol americano, béisbol, etc.
+- `sport_positions`: posiciones por deporte (POR, DEF, MED, DEL / Base, Escolta, Alero… ).
+- `sport_stat_types`: estadísticas por deporte, con:
+  - `code` (goal, assist, yellow_card, red_card, point_1, point_2, point_3, rebound, foul, …)
+  - `scores` (cuánto suma al marcador; 0 si no suma)
+  - `is_player_stat`, `is_team_stat`
+- `sport_settings`: duración y cantidad de periodos, si hay cambios ilimitados, etc.
+
+La PC y la App leen el catálogo; NO hay lógica fija por deporte en el cliente.
+
+---
+
+## 6. Modelo de datos (MariaDB, **InnoDB obligatorio**)
+
+Convenciones: `id` BIGINT, `created_at/updated_at`, borrado lógico (`deleted_at`) donde se indica, fechas en `America/Guatemala`.
+
+**Organización y personas**
+- `organizations` (name, slug único, type: school|team, status: active|suspended, logo_path, crest_path, cover_path, color_primary, color_secondary, color_on_primary, quota_pro, quota_premium, branding_editable_by_org bool, notes, deleted_at)
+- `users` (name, email único, password nullable, phone, google_sub, apple_sub, apple_refresh_token cifrado, is_super_admin, totp_secret cifrado, last_login_at, deleted_at)
+- `organization_members` (organization_id, user_id, role: org_admin|director|coach, status: active|invited|disabled) — único (org, user, role)
+- `invitations` (organization_id, email, role: org_admin|director|coach|guardian, player_id nullable, token_hash, expires_at, accepted_at, created_by)
+
+**Equipos y jugadores**
+- `seasons` (organization_id, name, starts_on, ends_on, is_current)
+- `teams` (organization_id, sport_id, season_id, name, category, gender, color, deleted_at)
+- `team_staff` (team_id, user_id, role: head_coach|assistant) — define qué ve cada coach
+- `players` (organization_id, first_name, last_name, birthdate, photo_path, document_number nullable, notes, deleted_at)
+- `team_players` (team_id, player_id, jersey_number, sport_position_id, active)
+- `guardian_players` (user_id, player_id, relationship, verified_at)
+
+**Calendario y actividad**
+- `events` (organization_id, team_id, type: match|training|other, title, starts_at, ends_at, location, opponent_name, home_away, status: scheduled|live|finished|cancelled, score_us, score_them, current_period, period_started_at, notes, created_by, deleted_at)
+- `event_callups` (event_id, player_id, status: called|reserve, guardian_response: pending|confirmed|declined, responded_at)
+- `attendances` (event_id, player_id, status: present|absent|late|excused, note, recorded_by)
+- `match_lineups` (event_id, player_id, is_starter, sport_position_id, jersey_number)
+- `match_actions` (event_id, client_uuid único, period, minute, second, type: stat|sub_in|sub_out|period_start|period_end|note, sport_stat_type_id nullable, player_id nullable, related_player_id nullable, value, recorded_by, voided_at)
+  - `client_uuid` hace idempotente el registro en vivo (reintentos sin duplicar).
+- `player_event_stats` (event_id, player_id, minutes_played, stats JSON) — resumen recalculado al cerrar o editar el partido.
+
+**Planes, avisos, auditoría**
+- `plan_grants` (user_id, organization_id nullable, plan: pro|premium, pro_player_id nullable, source: super_admin|org_admin, granted_by, starts_at, ends_at nullable, revoked_at, note)
+- `devices` (user_id, platform: android|ios|web, fcm_token, last_seen_at)
+- `notification_logs` (user_id, kind, ref_type, ref_id, sent_at) — para no repetir avisos
+- `audit_log` (actor_user_id, organization_id, action, target_type, target_id, data JSON, ip, created_at)
+
+---
+
+## 7. API (Laravel 12, `api.ppdguate.com`)
+
+- Autenticación: Laravel Sanctum (tokens). Una sesión por plataforma (encabezado `X-App-Platform: web|android|ios`), idea de Trafidoc.
+- PC: correo + contraseña (invitación por correo). Opcional Google.
+- App: correo + contraseña, Google y **Sign in with Apple** (obligatorio si hay Google). Borrado de cuenta dentro de la app con revocación del token de Apple (copiar idea de Trafidoc).
+- Panel: correo + contraseña + TOTP, bloqueo por intentos, sesión corta.
+- Prefijos:
+  - `/api/public/*` (branding, salud)
+  - `/api/auth/*`
+  - `/api/pc/*` (coach, director, org_admin; cada ruta valida organización + asignación)
+  - `/api/app/*` (padres; valida vínculo con el hijo + plan)
+  - `/api/admin/*` (super admin)
+- **En vivo**: el hosting compartido no permite WebSockets. Solución:
+  - Coach envía acciones (`POST /api/pc/events/{id}/actions`, con `client_uuid`).
+  - App consulta `GET /api/app/events/{id}/live?since=<cursor>` cada 10–15 s solo mientras el partido está `live` (respuesta corta, ETag).
+  - Push FCM en momentos clave: inicio, gol/punto, fin, convocatoria.
+- Respuestas JSON en español para mensajes al usuario. Errores con `code` estable para que los clientes traduzcan/decidan.
+- CORS solo: ppdguate.com, pc.ppdguate.com, admin.ppdguate.com (y orígenes locales de desarrollo).
+
+---
+
+## 8. Servidor y repositorio
+
+Servidor: Namecheap shared hosting, cPanel usuario `ppdgmmle`, `server292.web-hosting.com`, SSH puerto 21098. Reglas heredadas del proyecto anterior (Trafidoc): MyISAM por defecto → `'engine' => 'InnoDB'` antes de migrar; cron solo con el método de archivo; sin secretos en el repo; `APP_DEBUG=false`.
+
+| Carpeta en servidor | Contenido | Origen en repo |
+|---|---|---|
+| `~/public_html` | Página pública ppdguate.com | `web/` (deploy automático) |
+| `~/ppd-api` | Laravel (document root `ppd-api/public` para api.ppdguate.com) | `api/` |
+| `~/pc.ppdguate.com` | Build estático de la PC | `pc/` (se construye en GitHub Actions) |
+| `~/admin.ppdguate.com` | Build estático del Panel | `admin/` |
+| `~/ppdback` (700) | Respaldos, crontab, known_hosts | — |
+| `~/ppd_test` (700) | Scripts de pruebas en servidor | — |
+
+Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `admin/`, `app/` (Flutter), `docs/`.
+- Deploy: GitHub Actions por SSH al entrar a `main`. `.env`, `storage/` y llaves NUNCA se suben ni se sobrescriben.
+- Migraciones: solo a mano (workflow manual) y con respaldo previo.
+
+---
+
+## 9. Etapas
+
+| Etapa | Entrega | Responsable |
+|---|---|---|
+| E0 | Hosting, SSL, página "En construcción", deploy automático | Backend ✅ |
+| E1 | API base: Laravel, InnoDB, auth, organizaciones, marca blanca, miembros, invitaciones, auditoría, respaldo diario | Backend |
+| E2 | Panel (super admin): organizaciones, marca, cupos, deportes, planes | Agente del panel + Backend |
+| E3 | PC: login con marca, equipos, jugadores, staff, padres, asignación de planes | Agente de la web + Backend |
+| E4 | PC: calendario, partidos, entrenamientos, convocatorias, asistencia | Agente de la web + Backend |
+| E5 | PC: partido en vivo (alineación, minutos, acciones, cambios, marcador) | Agente de la web + Backend |
+| E6 | App padres: login, hijos, calendario, convocatorias, asistencia, estadísticas, en vivo, push, planes | Agente de Flutter + Backend |
+| E7 | Tiendas: cuenta demo, capturas, video, revisión Apple/Google | Todos |
+
+---
+
+## 10. Pendientes por definir (dueño del proyecto)
+
+1. Límites exactos del plan Gratis (ej. historial de N días, N hijos, estadísticas básicas).
+2. Deportes y posiciones de arranque.
+3. ¿El `org_admin` puede editar su propia marca o solo el super admin?
+4. Cuenta de Apple Developer y Google Play que publicará la App.
+5. Datos de contacto/soporte que aparecerán (soporte@ppdguate.com).
+
+---
+
+## 11. Reglas para todos los agentes
+
+- Leer este documento antes de escribir código. Cambios de alcance → se actualiza aquí primero.
+- Ningún cliente (PC, Panel, App) guarda llaves ni secretos.
+- Textos con trato de **usted**, español de Guatemala.
+- En la App: cero menciones de precios o pagos (sección 3).
+- Toda pantalla toma colores/logo de la marca de la organización (sección 4); ppd solo como "Powered by ppd".
+- Los clientes no deciden permisos: la API responde 403 y el cliente muestra el mensaje.

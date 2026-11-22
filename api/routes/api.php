@@ -3,6 +3,14 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Public\BrandingController;
 use App\Http\Controllers\Public\HealthController;
+use App\Http\Controllers\Files\PlayerPhotoController;
+use App\Http\Controllers\Pc\CatalogController;
+use App\Http\Controllers\Pc\MemberController;
+use App\Http\Controllers\Pc\PlayerController;
+use App\Http\Controllers\Pc\RosterController;
+use App\Http\Controllers\Pc\SeasonController;
+use App\Http\Controllers\Pc\TeamController;
+use App\Http\Controllers\Pc\TeamStaffController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -27,5 +35,46 @@ Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('auth.logout');
         Route::post('password', [AuthController::class, 'changePassword'])
             ->middleware(['throttle:codes', 'idempotent'])->name('auth.password');
+    });
+});
+
+// Archivos privados: solo con URL firmada y vigente (sin sesión).
+Route::prefix('files')->middleware(['signed', 'throttle:public'])->group(function () {
+    Route::get('players/{player}/photo', PlayerPhotoController::class)->name('files.player-photo');
+});
+
+Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function () {
+    Route::get('catalog/sports', [CatalogController::class, 'sports']);
+
+    // ---- PC: Plataforma Coach (coach, director, org_admin) ----
+    Route::prefix('pc/orgs/{organization:slug}')->middleware('org')->scopeBindings()->group(function () {
+        Route::get('seasons', [SeasonController::class, 'index']);
+        Route::post('seasons', [SeasonController::class, 'store'])->middleware('idempotent');
+        Route::patch('seasons/{season}', [SeasonController::class, 'update']);
+
+        Route::get('teams', [TeamController::class, 'index']);
+        Route::post('teams', [TeamController::class, 'store'])->middleware('idempotent');
+        Route::get('teams/{team}', [TeamController::class, 'show']);
+        Route::patch('teams/{team}', [TeamController::class, 'update']);
+        Route::delete('teams/{team}', [TeamController::class, 'destroy']);
+
+        Route::post('teams/{team}/staff', [TeamStaffController::class, 'store']);
+        Route::delete('teams/{team}/staff/{userId}', [TeamStaffController::class, 'destroy'])->whereNumber('userId');
+
+        Route::get('teams/{team}/roster', [RosterController::class, 'index']);
+        Route::post('teams/{team}/roster', [RosterController::class, 'store']);
+        Route::patch('teams/{team}/roster/{playerId}', [RosterController::class, 'update'])->whereNumber('playerId');
+        Route::delete('teams/{team}/roster/{playerId}', [RosterController::class, 'destroy'])->whereNumber('playerId');
+
+        Route::get('players', [PlayerController::class, 'index']);
+        Route::post('players', [PlayerController::class, 'store'])->middleware('idempotent');
+        Route::get('players/{player}', [PlayerController::class, 'show']);
+        Route::patch('players/{player}', [PlayerController::class, 'update']);
+        Route::delete('players/{player}', [PlayerController::class, 'destroy']);
+        Route::post('players/{player}/photo', [PlayerController::class, 'photo'])->middleware('throttle:codes');
+
+        Route::get('members', [MemberController::class, 'index']);
+        Route::patch('members/{member}', [MemberController::class, 'update']);
+        Route::delete('members/{member}', [MemberController::class, 'destroy']);
     });
 });

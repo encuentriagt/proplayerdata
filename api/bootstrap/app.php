@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\Idempotency;
+use App\Http\Middleware\ResolveOrganization;
 use App\Http\Middleware\SecurityHeaders;
 use App\Support\ApiError;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -29,7 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecurityHeaders::class);
         $middleware->prependToGroup('api', ForceJsonResponse::class);
-        $middleware->alias(['idempotent' => Idempotency::class, 'active' => EnsureActiveUser::class]);
+        $middleware->alias(['idempotent' => Idempotency::class, 'active' => EnsureActiveUser::class, 'org' => ResolveOrganization::class]);
         // La API usa tokens (sin cookies de sesión): no hay CSRF que verificar en /api.
     })
     ->withExceptions(function (Exceptions $exceptions): void {

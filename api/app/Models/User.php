@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -42,6 +43,17 @@ class User extends Authenticatable
     public function memberships(): HasMany
     {
         return $this->hasMany(OrganizationMember::class);
+    }
+
+    /** Hijos (jugadores) de los que este usuario es padre o encargado. */
+    public function children(): BelongsToMany
+    {
+        return $this->belongsToMany(Player::class, 'guardian_players')->withPivot(['relationship', 'verified_at'])->withTimestamps();
+    }
+
+    public function staffTeams(): HasMany
+    {
+        return $this->hasMany(TeamStaff::class);
     }
 
     public function isActive(): bool

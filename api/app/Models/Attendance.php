@@ -9,6 +9,11 @@ class Attendance extends Model
 {
     protected $fillable = ['event_id', 'player_id', 'status', 'note', 'recorded_by'];
 
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
+    }
+
     public function player(): BelongsTo
     {
         return $this->belongsTo(Player::class);

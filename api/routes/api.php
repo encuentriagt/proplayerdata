@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\App\AccountController;
+use App\Http\Controllers\App\ChildController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Public\BrandingController;
 use App\Http\Controllers\Public\HealthController;
@@ -10,6 +12,7 @@ use App\Http\Controllers\Pc\EventController;
 use App\Http\Controllers\Pc\InvitationController;
 use App\Http\Controllers\Public\InvitationAcceptController;
 use App\Http\Controllers\Pc\MemberController;
+use App\Http\Controllers\Pc\PlanController;
 use App\Http\Controllers\Pc\PlayerController;
 use App\Http\Controllers\Pc\RosterController;
 use App\Http\Controllers\Pc\SeasonController;
@@ -58,6 +61,18 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::get('me/notifications', [MeController::class, 'notifications']);
     Route::post('me/notifications/read', [MeController::class, 'markRead']);
 
+    // ---- App de padres ----
+    Route::prefix('app')->group(function () {
+        Route::get('children', [ChildController::class, 'index']);
+        Route::get('children/{player}/events', [ChildController::class, 'events']);
+        Route::get('children/{player}/events/{eventId}', [ChildController::class, 'event'])->whereNumber('eventId');
+        Route::post('children/{player}/events/{eventId}/callup-response', [ChildController::class, 'respondCallup'])->whereNumber('eventId')->middleware('idempotent');
+        Route::get('children/{player}/stats', [ChildController::class, 'stats']);
+        Route::get('plan', [AccountController::class, 'plan']);
+        Route::post('plan/pro-child', [AccountController::class, 'chooseProChild']);
+        Route::delete('account', [AccountController::class, 'destroy'])->middleware('throttle:codes');
+    });
+
     // ---- PC: Plataforma Coach (coach, director, org_admin) ----
     Route::prefix('pc/orgs/{organization:slug}')->middleware('org')->scopeBindings()->group(function () {
         Route::get('seasons', [SeasonController::class, 'index']);
@@ -97,6 +112,10 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::get('invitations', [InvitationController::class, 'index']);
         Route::post('invitations', [InvitationController::class, 'store'])->middleware(['throttle:invites', 'idempotent']);
         Route::delete('invitations/{invitation}', [InvitationController::class, 'destroy']);
+
+        Route::get('plans', [PlanController::class, 'index']);
+        Route::post('plans', [PlanController::class, 'store'])->middleware('idempotent');
+        Route::delete('plans/{grant}', [PlanController::class, 'destroy'])->withoutScopedBindings();
 
         Route::get('members', [MemberController::class, 'index']);
         Route::patch('members/{member}', [MemberController::class, 'update']);

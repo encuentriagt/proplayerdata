@@ -198,6 +198,7 @@ class AuthController extends Controller
             'organization_id' => $m->organization_id,
             'role' => $m->role->value,
             'role_label' => $m->role->label(),
+            'branding_editable' => $m->role === \App\Enums\MemberRole::OrgAdmin && $m->organization->branding_editable_by_org,
             'organization' => $m->organization->brandingPayload(),
         ])->values()->all();
     }

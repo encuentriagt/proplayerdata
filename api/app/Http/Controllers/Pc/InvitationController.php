@@ -79,6 +79,28 @@ class InvitationController extends Controller
         ]], 201);
     }
 
+    /** Rota el token (el enlace anterior deja de servir), extiende la vigencia y reenvía el correo. */
+    public function resend(Organization $organization, Invitation $invitation, OrgAccess $access): JsonResponse
+    {
+        $access->authorize($access->isAdmin() || $invitation->created_by === $access->user->id);
+        if ($invitation->accepted_at || $invitation->revoked_at) {
+            return response()->json(['error' => ['code' => 'invitation_unusable', 'message' => 'La invitación ya fue usada o anulada.']], 422);
+        }
+        $token = \Illuminate\Support\Str::random(48);
+        $invitation->update([
+            'token_hash' => hash('sha256', $token),
+            'expires_at' => now()->addDays((int) config('ppd.invitations.days_valid')),
+        ]);
+        $this->service->sendAfterResponse($invitation, $token);
+        Audit::log('invitation.resent', $invitation, [], $organization->id);
+
+        return response()->json(['data' => [
+            'id' => $invitation->id, 'email' => $invitation->email, 'role' => $invitation->role,
+            'expires_at' => $invitation->expires_at->toIso8601String(),
+            'invite_url' => $this->service->url($invitation, $token),
+        ]]);
+    }
+
     public function destroy(Organization $organization, Invitation $invitation, OrgAccess $access): JsonResponse
     {
         $access->authorize($access->isAdmin() || $invitation->created_by === $access->user->id);

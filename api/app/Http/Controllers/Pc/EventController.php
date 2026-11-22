@@ -31,11 +31,19 @@ class EventController extends Controller
         $data = $request->validate([
             'from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from'],
             'team_id' => ['nullable', 'integer'], 'type' => ['nullable', Rule::in(['match', 'training', 'other'])],
+            'pending_sheet' => ['nullable', 'boolean'],
         ]);
-        $from = CarbonImmutable::parse($data['from'] ?? now()->startOfMonth())->startOfDay();
-        $to = CarbonImmutable::parse($data['to'] ?? $from->addDays(41))->endOfDay();
-        if ($from->diffInDays($to) > 120) {
-            return ApiError::response('range_too_large', 'El rango máximo es de 120 días.', 422);
+        $pending = $request->boolean('pending_sheet');
+        if ($pending) {
+            // Partidos ya jugados (últimos 120 días), no cancelados y sin resultado publicado.
+            $from = CarbonImmutable::now()->subDays(120)->startOfDay();
+            $to = CarbonImmutable::now();
+        } else {
+            $from = CarbonImmutable::parse($data['from'] ?? now()->startOfMonth())->startOfDay();
+            $to = CarbonImmutable::parse($data['to'] ?? $from->addDays(41))->endOfDay();
+            if ($from->diffInDays($to) > 120) {
+                return ApiError::response('range_too_large', 'El rango máximo es de 120 días.', 422);
+            }
         }
 
         $teamIds = $access->teamIds();
@@ -48,6 +56,7 @@ class EventController extends Controller
             ->whereIn('team_id', $teamIds)
             ->whereBetween('starts_at', [$from, $to])
             ->when($data['type'] ?? null, fn ($q, $t) => $q->where('type', $t))
+            ->when($pending, fn ($q) => $q->where('type', 'match')->where('status', '!=', 'cancelled')->whereNull('result_published_at'))
             ->orderBy('starts_at')->get();
 
         return response()->json(['data' => $events->map->payload()->values()]);
@@ -58,7 +67,9 @@ class EventController extends Controller
         $access->authorize($access->canViewTeam($event->team));
         $event->load(['team.sport', 'callups.player', 'attendances.player', 'lineup.player', 'actions.statType', 'playerStats']);
 
+        $event->team->sport->load(['positions', 'statTypes']);
         $data = $event->payload();
+        $data['sport'] = $event->team->sport->payload();
         $data['callups'] = $event->callups->map(fn ($c) => [
             'player_id' => $c->player_id, 'player_name' => $c->player?->fullName(), 'status' => $c->status,
             'guardian_response' => $c->guardian_response, 'responded_at' => $c->responded_at?->toIso8601String(),

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\SportAdminController;
 use App\Http\Controllers\App\AccountController;
 use App\Http\Controllers\App\ChildController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TotpController;
 use App\Http\Controllers\Public\BrandingController;
 use App\Http\Controllers\Public\HealthController;
@@ -44,6 +45,9 @@ Route::prefix('public')->middleware('throttle:public')->group(function () {
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login')->name('auth.login');
+    Route::post('password/forgot', [PasswordResetController::class, 'forgot'])->middleware('throttle:codes');
+    Route::get('password/reset/{token}', [PasswordResetController::class, 'show'])->middleware('throttle:codes');
+    Route::post('password/reset', [PasswordResetController::class, 'reset'])->middleware(['throttle:codes', 'idempotent']);
 
     Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function () {
         Route::get('me', [AuthController::class, 'me'])->name('auth.me');
@@ -120,6 +124,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
 
         Route::get('invitations', [InvitationController::class, 'index']);
         Route::post('invitations', [InvitationController::class, 'store'])->middleware(['throttle:invites', 'idempotent']);
+        Route::post('invitations/{invitation}/resend', [InvitationController::class, 'resend'])->middleware(['throttle:invites', 'idempotent']);
         Route::delete('invitations/{invitation}', [InvitationController::class, 'destroy']);
 
         Route::get('plans', [PlanController::class, 'index']);
@@ -131,6 +136,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
 
         Route::get('members', [MemberController::class, 'index']);
         Route::patch('members/{member}', [MemberController::class, 'update']);
+        Route::post('members/{member}/reset-password', [MemberController::class, 'resetPassword'])->middleware('throttle:codes');
         Route::delete('members/{member}', [MemberController::class, 'destroy']);
     });
 });

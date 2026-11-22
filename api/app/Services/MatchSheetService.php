@@ -57,7 +57,8 @@ final class MatchSheetService
             throw ValidationException::withMessages($errors);
         }
 
-        $publish = (bool) ($data['publish'] ?? false);
+        // Una vez publicado, toda corrección se trata como publicación (si cambia el marcador, se avisa).
+        $publish = (bool) ($data['publish'] ?? false) || $event->result_published_at !== null;
         $oldScore = [$event->score_us, $event->score_them];
         $firstPublish = $publish && ! $event->result_published_at;
 

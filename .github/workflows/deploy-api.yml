@@ -110,7 +110,7 @@ jobs:
             --filter='P public/.well-known/' \
             --filter='P public/storage' \
             --filter='P bootstrap/cache/*.php' \
-            --exclude='.env' --exclude='.env.*' --exclude='storage/' \
+            --exclude='.env' --exclude='.env.production' --exclude='.env.backup' --exclude='.env.testing' --exclude='storage/' \
             --exclude='tests/' --exclude='phpunit.xml' --exclude='database/database.sqlite' \
             --exclude='.git*' --exclude='.editorconfig' --exclude='README.md' \
             --stats \

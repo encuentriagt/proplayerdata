@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.0 (2026-11-22)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.1 (2026-11-22)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -41,10 +41,13 @@ Enlaces de invitación: staff → `https://pc.ppdguate.com/{slug}/invitacion?tok
 
 | Método | Ruta | Cuerpo / Notas |
 |---|---|---|
-| POST | `/auth/login` | `{email, password}` + `X-App-Platform`. Respuesta: `token, token_type, expires_at, user{id,name,email,must_change_password,is_super_admin}, memberships[{organization_id, role, role_label, organization{marca}}], is_guardian, admin_totp (null\|setup\|verify)`. Errores: `invalid_credentials` (mismo mensaje exista o no el correo), `account_locked` (423, `retry_after_minutes`), `no_active_organization` (403), `platform_invalid` |
+| POST | `/auth/login` | `{email, password}` + `X-App-Platform`. Respuesta: `token, token_type, expires_at, user{id,name,email,must_change_password,is_super_admin}, memberships[{organization_id, role, role_label, branding_editable, organization{marca}}], is_guardian, admin_totp (null\|setup\|verify)`. `branding_editable` es `true` solo para `org_admin` cuando el super admin permitió que la organización edite su marca. Errores: `invalid_credentials` (mismo mensaje exista o no el correo), `account_locked` (423, `retry_after_minutes`), `no_active_organization` (403), `platform_invalid` |
 | GET | `/auth/me` | Igual que el login sin token |
 | POST | `/auth/logout` | Cierra la sesión actual |
 | POST ♻️ | `/auth/password` | `{current_password, password, password_confirmation}` (mín. 10, letras y números). Cierra las demás sesiones |
+| POST | `/auth/password/forgot` | `{email, slug?}` Siempre responde 200 con el mismo mensaje (no revela si el correo existe). Envía un enlace por correo que vence en 60 min: staff → `https://pc.ppdguate.com/{slug}/restablecer?token=`, padres → `https://ppdguate.com/restablecer?token=` |
+| GET | `/auth/password/reset/{token}` | `{email_masked}` o 410 `reset_invalid` |
+| POST ♻️ | `/auth/password/reset` | `{token, password, password_confirmation}` Cierra todas las sesiones y desbloquea la cuenta. 410 `reset_invalid` |
 | POST | `/auth/totp/setup` | Solo super admin sin TOTP: `{secret, otpauth_uri}` (mostrar como QR **una vez**) |
 | POST | `/auth/totp/confirm` | `{code}` activa el TOTP |
 | POST | `/auth/totp/verify` | `{code}` habilita el Panel en esta sesión (30 min sin uso) |
@@ -106,8 +109,9 @@ Permisos: **admin** todo · **director** ve y registra en todos los equipos · *
 | Método | Ruta | Cuerpo / Notas |
 |---|---|---|
 | GET | `events?from=&to=&team_id=&type=` | Máx. 120 días. Sin rango: el mes actual + 6 semanas |
+| GET | `events?pending_sheet=1` | Partidos ya jugados (últimos 120 días), no cancelados y **sin resultado publicado** (ignora `from/to`) |
 | POST ♻️ | `events` | `{team_id, type(match\|training\|other), starts_at, ends_at?, title?, location?, opponent_name?, home_away?(home\|away\|neutral), notes?}` |
-| GET | `events/{id}` | Detalle con `callups`, `attendance`, `lineup`, `actions`, `player_stats` |
+| GET | `events/{id}` | Detalle con `sport{positions, stat_types}` del equipo, `callups`, `attendance`, `lineup`, `actions`, `player_stats` |
 | PATCH | `events/{id}` | Mismos campos + `status: scheduled\|cancelled`. Cambiar fecha/lugar o cancelar **avisa a los padres** |
 | DELETE | `events/{id}` | No si tiene resultado publicado (`event_has_result`) |
 | PUT ♻️ | `events/{id}/callups` | `{players:[{player_id, status?(called\|reserve)}], notify?}` Reemplaza la lista. Avisa a los padres de los **nuevos** convocados (una sola vez). Se ve la respuesta del padre en `guardian_response` |
@@ -128,6 +132,7 @@ Ficha del partido:
 ```
 - `stat_code` sale de `/catalog/sports` del deporte del equipo; `value` (1–99) para sumar varias de una vez.
 - Guardar reemplaza la ficha completa (idempotente). `publish:false` = borrador.
+- **Una vez publicado, toda corrección cuenta como publicación** aunque se envíe `publish:false` (no se puede "despublicar").
 - `publish:true` marca el partido `finished` y **avisa a los padres** de la plantilla activa (personalizado con lo que hizo su hijo). Corregir sin cambiar el marcador no repite el aviso; si cambia el marcador se envía "Resultado corregido".
 - La respuesta trae `warnings` (por ejemplo, si la suma de goles de los jugadores no coincide con `score_us`). No bloquea.
 
@@ -136,9 +141,11 @@ Ficha del partido:
 |---|---|---|---|
 | GET | `invitations` | admin: todas; otros: las suyas | pendientes |
 | POST ♻️ | `invitations` | admin: `org_admin\|director\|coach\|guardian`; coach/director: solo `guardian` de jugadores que ve | `{email, role, player_id?(obligatorio en guardian), team_ids?(coach)}`. Responde `invite_url` (se envía también por correo) |
+| POST ♻️ | `invitations/{id}/resend` | admin o quien la creó | Genera un enlace nuevo (el anterior deja de servir), renueva la vigencia y reenvía el correo. Devuelve `invite_url` |
 | DELETE | `invitations/{id}` | admin o quien la creó | anula |
 | GET | `members` | admin | con equipos asignados |
 | PATCH | `members/{id}` | admin | `{status: active\|disabled}` (no a sí mismo) |
+| POST | `members/{id}/reset-password` | admin | Devuelve `reset_url` (vence en 24 h) para compartir por WhatsApp. No a sí mismo |
 | DELETE | `members/{id}` | admin | quita el rol y sus equipos |
 | GET | `plans` | admin | planes vigentes + `meta.usage{pro{quota,used},premium{...}}` |
 | POST ♻️ | `plans` | admin | `{email, plan(pro\|premium), ends_at?, note?}` el correo debe ser de un padre de la organización. `quota_exceeded` si no hay cupo |
@@ -190,7 +197,14 @@ Requiere `is_super_admin` + TOTP verificado en la sesión (`/auth/totp/verify`).
 
 ---
 
-## 8. Archivos
+## 8. Archivos (todo sale de `https://api.ppdguate.com`)
 
-- Fotos de jugadores: privadas, solo por `photo_url` firmada (15 min).
-- Logos/escudos/portadas de organizaciones: públicos (`https://api.ppdguate.com/storage/orgs/...`).
+- Fotos de jugadores: privadas, solo por `photo_url` firmada (15 min): `https://api.ppdguate.com/api/files/players/{id}/photo?...&signature=...`.
+- Logos/escudos/portadas de organizaciones: públicos: `https://api.ppdguate.com/storage/orgs/{id}/...`.
+- Por eso en la CSP de la PC basta `img-src 'self' https://api.ppdguate.com data:` y `connect-src https://api.ppdguate.com`.
+
+## 9. Páginas públicas en ppdguate.com (mientras no existe la App)
+
+- `https://ppdguate.com/invitacion?token=` — los padres aceptan su invitación (crear cuenta o vincular con su contraseña).
+- `https://ppdguate.com/restablecer?token=` — los padres crean una nueva contraseña.
+La PC tiene sus propias pantallas `/{slug}/invitacion` y `/{slug}/restablecer` para el staff.

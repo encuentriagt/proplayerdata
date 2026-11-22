@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.ppdguate.com; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Restablecer contraseña · ppd</title>
+<link rel="stylesheet" href="/assets/forms.css">
+</head>
+<body>
+<div class="wrap"><div class="card">
+  <div class="brand" id="brand"><strong>ppd</strong></div>
+
+  <div id="loading"><p>Verificando el enlace…</p></div>
+
+  <div id="invalid" class="hidden">
+    <h1>Enlace no válido</h1>
+    <p>El enlace no es válido o ya venció. Pida uno nuevo desde la App o a su institución.</p>
+  </div>
+
+  <form id="form" class="hidden" novalidate>
+    <h1>Cree una nueva contraseña</h1>
+    <p id="intro"></p>
+    <label for="password">Nueva contraseña</label>
+    <input id="password" type="password" autocomplete="new-password" maxlength="200">
+    <div class="hint">Mínimo 10 caracteres, con letras y números.</div>
+    <label for="password2">Repita la contraseña</label>
+    <input id="password2" type="password" autocomplete="new-password" maxlength="200">
+    <div class="err" id="err" role="alert"></div>
+    <button id="send" type="submit">Guardar contraseña</button>
+  </form>
+
+  <div id="done" class="hidden">
+    <h1 class="ok">Contraseña actualizada</h1>
+    <p>Ya puede ingresar con su correo y su nueva contraseña. Por seguridad, se cerraron sus sesiones abiertas.</p>
+  </div>
+
+  <div class="foot">Powered by ppd</div>
+</div></div>
+<script src="/assets/ppd.js"></script>
+<script src="/restablecer/restablecer.js"></script>
+</body>
+</html>

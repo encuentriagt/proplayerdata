@@ -57,6 +57,8 @@ Fuentes de la marca ppd (Saira y Saira Extra Condensed) **empaquetadas en el bui
 | `/:slug/login` | Login con la marca de la organización (`GET /public/orgs/{slug}/branding`). Si `active=false`: "Su organización no está activa. Comuníquese con su institución." |
 | `/:slug/invitacion?token=` | Aceptar invitación: `GET /public/invitations/{token}`; si `user_exists` pide solo la contraseña, si no: nombre + contraseña + confirmación |
 | `/:slug/cambiar-contrasena` | Obligatoria si `must_change_password=true` |
+| `/:slug/olvide-contrasena` | `POST /auth/password/forgot {email, slug}`; mostrar siempre el mismo mensaje |
+| `/:slug/restablecer?token=` | `GET /auth/password/reset/{token}` y `POST /auth/password/reset` |
 | `/:slug` | Inicio: próximos eventos de sus equipos, resultados pendientes de ficha, accesos rápidos |
 | `/:slug/calendario` | Mes/semana/lista. Filtros por equipo y tipo |
 | `/:slug/eventos/nuevo` y `/:slug/eventos/:id` | Crear o editar; pestañas **Convocatoria**, **Asistencia** y **Ficha** (solo partidos) |

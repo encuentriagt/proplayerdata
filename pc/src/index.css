@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+/* Fuentes de la marca ppd empaquetadas en el build (la CSP no permite Google Fonts). Subconjunto latino: cubre el español. */
+@import '@fontsource/saira/latin-400.css';
+@import '@fontsource/saira/latin-500.css';
+@import '@fontsource/saira/latin-600.css';
+@import '@fontsource/saira/latin-700.css';
+@import '@fontsource/saira-extra-condensed/latin-700.css';
+@import '@fontsource/saira-extra-condensed/latin-800.css';
+
+/* Variables de la organización (marca blanca). Se sobrescriben en tiempo de ejecución. */
+:root {
+  --org-primary: #25984d;
+  --org-secondary: #d28316;
+  --org-on-primary: #ffffff;
+  --org-accent: #25984d;
+}
+
+@theme {
+  --font-sans: 'Saira', system-ui, sans-serif;
+  --font-display: 'Saira Extra Condensed', 'Saira', system-ui, sans-serif;
+  --color-ppd-bg: #f3f2f2;
+  --color-ink: #201e1d;
+  --color-ppd-green: #25984d;
+  --color-ppd-star: #d28316;
+  --color-org: var(--org-primary);
+  --color-org-2: var(--org-secondary);
+  --color-on-org: var(--org-on-primary);
+  --color-org-accent: var(--org-accent);
+}
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body { @apply bg-ppd-bg text-ink font-sans antialiased; }
+  :focus-visible { outline: 3px solid var(--org-accent); outline-offset: 2px; }
+  input, select, textarea { font-size: 16px; } /* evita zoom en iOS */
+}
+
+/* Componentes base (Tailwind 4: @utility para poder combinarlos con variantes) */
+@utility title { @apply font-display italic font-extrabold uppercase tracking-tight; }
+@utility card { @apply rounded-2xl bg-white shadow-sm ring-1 ring-black/5; }
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-11 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed; }
+@utility btn-primary { @apply btn bg-org text-on-org hover:brightness-95 active:brightness-90; }
+@utility btn-secondary { @apply btn bg-white text-ink ring-1 ring-black/15 hover:bg-black/5; }
+@utility btn-ghost { @apply btn text-ink hover:bg-black/5; }
+@utility btn-danger { @apply btn bg-red-700 text-white hover:bg-red-800; }
+@utility input { @apply w-full rounded-xl border border-black/20 bg-white px-3 min-h-11 text-ink placeholder:text-black/40 focus:border-org-accent focus:outline-none focus:ring-2 focus:ring-org-accent/30 aria-[invalid=true]:border-red-700; }
+@utility label { @apply mb-1 block text-sm font-semibold; }
+@utility chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }

@@ -1,6 +1,6 @@
-# ppd (ProPlayer Data) — Arquitectura v1.2
+# ppd (ProPlayer Data) — Arquitectura v1.3
 
-Versión 1.2 · 2026-11-21 (12 Seguridad e idempotencia, 13 Emergencia, 14 Stack, 15 Lista para VPS) · Autor: agente de backend (dirige el proyecto)
+Versión 1.3 · 2026-11-21 (SIN partido en vivo: el coach llena la ficha al final; aviso a padres al guardar) · Autor: agente de backend (dirige el proyecto)
 Este documento es la fuente de verdad para TODOS los agentes (web, Flutter, diseño, panel).
 Si algo aquí cambia, se cambia primero en este archivo.
 
@@ -18,7 +18,7 @@ Plataforma multideporte para colegios y equipos (de cualquier deporte), con marc
 | **App** | App de padres (Android e iOS, Flutter) | Padres / encargados | Google Play y App Store |
 | **API** | Backend Laravel, único punto de datos | Todos los anteriores | api.ppdguate.com |
 
-Slogan: "En vivo". Idioma: español de Guatemala, trato de **usted** en todos los textos.
+Slogan: "En vivo" (es solo marca: **no hay registro de partido en tiempo real**). Idioma: español de Guatemala, trato de **usted** en todos los textos.
 
 ---
 
@@ -109,12 +109,11 @@ Convenciones: `id` BIGINT, `created_at/updated_at`, borrado lógico (`deleted_at
 - `guardian_players` (user_id, player_id, relationship, verified_at)
 
 **Calendario y actividad**
-- `events` (organization_id, team_id, type: match|training|other, title, starts_at, ends_at, location, opponent_name, home_away, status: scheduled|live|finished|cancelled, score_us, score_them, current_period, period_started_at, notes, created_by, deleted_at)
+- `events` (organization_id, team_id, type: match|training|other, title, starts_at, ends_at, location, opponent_name, home_away, status: scheduled|finished|cancelled, score_us, score_them, result_published_at, notes, created_by, deleted_at)
 - `event_callups` (event_id, player_id, status: called|reserve, guardian_response: pending|confirmed|declined, responded_at)
 - `attendances` (event_id, player_id, status: present|absent|late|excused, note, recorded_by)
 - `match_lineups` (event_id, player_id, is_starter, sport_position_id, jersey_number)
-- `match_actions` (event_id, client_uuid único, period, minute, second, type: stat|sub_in|sub_out|period_start|period_end|note, sport_stat_type_id nullable, player_id nullable, related_player_id nullable, value, recorded_by, voided_at)
-  - `client_uuid` hace idempotente el registro en vivo (reintentos sin duplicar).
+- `match_actions` (event_id, period, minute nullable, type: stat|sub_in|sub_out|note, sport_stat_type_id nullable, player_id nullable, related_player_id nullable, value, recorded_by) — detalle de la **ficha del partido** que el coach llena al terminar (goles/puntos, tarjetas, cambios). No es en tiempo real.
 - `player_event_stats` (event_id, player_id, minutes_played, stats JSON) — resumen recalculado al cerrar o editar el partido.
 
 **Planes, avisos, auditoría**
@@ -137,10 +136,8 @@ Convenciones: `id` BIGINT, `created_at/updated_at`, borrado lógico (`deleted_at
   - `/api/pc/*` (coach, director, org_admin; cada ruta valida organización + asignación)
   - `/api/app/*` (padres; valida vínculo con el hijo + plan)
   - `/api/admin/*` (super admin)
-- **En vivo**: el hosting compartido no permite WebSockets. Solución:
-  - Coach envía acciones (`POST /api/pc/events/{id}/actions`, con `client_uuid`).
-  - App consulta `GET /api/app/events/{id}/live?since=<cursor>` cada 10–15 s solo mientras el partido está `live` (respuesta corta, ETag).
-  - Push FCM en momentos clave: inicio, gol/punto, fin, convocatoria.
+- **Ficha del partido (no hay tiempo real)**: el coach llena la ficha completa al terminar el partido (marcador, alineación, minutos, goles/puntos, tarjetas, cambios) y la guarda con un solo envío (`PUT /api/pc/events/{id}/match-sheet`, idempotente). Puede corregirla después.
+- **Aviso a los padres al guardar**: al publicar la ficha, la API envía el resultado a los padres de los jugadores del equipo por push. Se envía **en el mismo momento, después de responder al coach** (Laravel `afterResponse`), sin cola ni tarea programada. Si el coach corrige la ficha, no se repite el aviso salvo que cambie el marcador (`result_published_at` + `notification_logs`).
 - Respuestas JSON en español para mensajes al usuario. Errores con `code` estable para que los clientes traduzcan/decidan.
 - CORS solo: ppdguate.com, pc.ppdguate.com, admin.ppdguate.com (y orígenes locales de desarrollo).
 
@@ -174,8 +171,8 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 | E2 | Panel (super admin): organizaciones, marca, cupos, deportes, planes | Agente del panel + Backend |
 | E3 | PC: login con marca, equipos, jugadores, staff, padres, asignación de planes | Agente de la web + Backend |
 | E4 | PC: calendario, partidos, entrenamientos, convocatorias, asistencia | Agente de la web + Backend |
-| E5 | PC: partido en vivo (alineación, minutos, acciones, cambios, marcador) | Agente de la web + Backend |
-| E6 | App padres: login, hijos, calendario, convocatorias, asistencia, estadísticas, en vivo, push, planes | Agente de Flutter + Backend |
+| E5 | PC: ficha del partido al final (alineación, minutos, goles/puntos, tarjetas, cambios, marcador) + aviso a padres | Agente de la web + Backend |
+| E6 | App padres: login, hijos, calendario, convocatorias, asistencia, estadísticas, resultados de partidos, push, planes | Agente de Flutter + Backend |
 | E7 | Tiendas: cuenta demo, capturas, video, revisión Apple/Google | Todos |
 
 ---
@@ -226,7 +223,7 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 - Todo `POST` que crea algo o tiene efectos (crear evento, registrar acción de partido, convocar, asignar plan, invitar, activar emergencia, enviar notificación) acepta el encabezado `Idempotency-Key` (UUID generado por el cliente).
   - Tabla `idempotency_keys` (user_id, key, route, request_hash, response_code, response_body, created_at; único user_id+key; caduca a las 24 h).
   - Misma clave + mismo contenido → se devuelve la respuesta guardada sin repetir el efecto. Misma clave + contenido distinto → 422.
-- Acciones del partido en vivo: además `client_uuid` único por acción (funciona sin conexión y con reintentos).
+- Ficha del partido: se guarda completa en una sola transacción; guardar dos veces la misma ficha no duplica acciones ni avisos.
 - Operaciones de estado con transacciones y bloqueo de fila (`lockForUpdate`) — requiere InnoDB.
 - Comandos del cron y jobs reentrantes: si se ejecutan dos veces, no duplican (marcas en `notification_logs`, `ShouldBeUnique`, banderas de estado).
 - Pagos/planes: asignar un plan dos veces no crea dos grants vigentes.
@@ -274,7 +271,7 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 | Pruebas | Pest (API), Vitest (web), Playwright (flujo PC) en GitHub Actions antes de cada deploy |
 | Página pública | HTML estático (`web/`) |
 
-Motivo: el hosting compartido solo ejecuta PHP (sin Node persistente ni WebSockets). Capacidad estimada: ~1,000 usuarios activos sin problema; el punto a vigilar es "en vivo" con muchos usuarios simultáneos (cPanel > Resource Usage).
+Motivo: el hosting compartido solo ejecuta PHP (sin Node persistente ni WebSockets). Capacidad estimada: ~1,000 usuarios activos sin problema; sin partido en tiempo real la carga es baja; se vigila en cPanel > Resource Usage.
 
 ---
 
@@ -290,7 +287,7 @@ Objetivo: mover la API a un VPS en horas, sin tocar PC ni App (solo apuntan a `a
   - `FILESYSTEM_DISK=local` → `s3` compatible (DigitalOcean Spaces, Cloudflare R2, etc.). Todos los archivos pasan por `Storage::disk(...)`; las URLs se generan con el disco, nunca armadas a mano.
   - `MAIL_MAILER` SMTP de cPanel → proveedor transaccional (SES, Postmark, etc.).
   - `BROADCAST_CONNECTION=null` hoy → `reverb` (WebSockets) en VPS.
-- "En vivo" detrás de una interfaz: hoy consulta periódica (`/live?since=`); en VPS se agrega WebSockets (Laravel Reverb) sin romper la consulta periódica (la App usa la que el servidor le anuncie en `/api/public/config`).
+- No hay tiempo real. Si algún día se quisiera, en VPS se agregaría WebSockets (Laravel Reverb) sin romper lo existente.
 - Tareas programadas solo en `routes/console.php` (scheduler de Laravel). En cPanel el cron llama a `schedule:run` y `queue:work --stop-when-empty`; en VPS se reemplaza por Supervisor + un solo cron, sin cambiar código.
 - Sin funciones exclusivas de cPanel dentro de la app (nada de llamar `uapi` desde PHP).
 - Sesiones/autenticación sin estado en el servidor (tokens Sanctum en BD) → se puede tener más de un servidor de API.
@@ -305,5 +302,16 @@ Objetivo: mover la API a un VPS en horas, sin tocar PC ni App (solo apuntan a `a
 
 **Señales para migrar**
 - Avisos de límite en cPanel > Resource Usage (procesos simultáneos, CPU, memoria).
-- Respuestas lentas en partidos en vivo o colas que se atrasan.
+- Respuestas lentas en horas pico.
 - Necesidad de WebSockets reales o de enviar emergencias con intervalos menores a 1 minuto.
+
+---
+
+## 16. Tareas en segundo plano y cron (decisión v1.3)
+
+- **No se usa cola para el día a día.** Push y correos que dispara una acción del usuario (resultado de partido, convocatoria, invitación) se envían en el mismo proceso **después de responder** (`afterResponse`): el usuario no espera y no hace falta cron.
+- **El cron se instala solo cuando haya algo periódico de verdad**:
+  - respaldo diario de BD + archivos (madrugada);
+  - limpieza diaria (claves de idempotencia y tokens vencidos);
+  - **emergencias**: repetir el aviso cada 1–2 min hasta que un padre confirme (única tarea frecuente; solo trabaja si hay una emergencia abierta).
+- Carga esperada del cron: una ejecución corta por intervalo; sin emergencias abiertas termina al instante.

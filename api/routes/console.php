@@ -15,8 +15,5 @@ Schedule::call(fn () => IdempotencyKey::where('expires_at', '<', now())->delete(
 // Tokens de Sanctum vencidos.
 Schedule::command('sanctum:prune-expired --hours=24')->dailyAt('03:20')->withoutOverlapping();
 
-// Procesa la cola sin un proceso permanente (hosting compartido).
-// Hoy cada 5 minutos (carga mínima). Cuando existan push/emergencias se pasa a cada minuto
-// (PPD_QUEUE_EVERY_MINUTE=true en .env y cron a cada minuto).
-$queue = Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')->withoutOverlapping(5);
-env('PPD_QUEUE_EVERY_MINUTE', false) ? $queue->everyMinute() : $queue->everyFiveMinutes();
+// Sin cola por ahora (docs/ARQUITECTURA.md, sección 16): avisos se envían con afterResponse.
+// Cuando exista el módulo de emergencias se agregará aquí su repetición.

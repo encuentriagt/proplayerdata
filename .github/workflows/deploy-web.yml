@@ -1,0 +1,59 @@
+name: Deploy web (ppdguate.com)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Revisar que no se suban secretos
+        run: |
+          if find web -type f \( -name ".env*" -o -name "*.sql" -o -name "*.zip" -o -name "*.bak*" -o -name "*.p8" -o -name "*.pem" -o -name "*.log" \) | grep -q .; then
+            echo "Archivo prohibido dentro de web/"; exit 1
+          fi
+
+      - name: Preparar SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Copiar web a public_html
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          rsync -rlvz --delete --chmod=D755,F644 \
+            --filter='P .well-known/' \
+            --filter='P cgi-bin/' \
+            --filter='P .htaccess' \
+            -e "ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o StrictHostKeyChecking=yes" \
+            web/ "$SSH_USER@$SSH_HOST:public_html/"
+
+      - name: Verificar
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://ppdguate.com/ || true)
+          echo "https://ppdguate.com respondió: $code"
+
+      - name: Limpiar llave
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

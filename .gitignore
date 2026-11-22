@@ -1,0 +1,15 @@
+# Nunca subir secretos ni respaldos
+.env
+.env.*
+!.env.example
+*.p8
+*.pem
+*.key
+*.sql
+*.zip
+*.bak
+*.bak-*
+*.log
+.DS_Store
+node_modules/
+vendor/

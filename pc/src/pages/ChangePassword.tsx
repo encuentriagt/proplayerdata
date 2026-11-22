@@ -23,7 +23,7 @@ export function ChangePassword() {
 
   if (loading || branding.isLoading) return <Spinner />
   if (!session) return <Navigate to={`/${slug}/login`} replace />
-  if (!branding.data) return <OrgMissing />
+  if (!branding.data) return <OrgMissing error={branding.error} />
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()

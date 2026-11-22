@@ -7,6 +7,8 @@ import { OrgContext, useOrg, type OrgContextValue } from '../lib/org'
 import { setLastOrg } from '../lib/session'
 import { Alert, Spinner } from './ui'
 import { OrgLogo, PoweredBy } from './OrgLogo'
+import { ApiError } from '../lib/api'
+import { OrgMissing } from '../pages/OrgAuthShell'
 
 const NAV = [
   { to: '', label: 'Inicio', Icon: Home, end: true },
@@ -33,7 +35,8 @@ export function OrgLayout() {
   if (loading || branding.isLoading) return <Spinner />
   if (!session) return <Navigate to={`/${slug}/login`} replace state={{ from: location.pathname }} />
   if (session.user.must_change_password) return <Navigate to={`/${slug}/cambiar-contrasena`} replace />
-  if (branding.isError || !branding.data) return <Navigate to="/" replace />
+  if (branding.error instanceof ApiError && branding.error.status === 404) return <Navigate to="/" replace />
+  if (branding.isError || !branding.data) return <OrgMissing error={branding.error} />
   if (!branding.data.active) {
     return (
       <Centered>

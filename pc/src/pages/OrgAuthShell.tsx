@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { ApiError } from '../lib/api'
 import { applyTheme } from '../lib/branding'
 import type { Branding } from '../lib/types'
 import { OrgLogo, PoweredBy } from '../components/OrgLogo'
@@ -30,12 +31,17 @@ export function OrgAuthShell({ org, children }: { org: Branding; children: React
   )
 }
 
-export function OrgMissing() {
+/** Solo un 404 significa que la organización no existe; cualquier otro error es de conexión o del servidor. */
+export function OrgMissing({ error }: { error?: unknown }) {
+  const notFound = !error || (error instanceof ApiError && error.status === 404)
   return (
     <div className="grid min-h-dvh place-items-center p-4">
       <div className="card w-full max-w-sm p-6 text-center">
-        <p className="font-semibold">No se encontró la organización.</p>
-        <p className="mt-1 text-sm text-black/60">Revise el enlace que le compartió su institución.</p>
+        <p className="font-semibold">{notFound ? 'No se encontró la organización.' : 'No se pudo conectar con el servidor.'}</p>
+        <p className="mt-1 text-sm text-black/60">
+          {notFound ? 'Revise el enlace que le compartió su institución.' : 'Revise su conexión e intente de nuevo en unos minutos.'}
+        </p>
+        {!notFound && <button className="btn-primary mt-4 w-full" onClick={() => window.location.reload()}>Intentar de nuevo</button>}
         <Link to="/" className="btn-secondary mt-4 w-full">Volver</Link>
       </div>
     </div>

@@ -30,7 +30,7 @@ export function ResetPassword() {
   const keyRef = useRef<string | null>(null)
 
   if (branding.isLoading || link.isLoading) return <Spinner />
-  if (branding.isError || !branding.data) return <OrgMissing />
+  if (branding.isError || !branding.data) return <OrgMissing error={branding.error} />
   const org = branding.data
 
   const invalid = !token || (link.error instanceof ApiError && link.error.code === 'reset_invalid')

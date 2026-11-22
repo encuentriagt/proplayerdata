@@ -94,7 +94,7 @@ function PpdShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid min-h-dvh place-items-center bg-ppd-bg p-4">
       <div className="w-full max-w-md">
-        <p className="title mb-6 text-5xl text-ppd-green">ppd<span className="text-ppd-star">★</span></p>
+        <p className="title mb-6 text-5xl normal-case text-ppd-green" aria-label="ppd">ppd<span className="text-ppd-star" aria-hidden>★</span></p>
         <div className="card p-6">{children}</div>
         <p className="mt-6 text-center text-xs text-black/50">ProPlayer Data</p>
       </div>

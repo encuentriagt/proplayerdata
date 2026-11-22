@@ -109,6 +109,13 @@ test('olvidé mi contraseña y restablecer', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /Hola, Carlos/ })).toBeVisible()
 })
 
+test('sin conexión con la API no dice que la organización no existe', async ({ page }) => {
+  await page.route('**/api/**', (r) => r.abort('failed'))
+  await page.goto('/colegio-demo/login')
+  await expect(page.getByText('No se pudo conectar con el servidor.')).toBeVisible()
+  await expect(page.getByText('No se encontró la organización.')).toHaveCount(0)
+})
+
 test('organización inactiva muestra el aviso', async ({ page }) => {
   await page.route('**/api/public/orgs/cerrado/branding', (r) => r.fulfill({
     contentType: 'application/json',

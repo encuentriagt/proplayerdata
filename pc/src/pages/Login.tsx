@@ -24,7 +24,7 @@ export function Login() {
   const [error, setError] = useState<unknown>(null)
 
   if (branding.isLoading) return <Spinner />
-  if (branding.isError || !branding.data) return <OrgMissing />
+  if (branding.isError || !branding.data) return <OrgMissing error={branding.error} />
   const org = branding.data
 
   if (!org.active) {

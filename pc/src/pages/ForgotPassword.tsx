@@ -14,7 +14,7 @@ export function ForgotPassword() {
   const [sent, setSent] = useState<string | null>(null)
 
   if (branding.isLoading) return <Spinner />
-  if (branding.isError || !branding.data) return <OrgMissing />
+  if (branding.isError || !branding.data) return <OrgMissing error={branding.error} />
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()

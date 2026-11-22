@@ -135,12 +135,11 @@ jobs:
             exit 0
           fi
           chmod 600 .env
-          php artisan optimize:clear > /dev/null
-          php artisan config:cache > /dev/null
-          php artisan route:cache > /dev/null
-          php artisan view:cache > /dev/null
-          php artisan event:cache > /dev/null
-          [ -L public/storage ] || php artisan storage:link > /dev/null
+          # (sin optimize:clear: su cache:clear necesita la tabla cache, que puede no existir aún)
+          for c in config:clear route:clear view:clear event:clear config:cache route:cache view:cache event:cache; do
+            php artisan $c > /tmp/ppd-artisan.log 2>&1 || { echo "FALLÓ: php artisan $c"; tail -5 /tmp/ppd-artisan.log; exit 1; }
+          done
+          [ -L public/storage ] || php artisan storage:link > /dev/null 2>&1 || echo "AVISO: storage:link falló"
           echo "Cachés listas."
           PENDING=$(php artisan migrate:status --pending 2>/dev/null | grep -c "Pending" || true)
           if [ "$PENDING" != "0" ]; then echo "AVISO: hay $PENDING migraciones pendientes (correr el workflow 'Migrar API' a mano)."; fi

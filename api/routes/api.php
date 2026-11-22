@@ -1,12 +1,18 @@
 <?php
 
+use App\Http\Controllers\Admin\AuditAdminController;
+use App\Http\Controllers\Admin\OrganizationAdminController;
+use App\Http\Controllers\Admin\PlanAdminController;
+use App\Http\Controllers\Admin\SportAdminController;
 use App\Http\Controllers\App\AccountController;
 use App\Http\Controllers\App\ChildController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\TotpController;
 use App\Http\Controllers\Public\BrandingController;
 use App\Http\Controllers\Public\HealthController;
 use App\Http\Controllers\Files\PlayerPhotoController;
 use App\Http\Controllers\Me\MeController;
+use App\Http\Controllers\Pc\BrandingController as PcBrandingController;
 use App\Http\Controllers\Pc\CatalogController;
 use App\Http\Controllers\Pc\EventController;
 use App\Http\Controllers\Pc\InvitationController;
@@ -42,6 +48,9 @@ Route::prefix('auth')->group(function () {
     Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function () {
         Route::get('me', [AuthController::class, 'me'])->name('auth.me');
         Route::post('logout', [AuthController::class, 'logout'])->name('auth.logout');
+        Route::post('totp/setup', [TotpController::class, 'setup']);
+        Route::post('totp/confirm', [TotpController::class, 'confirm'])->middleware('throttle:codes');
+        Route::post('totp/verify', [TotpController::class, 'verify'])->middleware('throttle:codes');
         Route::post('password', [AuthController::class, 'changePassword'])
             ->middleware(['throttle:codes', 'idempotent'])->name('auth.password');
     });
@@ -117,8 +126,36 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::post('plans', [PlanController::class, 'store'])->middleware('idempotent');
         Route::delete('plans/{grant}', [PlanController::class, 'destroy'])->withoutScopedBindings();
 
+        Route::patch('branding', [PcBrandingController::class, 'update']);
+        Route::post('branding/{kind}', [PcBrandingController::class, 'image'])->whereIn('kind', ['logo', 'crest', 'cover'])->middleware('throttle:codes');
+
         Route::get('members', [MemberController::class, 'index']);
         Route::patch('members/{member}', [MemberController::class, 'update']);
         Route::delete('members/{member}', [MemberController::class, 'destroy']);
     });
+});
+
+// ---- Panel de super admin (TOTP verificado en esta sesión) ----
+Route::prefix('admin')->middleware(['auth:sanctum', 'active', 'superadmin', 'throttle:api'])->group(function () {
+    Route::get('organizations', [OrganizationAdminController::class, 'index']);
+    Route::post('organizations', [OrganizationAdminController::class, 'store'])->middleware('idempotent');
+    Route::get('organizations/{organization}', [OrganizationAdminController::class, 'show']);
+    Route::patch('organizations/{organization}', [OrganizationAdminController::class, 'update']);
+    Route::post('organizations/{organization}/branding/{kind}', [OrganizationAdminController::class, 'branding'])->whereIn('kind', ['logo', 'crest', 'cover']);
+    Route::post('organizations/{organization}/invitations', [OrganizationAdminController::class, 'invite'])->middleware('idempotent');
+    Route::get('organizations/{organization}/members', [OrganizationAdminController::class, 'members']);
+
+    Route::get('sports', [SportAdminController::class, 'index']);
+    Route::post('sports', [SportAdminController::class, 'store']);
+    Route::patch('sports/{sport}', [SportAdminController::class, 'update']);
+    Route::post('sports/{sport}/positions', [SportAdminController::class, 'storePosition']);
+    Route::patch('positions/{position}', [SportAdminController::class, 'updatePosition']);
+    Route::post('sports/{sport}/stat-types', [SportAdminController::class, 'storeStatType']);
+    Route::patch('stat-types/{statType}', [SportAdminController::class, 'updateStatType']);
+
+    Route::get('plans', [PlanAdminController::class, 'index']);
+    Route::post('plans', [PlanAdminController::class, 'store'])->middleware('idempotent');
+    Route::delete('plans/{grant}', [PlanAdminController::class, 'destroy']);
+
+    Route::get('audit', [AuditAdminController::class, 'index']);
 });

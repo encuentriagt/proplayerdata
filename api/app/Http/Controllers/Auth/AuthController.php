@@ -80,10 +80,13 @@ class AuthController extends Controller
 
             $minutes = (int) config('sanctum.expiration');
 
-            return $user->createToken('platform:'.$platform, ['*'], $minutes > 0 ? now()->addMinutes($minutes) : null);
+            return $user->createToken('platform:'.$platform, ['basic'], $minutes > 0 ? now()->addMinutes($minutes) : null);
         });
 
         Audit::log('auth.login', $user, ['platform' => $platform], null, $user->id);
+
+        // Super admin: el panel exige además el código TOTP en esta sesión.
+        $totp = $user->is_super_admin ? ($user->totp_confirmed_at ? 'verify' : 'setup') : null;
 
         return response()->json([
             'data' => [
@@ -93,6 +96,7 @@ class AuthController extends Controller
                 'user' => $this->userPayload($user),
                 'memberships' => $this->membershipsPayload($memberships),
                 'is_guardian' => $this->hasActiveChildren($user),
+                'admin_totp' => $totp,
             ],
         ]);
     }

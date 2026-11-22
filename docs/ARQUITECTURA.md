@@ -1,6 +1,6 @@
-# ppd (ProPlayer Data) — Arquitectura v1
+# ppd (ProPlayer Data) — Arquitectura v1.1
 
-Versión 1 · 2026-11-21 · Autor: agente de backend (dirige el proyecto)
+Versión 1.1 · 2026-11-21 (agrega secciones 12 Seguridad e idempotencia y 13 Módulo de emergencia) · Autor: agente de backend (dirige el proyecto)
 Este documento es la fuente de verdad para TODOS los agentes (web, Flutter, diseño, panel).
 Si algo aquí cambia, se cambia primero en este archivo.
 
@@ -198,3 +198,64 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 - En la App: cero menciones de precios o pagos (sección 3).
 - Toda pantalla toma colores/logo de la marca de la organización (sección 4); ppd solo como "Powered by ppd".
 - Los clientes no deciden permisos: la API responde 403 y el cliente muestra el mensaje.
+
+---
+
+## 12. Seguridad e idempotencia (obligatorio en TODO el proyecto)
+
+**Principios**
+- Mínimo privilegio: cada rol ve solo lo suyo; autorización en la API con Policies de Laravel en cada ruta (nunca en el cliente).
+- Aislamiento por organización: todo query de datos de una organización lleva `organization_id` del usuario autenticado; pruebas automáticas que intentan leer datos de otra organización (deben dar 403/404).
+- Validación de toda entrada con Form Requests; nada de `$request->all()` a modelos; `$fillable` explícito.
+- Contraseñas con bcrypt/argon2 (Laravel por defecto), mínimo 10 caracteres, verificación contra listas de contraseñas filtradas.
+- Rate limiting: login, recuperación de contraseña, invitaciones, códigos de vínculo padre-hijo, endpoints públicos.
+- Bloqueo progresivo tras intentos fallidos; TOTP obligatorio para super admin y recomendado para org_admin.
+- Tokens Sanctum con expiración; revocación al cambiar contraseña, al suspender organización o al quitar un rol.
+- Datos sensibles cifrados en reposo (`encrypted` cast): datos médicos, tokens de Apple, secretos TOTP, documento de identidad.
+- Archivos: validar tipo real (MIME por contenido) y tamaño; renombrar con UUID; fotos de menores y datos privados en `storage/app/private` servidos solo por endpoint autorizado con URL firmada de corta duración; nunca listables.
+- Datos de menores: minimizar lo que se pide; el padre/encargado ve solo a sus hijos; los coaches solo a jugadores de sus equipos; sin perfiles públicos de jugadores.
+- Encabezados de seguridad en web/PC/Panel: HSTS, CSP, X-Frame-Options/frame-ancestors, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.
+- CORS cerrado a los dominios propios; cookies `Secure`, `HttpOnly`, `SameSite`.
+- `APP_DEBUG=false`; errores sin trazas al cliente; logs sin contraseñas, tokens ni datos médicos.
+- Auditoría (`audit_log`) de: logins, cambios de rol, asignación/revocación de planes, cambios de marca, exportaciones, activación/cierre de emergencias, accesos a datos médicos.
+- Dependencias: `composer audit` / `npm audit` en GitHub Actions; actualizaciones de seguridad prioritarias.
+- Secretos solo en `.env` del servidor y en GitHub Secrets; nunca en el repo ni en el chat.
+- Respaldo diario cifrado de BD + storage, rotación 7 días, prueba de restauración periódica.
+
+**Idempotencia**
+- Todo `POST` que crea algo o tiene efectos (crear evento, registrar acción de partido, convocar, asignar plan, invitar, activar emergencia, enviar notificación) acepta el encabezado `Idempotency-Key` (UUID generado por el cliente).
+  - Tabla `idempotency_keys` (user_id, key, route, request_hash, response_code, response_body, created_at; único user_id+key; caduca a las 24 h).
+  - Misma clave + mismo contenido → se devuelve la respuesta guardada sin repetir el efecto. Misma clave + contenido distinto → 422.
+- Acciones del partido en vivo: además `client_uuid` único por acción (funciona sin conexión y con reintentos).
+- Operaciones de estado con transacciones y bloqueo de fila (`lockForUpdate`) — requiere InnoDB.
+- Comandos del cron y jobs reentrantes: si se ejecutan dos veces, no duplican (marcas en `notification_logs`, `ShouldBeUnique`, banderas de estado).
+- Pagos/planes: asignar un plan dos veces no crea dos grants vigentes.
+
+---
+
+## 13. Módulo de emergencia (se construye después; el diseño lo contempla desde ya)
+
+**Objetivo**: si un coach/director activa una emergencia sobre un jugador (lesión, accidente, malestar), TODOS sus padres/encargados vinculados reciben avisos push insistentes hasta que alguien confirme.
+
+**Flujo**
+1. Coach (PC o, más adelante, app del coach) toca "Emergencia" en el perfil del jugador → confirma (doble paso para evitar toques accidentales) → elige tipo y nota corta opcional y ubicación (evento actual o texto).
+2. API crea `emergencies` (idempotente con `Idempotency-Key`; si ya hay una abierta para ese jugador, devuelve la existente).
+3. Envío inmediato a todos los dispositivos de todos los encargados del jugador + al director/org_admin.
+4. Repetición cada N minutos (configurable, ej. 1–2 min) hasta que un encargado toque "Recibido" (ACK) o se cierre la emergencia; luego aviso "Confirmado por <nombre>" a los demás.
+5. Si nadie confirma en X minutos → escalar: avisar al director/org_admin y, a futuro, SMS o llamada (proveedor por definir).
+6. Cierre por coach/director con nota; todo queda en `audit_log`.
+
+**Notificaciones insistentes por plataforma**
+- Android: FCM prioridad alta, canal de notificación propio "Emergencias" con sonido de alarma, vibración, importancia máxima y pantalla completa (full-screen intent, requiere permiso en Android 14+).
+- iOS: `interruption-level: time-sensitive` (requiere capacidad Time Sensitive). Para que suene aun en silencio/No molestar hace falta el permiso **Critical Alerts**, que Apple otorga solo con solicitud especial y justificación; se pedirá cuando el módulo exista.
+- La App muestra pantalla de emergencia a pantalla completa al abrirse con botón "Recibido" y botón para llamar al coach/colegio.
+- El push de emergencia NO depende del plan: funciona igual en Gratis, Pro y Premium.
+
+**Datos (borrador)**
+- `emergencies` (organization_id, player_id, event_id nullable, type, note cifrada, location_text, status: open|acknowledged|closed, opened_by, opened_at, acknowledged_by, acknowledged_at, closed_by, closed_at, close_note cifrada, escalated_at)
+- `emergency_deliveries` (emergency_id, user_id, device_id, attempt, sent_at, fcm_message_id, error)
+- `player_medical` (player_id, blood_type, allergies, conditions, medications, emergency_contacts JSON, insurance) — TODO cifrado; visible solo para staff asignado y encargados; cada lectura queda en `audit_log`.
+
+**Restricciones del hosting a validar antes de construirlo**
+- El cron de cPanel permite intervalos de minutos; la repetición se hará con un comando programado (y/o cola) reentrante. Si el intervalo mínimo no alcanza, evaluar un servicio externo de colas/notificaciones.
+- FCM HTTP v1 con cuenta de servicio (llave solo en `storage/app/private`, chmod 600).

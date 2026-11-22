@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Public\BrandingController;
 use App\Http\Controllers\Public\HealthController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,4 +15,5 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('public')->middleware('throttle:public')->group(function () {
     Route::get('health', HealthController::class);
+    Route::get('orgs/{slug}/branding', BrandingController::class);
 });

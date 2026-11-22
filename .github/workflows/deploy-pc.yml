@@ -21,9 +21,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.c.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: c
+        # Hasta que el agente de la web suba pc/package.json no hay nada que compilar.
+        run: echo "exists=$([ -f pc/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   build:
-    # Hasta que el agente de la web suba pc/package.json no hay nada que compilar.
-    if: hashFiles('pc/package.json') != ''
+    needs: check
+    if: needs.check.outputs.exists == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

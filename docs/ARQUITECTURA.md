@@ -125,9 +125,9 @@ Convenciones: `id` BIGINT, `created_at/updated_at`, borrado lógico (`deleted_at
 
 ---
 
-## 7. API (Laravel 12, `api.ppdguate.com`)
+## 7. API (Laravel 13, `api.ppdguate.com`)
 
-- Autenticación: Laravel Sanctum (tokens). Una sesión por plataforma (encabezado `X-App-Platform: web|android|ios`), idea de Trafidoc.
+- Laravel 13 sobre PHP 8.5. Autenticación: Laravel Sanctum (tokens). Una sesión por plataforma (encabezado `X-App-Platform: web|android|ios`), idea de Trafidoc.
 - PC: correo + contraseña (invitación por correo). Opcional Google.
 - App: correo + contraseña, Google y **Sign in with Apple** (obligatorio si hay Google). Borrado de cuenta dentro de la app con revocación del token de Apple (copiar idea de Trafidoc).
 - Panel: correo + contraseña + TOTP, bloqueo por intentos, sesión corta.
@@ -148,7 +148,7 @@ Convenciones: `id` BIGINT, `created_at/updated_at`, borrado lógico (`deleted_at
 
 ## 8. Servidor y repositorio
 
-Servidor: Namecheap shared hosting, cPanel usuario `ppdgmmle`, `server292.web-hosting.com`, SSH puerto 21098. Reglas heredadas del proyecto anterior (Trafidoc): MyISAM por defecto → `'engine' => 'InnoDB'` antes de migrar; cron solo con el método de archivo; sin secretos en el repo; `APP_DEBUG=false`.
+Servidor: Namecheap shared hosting, cPanel usuario `ppdgmmle`, `server292.web-hosting.com`, IP 162.0.235.5, SSH puerto 21098, PHP 8.5 (CloudLinux "Select PHP Version", cuenta completa), MariaDB 11.4, DNS del hosting (dns1/dns2.namecheaphosting.com: los registros se editan en cPanel > Zone Editor). BD `ppdgmmle_ppd`, usuario `ppdgmmle_ppdapp` (credenciales solo en `~/ppdback/.db_credentials`, 600). Reglas heredadas del proyecto anterior (Trafidoc): MyISAM por defecto → `'engine' => 'InnoDB'` antes de migrar; cron solo con el método de archivo; sin secretos en el repo; `APP_DEBUG=false`.
 
 | Carpeta en servidor | Contenido | Origen en repo |
 |---|---|---|
@@ -266,7 +266,7 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 
 | Pieza | Tecnología |
 |---|---|
-| API | Laravel 12, PHP 8.2+, MariaDB (InnoDB), Sanctum |
+| API | Laravel 13, PHP 8.5, MariaDB 11.4 (InnoDB), Sanctum |
 | Colas / tareas | Laravel Queue (driver `database` hoy) procesada por cron |
 | PC y Panel | React + TypeScript + Vite, Tailwind CSS, TanStack Query, React Router (SPA compilada a estático) |
 | App padres | Flutter (Android + iOS), Riverpod, Dio, firebase_messaging, flutter_local_notifications |

@@ -32,7 +32,7 @@ jobs:
       run:
         working-directory: api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -146,10 +146,14 @@ jobs:
           if [ "$PENDING" != "0" ]; then echo "AVISO: hay $PENDING migraciones pendientes (correr el workflow 'Migrar API' a mano)."; fi
           REMOTE
 
-      - name: Verificar
+      - name: Verificar (informativo)
         run: |
           code=$(curl -s -o /tmp/h.json -w '%{http_code}' https://api.ppdguate.com/api/public/health || true)
-          echo "health: $code"; cat /tmp/h.json 2>/dev/null; echo
+          echo "https health: $code"; cat /tmp/h.json 2>/dev/null || true; echo
+          if [ "$code" = "000" ]; then
+            echo "AVISO: HTTPS no responde (¿falta el certificado SSL de api?). Probando por HTTP:"
+            curl -s -o /dev/null -w 'http health: %{http_code}\n' http://api.ppdguate.com/api/public/health || true
+          fi
 
       - name: Limpiar llave
         if: always()

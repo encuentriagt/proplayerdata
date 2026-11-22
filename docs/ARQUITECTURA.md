@@ -309,9 +309,22 @@ Objetivo: mover la API a un VPS en horas, sin tocar PC ni App (solo apuntan a `a
 
 ## 16. Tareas en segundo plano y cron (decisión v1.3)
 
-- **No se usa cola para el día a día.** Push y correos que dispara una acción del usuario (resultado de partido, convocatoria, invitación) se envían en el mismo proceso **después de responder** (`afterResponse`): el usuario no espera y no hace falta cron.
-- **El cron se instala solo cuando haya algo periódico de verdad**:
-  - respaldo diario de BD + archivos (madrugada);
-  - limpieza diaria (claves de idempotencia y tokens vencidos);
-  - **emergencias**: repetir el aviso cada 1–2 min hasta que un padre confirme (única tarea frecuente; solo trabaja si hay una emergencia abierta).
-- Carga esperada del cron: una ejecución corta por intervalo; sin emergencias abiertas termina al instante.
+- **No se usa cola.** Push y correos que dispara una acción del usuario (resultado, convocatoria, cambios, invitaciones) se envían en el mismo proceso **después de responder** (`app()->terminating`): el usuario no espera y no hace falta cron.
+- **Cron: solo 2 ejecuciones al día** (hora de Guatemala con `CRON_TZ`):
+  - `02:00` `~/ppd-api/ops/backup.sh` → BD + `storage/app` + `.env` en `~/ppdback/daily/ppd-AAAAMMDD-HHMM.tar.gz` (600, carpeta 700, fuera del document root), rotación de 7.
+  - `03:10` `php artisan ppd:maintenance` → borra claves de idempotencia, tokens, invitaciones y registros vencidos.
+- **Emergencias (futuro)**: única tarea frecuente (repetir aviso cada 1–2 min mientras haya una emergencia abierta). Se agregará cuando se construya el módulo.
+
+---
+
+## 17. Estado del backend (2026-11-22)
+
+Hecho y con pruebas (78, en SQLite y MariaDB 11.4): login y sesiones, TOTP del super admin, organizaciones con marca blanca, miembros e invitaciones, deportes/temporadas/equipos/plantillas/jugadores, calendario, convocatorias, asistencia, ficha del partido con aviso a padres, notificaciones (bandeja + push), planes Gratis/Pro/Premium con cupos, API de la App, Panel de super admin, auditoría, respaldo y mantenimiento diario.
+Referencia de endpoints para los agentes: **`docs/API.md`**.
+
+Pendiente (no bloquea a la PC ni al Panel):
+- Credenciales de Firebase (`PPD_PUSH_DRIVER=fcm` + llave en `storage/app/private`) — hoy el push se registra en el log.
+- Correo saliente real (`MAIL_MAILER=smtp` con noreply@ppdguate.com) — hoy el correo va al log; las invitaciones devuelven `invite_url` para compartir.
+- Login con Google y Apple para padres (cuando exista la App).
+- Módulo de emergencias.
+- Límites exactos del plan Gratis (`config/plans.php`).

@@ -47,4 +47,12 @@ class PublicApiTest extends TestCase
     {
         $this->get('/storage/cualquier-cosa')->assertNotFound();
     }
+
+    public function test_mantenimiento_diario_borra_solo_lo_vencido(): void
+    {
+        \App\Models\IdempotencyKey::create(['scope' => 'u:1', 'idempotency_key' => 'vieja-0001', 'method' => 'POST', 'path' => 'x', 'request_hash' => str_repeat('a', 64), 'expires_at' => now()->subHour()]);
+        \App\Models\IdempotencyKey::create(['scope' => 'u:1', 'idempotency_key' => 'nueva-0001', 'method' => 'POST', 'path' => 'x', 'request_hash' => str_repeat('a', 64), 'expires_at' => now()->addHour()]);
+        $this->artisan('ppd:maintenance')->assertExitCode(0);
+        $this->assertSame(['nueva-0001'], \App\Models\IdempotencyKey::pluck('idempotency_key')->all());
+    }
 }

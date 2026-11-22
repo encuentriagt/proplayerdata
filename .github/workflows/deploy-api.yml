@@ -1,0 +1,156 @@
+name: Deploy API (api.ppdguate.com)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - ".github/workflows/deploy-api.yml"
+  pull_request:
+    paths:
+      - "api/**"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: ppd_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          extensions: bcmath, curl, exif, fileinfo, gd, intl, mbstring, openssl, pdo_mysql, pdo_sqlite, sodium, zip
+          coverage: none
+
+      - name: Instalar dependencias
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Auditoría de seguridad de dependencias
+        run: composer audit --no-interaction
+
+      - name: Pruebas (SQLite)
+        run: php artisan test
+
+      - name: Pruebas (MariaDB 11.4, InnoDB como en producción)
+        env:
+          DB_CONNECTION: mariadb
+          DB_HOST: 127.0.0.1
+          DB_PORT: "3306"
+          DB_DATABASE: ppd_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: php artisan test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          extensions: bcmath, curl, exif, fileinfo, gd, intl, mbstring, openssl, pdo_mysql, sodium, zip
+          coverage: none
+
+      - name: Dependencias de producción
+        working-directory: api
+        run: composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Revisar que no se suban secretos
+        run: |
+          if find api -path api/vendor -prune -o -type f \( -name ".env" -o -name ".env.production" -o -name "*.sql" -o -name "*.zip" -o -name "*.bak*" -o -name "*.p8" -o -name "*.pem" -o -name "*.key" \) -print | grep -q .; then
+            echo "Archivo prohibido dentro de api/"; exit 1
+          fi
+
+      - name: Preparar SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          if printf '%s' "$SSH_KEY" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+            printf '%s\n' "$SSH_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//' > ~/.ssh/deploy_key
+          else
+            printf '%s' "$SSH_KEY" | tr -d ' \r\n\t' | base64 -d > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Copiar API a ~/ppd-api
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          rsync -rlz --delete --chmod=D755,F644 \
+            --filter='P .env' \
+            --filter='P storage/' \
+            --filter='P public/.well-known/' \
+            --filter='P public/storage' \
+            --filter='P bootstrap/cache/*.php' \
+            --exclude='.env' --exclude='.env.*' --exclude='storage/' \
+            --exclude='tests/' --exclude='phpunit.xml' --exclude='database/database.sqlite' \
+            --exclude='.git*' --exclude='.editorconfig' --exclude='README.md' \
+            --stats \
+            -e "ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o StrictHostKeyChecking=yes" \
+            api/ "$SSH_USER@$SSH_HOST:ppd-api/" | grep -E "Number of (regular )?files transferred|Total transferred file size|deleted"
+
+      - name: Preparar en el servidor (cachés, permisos, estado)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -e
+          cd ~/ppd-api
+          php -r 'exit(version_compare(PHP_VERSION,"8.5.0",">=")?0:1);' || { echo "PHP del servidor menor a 8.5"; exit 1; }
+          mkdir -p storage/app/private storage/app/public storage/framework/cache/data storage/framework/sessions storage/framework/views storage/framework/testing storage/logs bootstrap/cache
+          chmod 755 storage bootstrap/cache
+          chmod -R u+rwX storage bootstrap/cache
+          if [ ! -f .env ]; then
+            echo "AVISO: todavía no existe ~/ppd-api/.env (se crea con un script aparte). Código copiado; sin cachés."
+            exit 0
+          fi
+          chmod 600 .env
+          php artisan optimize:clear > /dev/null
+          php artisan config:cache > /dev/null
+          php artisan route:cache > /dev/null
+          php artisan view:cache > /dev/null
+          php artisan event:cache > /dev/null
+          [ -L public/storage ] || php artisan storage:link > /dev/null
+          echo "Cachés listas."
+          PENDING=$(php artisan migrate:status --pending 2>/dev/null | grep -c "Pending" || true)
+          if [ "$PENDING" != "0" ]; then echo "AVISO: hay $PENDING migraciones pendientes (correr el workflow 'Migrar API' a mano)."; fi
+          REMOTE
+
+      - name: Verificar
+        run: |
+          code=$(curl -s -o /tmp/h.json -w '%{http_code}' https://api.ppdguate.com/api/public/health || true)
+          echo "health: $code"; cat /tmp/h.json 2>/dev/null; echo
+
+      - name: Limpiar llave
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

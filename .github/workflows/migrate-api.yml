@@ -1,0 +1,62 @@
+name: Migrar API (manual, con respaldo)
+
+# Las migraciones NUNCA corren solas: solo con este botón y escribiendo MIGRAR.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escriba MIGRAR para confirmar (se hace respaldo de la BD antes)'
+        required: true
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.event.inputs.confirmar == 'MIGRAR'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Preparar SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          if printf '%s' "$SSH_KEY" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+            printf '%s\n' "$SSH_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//' > ~/.ssh/deploy_key
+          else
+            printf '%s' "$SSH_KEY" | tr -d ' \r\n\t' | base64 -d > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Respaldo + migración
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -e
+          cd ~/ppd-api
+          [ -f .env ] || { echo "No existe .env"; exit 1; }
+          val(){ grep -E "^$1=" .env | head -1 | cut -d= -f2- | sed 's/^"//; s/"$//'; }
+          DB=$(val DB_DATABASE); U=$(val DB_USERNAME); P=$(val DB_PASSWORD)
+          umask 077
+          CNF=$(mktemp); printf '[client]\nuser=%s\npassword=%s\n' "$U" "$P" > "$CNF"
+          OUT=~/ppdback/db-premigrate-$(date +%Y%m%d%H%M%S).sql.gz
+          mysqldump --defaults-extra-file="$CNF" --single-transaction --routines --triggers "$DB" | gzip > "$OUT"
+          rm -f "$CNF"; chmod 600 "$OUT"
+          echo "Respaldo: $OUT ($(du -h "$OUT" | cut -f1))"
+          echo "--- Pendientes ---"; php artisan migrate:status --pending || true
+          php artisan migrate --force
+          php artisan config:cache > /dev/null
+          echo "--- Motores de tablas (deben ser InnoDB) ---"
+          php artisan tinker --execute='foreach (DB::select("SELECT TABLE_NAME t, ENGINE e FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()") as $r) echo $r->t, " ", $r->e, PHP_EOL;'
+          REMOTE
+
+      - name: Limpiar llave
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

@@ -62,7 +62,7 @@ class AuthController extends Controller
         }
 
         $memberships = $this->activeMemberships($user);
-        if (! $user->is_super_admin && $memberships->isEmpty()) {
+        if (! $user->is_super_admin && $memberships->isEmpty() && ! $this->hasActiveChildren($user)) {
             Audit::log('auth.login_denied', $user, ['reason' => 'no_active_organization'], null, $user->id);
 
             return ApiError::response(
@@ -92,6 +92,7 @@ class AuthController extends Controller
                 'expires_at' => $token->accessToken->expires_at?->toIso8601String(),
                 'user' => $this->userPayload($user),
                 'memberships' => $this->membershipsPayload($memberships),
+                'is_guardian' => $this->hasActiveChildren($user),
             ],
         ]);
     }
@@ -103,6 +104,7 @@ class AuthController extends Controller
         return response()->json(['data' => [
             'user' => $this->userPayload($user),
             'memberships' => $this->membershipsPayload($this->activeMemberships($user)),
+            'is_guardian' => $this->hasActiveChildren($user),
         ]]);
     }
 
@@ -167,6 +169,12 @@ class AuthController extends Controller
             ->whereHas('organization', fn ($q) => $q->where('status', 'active'))
             ->orderBy('organization_id')
             ->get();
+    }
+
+    /** Padre/encargado con al menos un hijo en una organización activa. */
+    private function hasActiveChildren(User $user): bool
+    {
+        return $user->children()->whereHas('organization', fn ($q) => $q->where('status', 'active'))->exists();
     }
 
     private function userPayload(User $user): array

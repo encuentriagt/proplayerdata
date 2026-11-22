@@ -5,6 +5,8 @@ use App\Http\Controllers\Public\BrandingController;
 use App\Http\Controllers\Public\HealthController;
 use App\Http\Controllers\Files\PlayerPhotoController;
 use App\Http\Controllers\Pc\CatalogController;
+use App\Http\Controllers\Pc\InvitationController;
+use App\Http\Controllers\Public\InvitationAcceptController;
 use App\Http\Controllers\Pc\MemberController;
 use App\Http\Controllers\Pc\PlayerController;
 use App\Http\Controllers\Pc\RosterController;
@@ -25,6 +27,8 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('public')->middleware('throttle:public')->group(function () {
     Route::get('health', HealthController::class);
     Route::get('orgs/{slug}/branding', BrandingController::class);
+    Route::get('invitations/{token}', [InvitationAcceptController::class, 'show'])->middleware('throttle:codes');
+    Route::post('invitations/{token}/accept', [InvitationAcceptController::class, 'accept'])->middleware(['throttle:codes', 'idempotent']);
 });
 
 Route::prefix('auth')->group(function () {
@@ -72,6 +76,10 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::patch('players/{player}', [PlayerController::class, 'update']);
         Route::delete('players/{player}', [PlayerController::class, 'destroy']);
         Route::post('players/{player}/photo', [PlayerController::class, 'photo'])->middleware('throttle:codes');
+
+        Route::get('invitations', [InvitationController::class, 'index']);
+        Route::post('invitations', [InvitationController::class, 'store'])->middleware(['throttle:invites', 'idempotent']);
+        Route::delete('invitations/{invitation}', [InvitationController::class, 'destroy']);
 
         Route::get('members', [MemberController::class, 'index']);
         Route::patch('members/{member}', [MemberController::class, 'update']);

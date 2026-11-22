@@ -1,0 +1,90 @@
+<?php
+
+namespace App\Http\Controllers\Pc;
+
+use App\Http\Controllers\Controller;
+use App\Models\Invitation;
+use App\Models\Organization;
+use App\Models\Player;
+use App\Models\Team;
+use App\Services\InvitationService;
+use App\Support\Audit;
+use App\Support\OrgAccess;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+/**
+ * Invitaciones de la organización.
+ * - Admin: puede invitar org_admin, director, coach y padres.
+ * - Coach/director: solo padres de jugadores que ve.
+ * La respuesta incluye invite_url (solo para quien la crea) por si se quiere compartir por otro medio.
+ */
+class InvitationController extends Controller
+{
+    public function __construct(private InvitationService $service) {}
+
+    public function index(Organization $organization, OrgAccess $access): JsonResponse
+    {
+        $q = Invitation::where('organization_id', $organization->id)
+            ->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', now())
+            ->orderByDesc('id');
+        if (! $access->isAdmin()) {
+            $q->where('created_by', $access->user->id);
+        }
+
+        return response()->json(['data' => $q->get()->map(fn (Invitation $i) => [
+            'id' => $i->id, 'email' => $i->email, 'role' => $i->role,
+            'role_label' => InvitationService::ROLE_LABELS[$i->role] ?? $i->role,
+            'player_id' => $i->player_id, 'team_ids' => $i->team_ids,
+            'expires_at' => $i->expires_at->toIso8601String(),
+        ])]);
+    }
+
+    public function store(Request $request, Organization $organization, OrgAccess $access): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:191'],
+            'role' => ['required', Rule::in(['org_admin', 'director', 'coach', 'guardian'])],
+            'player_id' => ['required_if:role,guardian', 'nullable', 'integer'],
+            'team_ids' => ['nullable', 'array', 'max:30'],
+            'team_ids.*' => ['integer'],
+        ]);
+
+        if ($data['role'] === 'guardian') {
+            $player = Player::where('organization_id', $organization->id)->find($data['player_id']);
+            $access->authorize($player !== null && $access->canViewPlayer($player));
+            $data['team_ids'] = null;
+        } else {
+            $access->authorize($access->isAdmin());
+            $data['player_id'] = null;
+            if (! empty($data['team_ids'])) {
+                $valid = Team::where('organization_id', $organization->id)->whereIn('id', $data['team_ids'])->count();
+                if ($valid !== count(array_unique($data['team_ids']))) {
+                    return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Hay equipos que no pertenecen a su organización.']], 422);
+                }
+            }
+        }
+
+        [$inv, $token] = $this->service->create($organization, $data['email'], $data['role'], $data['player_id'], $data['team_ids'] ?? null, $access->user);
+        $this->service->sendAfterResponse($inv, $token);
+        Audit::log('invitation.created', $inv, ['role' => $inv->role, 'player_id' => $inv->player_id], $organization->id);
+
+        return response()->json(['data' => [
+            'id' => $inv->id,
+            'email' => $inv->email,
+            'role' => $inv->role,
+            'expires_at' => $inv->expires_at->toIso8601String(),
+            'invite_url' => $this->service->url($inv, $token),
+        ]], 201);
+    }
+
+    public function destroy(Organization $organization, Invitation $invitation, OrgAccess $access): JsonResponse
+    {
+        $access->authorize($access->isAdmin() || $invitation->created_by === $access->user->id);
+        $invitation->update(['revoked_at' => now()]);
+        Audit::log('invitation.revoked', $invitation, [], $organization->id);
+
+        return response()->json(['data' => ['ok' => true]]);
+    }
+}

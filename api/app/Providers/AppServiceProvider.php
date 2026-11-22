@@ -40,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by(mb_strtolower((string) $r->input('email')).'|'.$r->ip()),
             Limit::perMinute(20)->by($r->ip()),
         ]);
+        RateLimiter::for('invites', fn (Request $r) => Limit::perMinute(30)->by($r->user()?->getAuthIdentifier() ?: $r->ip()));
         RateLimiter::for('codes', fn (Request $r) => Limit::perMinute(5)->by($r->user()?->getAuthIdentifier() ?: $r->ip()));
     }
 }

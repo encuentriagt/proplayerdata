@@ -47,7 +47,7 @@ jobs:
         run: composer audit --no-interaction
 
       - name: Pruebas (SQLite)
-        run: php artisan test
+        run: vendor/bin/phpunit --display-warnings --display-deprecations
 
       - name: Pruebas (MariaDB 11.4, InnoDB como en producción)
         env:
@@ -57,7 +57,7 @@ jobs:
           DB_DATABASE: ppd_test
           DB_USERNAME: root
           DB_PASSWORD: root
-        run: php artisan test
+        run: vendor/bin/phpunit --display-warnings --display-deprecations
 
   deploy:
     needs: test

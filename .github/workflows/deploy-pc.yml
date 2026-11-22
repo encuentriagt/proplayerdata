@@ -22,6 +22,8 @@ concurrency:
 
 jobs:
   build:
+    # Hasta que el agente de la web suba pc/package.json no hay nada que compilar.
+    if: hashFiles('pc/package.json') != ''
     runs-on: ubuntu-latest
     defaults:
       run:

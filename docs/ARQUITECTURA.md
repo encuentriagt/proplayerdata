@@ -1,6 +1,6 @@
-# ppd (ProPlayer Data) — Arquitectura v1.1
+# ppd (ProPlayer Data) — Arquitectura v1.2
 
-Versión 1.1 · 2026-11-21 (agrega secciones 12 Seguridad e idempotencia y 13 Módulo de emergencia) · Autor: agente de backend (dirige el proyecto)
+Versión 1.2 · 2026-11-21 (12 Seguridad e idempotencia, 13 Emergencia, 14 Stack, 15 Lista para VPS) · Autor: agente de backend (dirige el proyecto)
 Este documento es la fuente de verdad para TODOS los agentes (web, Flutter, diseño, panel).
 Si algo aquí cambia, se cambia primero en este archivo.
 
@@ -259,3 +259,51 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 **Restricciones del hosting a validar antes de construirlo**
 - El cron de cPanel permite intervalos de minutos; la repetición se hará con un comando programado (y/o cola) reentrante. Si el intervalo mínimo no alcanza, evaluar un servicio externo de colas/notificaciones.
 - FCM HTTP v1 con cuenta de servicio (llave solo en `storage/app/private`, chmod 600).
+
+---
+
+## 14. Stack tecnológico (decidido)
+
+| Pieza | Tecnología |
+|---|---|
+| API | Laravel 12, PHP 8.2+, MariaDB (InnoDB), Sanctum |
+| Colas / tareas | Laravel Queue (driver `database` hoy) procesada por cron |
+| PC y Panel | React + TypeScript + Vite, Tailwind CSS, TanStack Query, React Router (SPA compilada a estático) |
+| App padres | Flutter (Android + iOS), Riverpod, Dio, firebase_messaging, flutter_local_notifications |
+| Push | Firebase Cloud Messaging HTTP v1 |
+| Pruebas | Pest (API), Vitest (web), Playwright (flujo PC) en GitHub Actions antes de cada deploy |
+| Página pública | HTML estático (`web/`) |
+
+Motivo: el hosting compartido solo ejecuta PHP (sin Node persistente ni WebSockets). Capacidad estimada: ~1,000 usuarios activos sin problema; el punto a vigilar es "en vivo" con muchos usuarios simultáneos (cPanel > Resource Usage).
+
+---
+
+## 15. Lista para migrar a VPS (regla de diseño desde el día 1)
+
+Objetivo: mover la API a un VPS en horas, sin tocar PC ni App (solo apuntan a `api.ppdguate.com`).
+
+**En el código**
+- Toda configuración por `.env` (12-factor). Nada de rutas `/home/ppdgmmle/...` ni nombres del servidor dentro del código.
+- Drivers intercambiables por `.env`, nunca llamados directo:
+  - `QUEUE_CONNECTION=database` → `redis` en VPS.
+  - `CACHE_STORE=database` (o `file`) → `redis`.
+  - `FILESYSTEM_DISK=local` → `s3` compatible (DigitalOcean Spaces, Cloudflare R2, etc.). Todos los archivos pasan por `Storage::disk(...)`; las URLs se generan con el disco, nunca armadas a mano.
+  - `MAIL_MAILER` SMTP de cPanel → proveedor transaccional (SES, Postmark, etc.).
+  - `BROADCAST_CONNECTION=null` hoy → `reverb` (WebSockets) en VPS.
+- "En vivo" detrás de una interfaz: hoy consulta periódica (`/live?since=`); en VPS se agrega WebSockets (Laravel Reverb) sin romper la consulta periódica (la App usa la que el servidor le anuncie en `/api/public/config`).
+- Tareas programadas solo en `routes/console.php` (scheduler de Laravel). En cPanel el cron llama a `schedule:run` y `queue:work --stop-when-empty`; en VPS se reemplaza por Supervisor + un solo cron, sin cambiar código.
+- Sin funciones exclusivas de cPanel dentro de la app (nada de llamar `uapi` desde PHP).
+- Sesiones/autenticación sin estado en el servidor (tokens Sanctum en BD) → se puede tener más de un servidor de API.
+- Base de datos estándar MariaDB/MySQL 8 compatible; sin SQL propio de una versión.
+
+**En la operación**
+- Deploy por GitHub Actions + SSH + rsync + `php artisan` (sirve igual para cualquier servidor con SSH; solo cambian los secrets `SSH_*`).
+- Respaldo diario portátil: `mysqldump` + `storage/` en un `.tar.gz` cifrado; procedimiento de restauración documentado y probado.
+- DNS de `api` con TTL bajo (300 s) para cambiar de servidor rápido.
+- Variables del `.env` documentadas en `api/.env.example` (sin valores secretos).
+- Opcional en VPS: `docker-compose` (php-fpm, nginx, mariadb, redis) que se agregará cuando se decida migrar.
+
+**Señales para migrar**
+- Avisos de límite en cPanel > Resource Usage (procesos simultáneos, CPU, memoria).
+- Respuestas lentas en partidos en vivo o colas que se atrasan.
+- Necesidad de WebSockets reales o de enviar emergencias con intervalos menores a 1 minuto.

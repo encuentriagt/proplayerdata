@@ -14,7 +14,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->singleton(\App\Services\Push\PushSender::class, fn () => config('ppd.push.driver') === 'fcm'
+            ? new \App\Services\Push\FcmPushSender(config('ppd.push.fcm_credentials'))
+            : new \App\Services\Push\LogPushSender);
     }
 
     public function boot(): void

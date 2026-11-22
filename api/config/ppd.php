@@ -22,6 +22,12 @@ return [
         'days_valid' => (int) env('PPD_INVITATION_DAYS', 7),
     ],
 
+    'push' => [
+        // log (por defecto, sin enviar) | fcm (requiere la llave en storage/app/private)
+        'driver' => env('PPD_PUSH_DRIVER', 'log'),
+        'fcm_credentials' => storage_path('app/private/'.env('PPD_FCM_CREDENTIALS_FILE', 'firebase-service-account.json')),
+    ],
+
     // Plataformas aceptadas en el encabezado X-App-Platform.
     'platforms' => ['web', 'android', 'ios'],
 ];

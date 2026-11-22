@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Public\BrandingController;
 use App\Http\Controllers\Public\HealthController;
 use App\Http\Controllers\Files\PlayerPhotoController;
+use App\Http\Controllers\Me\MeController;
 use App\Http\Controllers\Pc\CatalogController;
 use App\Http\Controllers\Pc\InvitationController;
 use App\Http\Controllers\Public\InvitationAcceptController;
@@ -49,6 +50,12 @@ Route::prefix('files')->middleware(['signed', 'throttle:public'])->group(functio
 
 Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function () {
     Route::get('catalog/sports', [CatalogController::class, 'sports']);
+
+    // ---- Del usuario autenticado (cualquier rol) ----
+    Route::post('me/devices', [MeController::class, 'registerDevice']);
+    Route::delete('me/devices', [MeController::class, 'removeDevice']);
+    Route::get('me/notifications', [MeController::class, 'notifications']);
+    Route::post('me/notifications/read', [MeController::class, 'markRead']);
 
     // ---- PC: Plataforma Coach (coach, director, org_admin) ----
     Route::prefix('pc/orgs/{organization:slug}')->middleware('org')->scopeBindings()->group(function () {

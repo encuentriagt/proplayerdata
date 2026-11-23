@@ -198,6 +198,7 @@ final class OrgAccess
             'manage_branding' => $this->isAdmin() && $this->organization->branding_editable_by_org,
             'create_teams' => $this->isAdmin() ? 'all' : $this->directorScope()['sport_ids'],
             'delete_players' => $this->isAdmin(),
+            'create_players_without_team' => $this->isAdmin(),
             'director_scope' => $this->isDirector() ? $this->directorScope() : null,
         ];
     }

@@ -67,6 +67,8 @@ class RolesTest extends TestCase
     {
         $e = $this->escenario();
         $this->assertSame(['Fútbol Sub-12', 'Fútbol Sub-15'], $this->names($this->as($e['dtFutbol'])->getJson($this->base.'/teams')));
+        $this->assertSame([true], collect($this->as($e['dtFutbol'])->getJson($this->base.'/teams')->json('data'))->pluck('can_manage')->unique()->values()->all());
+        $this->assertSame([false], collect($this->as($e['coachF'])->getJson($this->base.'/teams')->json('data'))->pluck('can_manage')->all());
         $this->assertSame(['Básquet Juvenil', 'Voleibol Mayor'], $this->names($this->as($e['dtOtro'])->getJson($this->base.'/teams')));
         $this->as($e['dtFutbol'])->getJson($this->base."/teams/{$e['bJ']->id}")->assertForbidden();
 
@@ -177,7 +179,8 @@ class RolesTest extends TestCase
             ->assertJsonPath('data.roles', ['coach'])
             ->assertJsonPath('data.permissions.invite_roles', ['guardian'])
             ->assertJsonPath('data.permissions.manage_members', false)
-            ->assertJsonPath('data.permissions.create_teams', []);
+            ->assertJsonPath('data.permissions.create_teams', [])
+            ->assertJsonPath('data.permissions.create_players_without_team', false);
         $this->as($e['admin'])->getJson($this->base.'/access')->assertJsonPath('data.permissions.create_teams', 'all')
             ->assertJsonPath('data.permissions.manage_directors', true);
     }

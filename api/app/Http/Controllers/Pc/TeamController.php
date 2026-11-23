@@ -22,7 +22,7 @@ class TeamController extends Controller
             ->orderBy('name')
             ->get();
 
-        return response()->json(['data' => $teams->map->payload()->values()]);
+        return response()->json(['data' => $teams->map(fn (Team $t) => $t->payload() + ['can_manage' => $access->canManageTeam($t)])->values()]);
     }
 
     public function show(Organization $organization, Team $team, OrgAccess $access): JsonResponse
@@ -51,7 +51,7 @@ class TeamController extends Controller
         $team = $organization->teams()->create($data);
         Audit::log('team.created', $team, ['name' => $team->name], $organization->id);
 
-        return response()->json(['data' => $team->load(['sport', 'season'])->payload()], 201);
+        return response()->json(['data' => $team->load(['sport', 'season'])->payload() + ['can_manage' => true]], 201);
     }
 
     public function update(Request $request, Organization $organization, Team $team, OrgAccess $access): JsonResponse
@@ -69,7 +69,7 @@ class TeamController extends Controller
         $team->update($data);
         Audit::log('team.updated', $team, array_keys($data), $organization->id);
 
-        return response()->json(['data' => $team->fresh(['sport', 'season'])->payload()]);
+        return response()->json(['data' => $team->fresh(['sport', 'season'])->payload() + ['can_manage' => $access->canManageTeam($team)]]);
     }
 
     public function destroy(Organization $organization, Team $team, OrgAccess $access): JsonResponse

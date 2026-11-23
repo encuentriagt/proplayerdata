@@ -86,6 +86,7 @@ Permisos (v1.4, ver `docs/ARQUITECTURA.md` §2): **admin** todo · **director t�
   "manage_seasons": false, "manage_plans": false, "manage_branding": false,
   "create_teams": [1, 5],                        // "all" (admin) | ids de deportes donde puede crear equipos | []
   "delete_players": false,
+  "create_players_without_team": false,           // solo admin: registrar jugador sin equipo
   "director_scope": {"sport_ids": [1, 5], "team_ids": [12]}   // null si no es director
 }
 ```
@@ -99,7 +100,7 @@ Permisos (v1.4, ver `docs/ARQUITECTURA.md` §2): **admin** todo · **director t�
 | GET | `seasons` | todos | |
 | POST ♻️ | `seasons` | admin | `{name, starts_on?, ends_on?, is_current?}` |
 | PATCH | `seasons/{id}` | admin | |
-| GET | `teams?sport_id=` | todos (coach: los suyos) | |
+| GET | `teams?sport_id=` | todos (según alcance) | cada equipo trae `can_manage` |
 | POST ♻️ | `teams` | admin; director solo en deportes de `create_teams` | `{name, sport_id, season_id?, category?, gender?(male\|female\|mixed), color?}` |
 | GET | `teams/{id}` | quien lo ve | incluye `sport` completo, `staff` (el coach solo se ve a sí mismo) y `can_manage` |
 | PATCH / DELETE | `teams/{id}` | admin; director con el equipo en su alcance | No se cambia el deporte si ya hay jugadores (`sport_locked`) |

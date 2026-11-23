@@ -150,8 +150,10 @@ Servidor: Namecheap shared hosting, cPanel usuario `ppdgmmle`, `server292.web-ho
 | Carpeta en servidor | Contenido | Origen en repo |
 |---|---|---|
 | `~/public_html` | Página pública ppdguate.com | `web/` (deploy automático) |
-| `~/ppd-api` | Laravel (document root `ppd-api/public` para api.ppdguate.com) | `api/` |
+| `~/ppd-api` | Laravel. api.ppdguate.com tiene document root `~/api.ppdguate.com`, que es un **enlace** a `~/ppd-api/public` (el subdominio se creó desde cPanel > Domains para que Namecheap emita el SSL gratis; no borrar el enlace) | `api/` |
 | `~/pc.ppdguate.com` | Build estático de la PC | `pc/` (se construye en GitHub Actions) |
+
+**SSL**: los subdominios se crean SIEMPRE desde **cPanel > Domains > Create A New Domain**; así Namecheap instala el StandardSSL gratis solo. Creados por terminal (uapi) no reciben SSL.
 | `~/admin.ppdguate.com` | Build estático del Panel | `admin/` |
 | `~/ppdback` (700) | Respaldos, crontab, known_hosts | — |
 | `~/ppd_test` (700) | Scripts de pruebas en servidor | — |

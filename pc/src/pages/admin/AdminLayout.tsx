@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Navigate, NavLink, Outlet } from 'react-router-dom'
-import { canCreateTeams, canManageTeam } from '../../lib/auth'
+import { canCreateTeams } from '../../lib/auth'
 import { useOrg } from '../../lib/org'
 import { useTeams } from '../../lib/queries'
 import type { OrgPermissions } from '../../lib/types'
@@ -21,7 +21,7 @@ const TABS: Tab[] = [
 function useVisibleTabs() {
   const { can } = useOrg()
   const teams = useTeams()
-  const some = (teams.data ?? []).some((t) => canManageTeam(can, t))
+  const some = (teams.data ?? []).some((t) => t.can_manage)
   return TABS.filter((t) => t.show(can, some))
 }
 

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Plus, Trash2, Users } from 'lucide-react'
-import { canCreateTeamInSport, canCreateTeams, canManageTeam } from '../../lib/auth'
+import { canCreateTeamInSport, canCreateTeams } from '../../lib/auth'
 import { TEAM_GENDER } from '../../lib/labels'
 import { useOrg } from '../../lib/org'
 import { useMembers, usePcMutation, useSeasons, useSports, useTeam, useTeams } from '../../lib/queries'
@@ -34,7 +34,7 @@ export function AdminTeams() {
                 <span className="block truncate font-semibold">{t.name}</span>
                 <span className="text-xs text-black/60">{[t.sport.name, t.category, t.gender && TEAM_GENDER[t.gender], t.season?.name].filter(Boolean).join(' · ')}</span>
               </Link>
-              {canManageTeam(can, t) && <div className="flex gap-1">
+              {t.can_manage && <div className="flex gap-1">
                 <button className="btn-secondary min-h-9 text-sm" onClick={() => setStaffFor(t)}><Users className="size-4" aria-hidden /> Staff</button>
                 <button className="btn-ghost min-h-9 px-2" aria-label={`Editar ${t.name}`} onClick={() => setEditing(t)}><Pencil className="size-4" aria-hidden /></button>
                 <button className="btn-ghost min-h-9 px-2 text-red-700" aria-label={`Borrar ${t.name}`} onClick={() => setDeleting(t)}><Trash2 className="size-4" aria-hidden /></button>

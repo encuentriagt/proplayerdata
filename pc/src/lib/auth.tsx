@@ -92,7 +92,7 @@ export function topRole(memberships: Membership[]): Role | null {
 
 export const NO_PERMISSIONS: OrgPermissions = {
   invite_roles: [], manage_members: false, manage_directors: false, manage_seasons: false, manage_plans: false,
-  manage_branding: false, create_teams: [], delete_players: false, director_scope: null,
+  manage_branding: false, create_teams: [], delete_players: false, create_players_without_team: false, director_scope: null,
 }
 
 /** Permisos de la organización tal como los manda la API (iguales en todas las membresías de esa organización). */
@@ -106,17 +106,6 @@ export function canCreateTeams(p: OrgPermissions): boolean {
 
 export function canCreateTeamInSport(p: OrgPermissions, sportId: number): boolean {
   return p.create_teams === 'all' || p.create_teams.includes(sportId)
-}
-
-/**
- * ¿Puede editar/borrar/asignar staff de este equipo? En el detalle viene `can_manage`; en la lista se calcula
- * con los permisos (admin: todos; director: equipos o deportes de su alcance). La API valida igual.
- */
-export function canManageTeam(p: OrgPermissions, team: { id: number; sport: { id: number }; can_manage?: boolean }): boolean {
-  if (typeof team.can_manage === 'boolean') return team.can_manage
-  if (p.create_teams === 'all') return true
-  const s = p.director_scope
-  return !!s && (s.team_ids.includes(team.id) || s.sport_ids.includes(team.sport.id))
 }
 
 /** ¿Tiene algo que hacer en Administración? */

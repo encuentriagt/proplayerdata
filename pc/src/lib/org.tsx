@@ -1,10 +1,12 @@
 import { createContext, useContext } from 'react'
-import type { Permissions } from './auth'
-import type { Branding } from './types'
+import type { Branding, OrgPermissions, Role } from './types'
 
-export interface OrgContextValue extends Permissions {
+export interface OrgContextValue {
   slug: string
   branding: Branding
+  /** Solo para mostrar la etiqueta del rol. Los permisos salen de `can`. */
+  role: Role | null
+  can: OrgPermissions
 }
 
 export const OrgContext = createContext<OrgContextValue | null>(null)

@@ -23,4 +23,4 @@ export const ATTENDANCE: Record<AttendanceStatus, { label: string; short: string
 export const ATTENDANCE_ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'excused']
 export const TEAM_GENDER = { male: 'Masculino', female: 'Femenino', mixed: 'Mixto' } as const
 export const PLAYER_GENDER = { male: 'Masculino', female: 'Femenino', other: 'Otro' } as const
-export const ROLE_LABEL = { org_admin: 'Administrador', director: 'Director deportivo', coach: 'Coach', guardian: 'Padre o madre' } as const
+export const ROLE_LABEL = { org_admin: 'Administrador', director: 'Director técnico', coach: 'Coach', guardian: 'Padre o madre' } as const

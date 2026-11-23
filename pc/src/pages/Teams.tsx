@@ -1,21 +1,23 @@
 import { Link } from 'react-router-dom'
 import { ChevronRight, Plus } from 'lucide-react'
 import { TEAM_GENDER } from '../lib/labels'
+import { canCreateTeams } from '../lib/auth'
 import { useOrg } from '../lib/org'
 import { useTeams } from '../lib/queries'
 import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
 
 export function Teams() {
-  const { slug, isAdmin } = useOrg()
+  const { slug, can } = useOrg()
+  const canCreate = canCreateTeams(can)
   const teams = useTeams()
 
   return (
     <>
-      <PageHeader title="Equipos" actions={isAdmin && (
-        <Link to={`/${slug}/admin/equipos`} className="btn-primary"><Plus className="size-5" aria-hidden /> Administrar equipos</Link>
+      <PageHeader title="Equipos" actions={canCreate && (
+        <Link to={`/${slug}/admin/equipos`} className="btn-primary"><Plus className="size-5" aria-hidden /> Crear o administrar equipos</Link>
       )} />
       {teams.isLoading ? <Spinner /> : teams.isError ? <ErrorAlert error={teams.error} /> : !teams.data?.length ? (
-        <Empty>{isAdmin ? 'Aún no hay equipos. Créelos en Administración.' : 'Aún no tiene equipos asignados. Consulte con el administrador.'}</Empty>
+        <Empty>{canCreate ? 'Aún no hay equipos. Créelos en Administración.' : 'Aún no tiene equipos asignados. Consulte con su institución.'}</Empty>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {teams.data.map((t) => (

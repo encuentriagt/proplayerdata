@@ -48,6 +48,22 @@ test('director técnico: sus coaches, crear equipos solo de su deporte, sin temp
   await page.getByRole('button', { name: 'Crear equipo' }).click()
   const opciones = await page.getByLabel('Deporte').locator('option').allTextContents()
   expect(opciones).toEqual(['Elija un deporte', 'Fútbol'])
+  await page.getByRole('button', { name: 'Cancelar' }).click()
+
+  // Sin create_players_without_team: el equipo es obligatorio
+  await page.goto('/colegio-demo/jugadores')
+  await page.getByRole('button', { name: 'Nuevo jugador' }).click()
+  await expect(page.getByLabel('Equipo', { exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'Sin equipo por ahora' })).toHaveCount(0)
+})
+
+test('admin: puede registrar un jugador sin equipo', async ({ page }) => {
+  mockApi(page, 'org_admin')
+  await entrar(page)
+  await page.goto('/colegio-demo/jugadores')
+  await page.getByRole('button', { name: 'Nuevo jugador' }).click()
+  await expect(page.getByLabel('Equipo (opcional)')).toHaveValue('')
+  await expect(page.getByRole('option', { name: 'Sin equipo por ahora' })).toHaveCount(1)
 })
 
 test('admin: asigna deportes y equipos a un director técnico', async ({ page }) => {

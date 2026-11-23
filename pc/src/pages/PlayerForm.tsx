@@ -17,7 +17,7 @@ interface Props {
 /** Datos mínimos del menor: nombre, apellidos, fecha de nacimiento, género, documento (opcional) y notas. */
 export function PlayerFormDialog({ team, player, onClose }: Props) {
   const { slug, can } = useOrg()
-  const teamOptional = can.create_teams === 'all'
+  const teamOptional = can.create_players_without_team
   const navigate = useNavigate()
   const teams = useTeams()
   const [f, setF] = useState({

@@ -4,9 +4,9 @@ import type { Page, Route } from '@playwright/test'
 type MockRole = 'coach' | 'director' | 'org_admin'
 
 const PERMS = {
-  coach: { invite_roles: ['guardian'], manage_members: false, manage_directors: false, manage_seasons: false, manage_plans: false, manage_branding: false, create_teams: [], delete_players: false, director_scope: null },
-  director: { invite_roles: ['coach', 'guardian'], manage_members: true, manage_directors: false, manage_seasons: false, manage_plans: false, manage_branding: false, create_teams: [1], delete_players: false, director_scope: { sport_ids: [1], team_ids: [] } },
-  org_admin: { invite_roles: ['org_admin', 'director', 'coach', 'guardian'], manage_members: true, manage_directors: true, manage_seasons: true, manage_plans: true, manage_branding: true, create_teams: 'all', delete_players: true, director_scope: null },
+  coach: { invite_roles: ['guardian'], manage_members: false, manage_directors: false, manage_seasons: false, manage_plans: false, manage_branding: false, create_teams: [], delete_players: false, create_players_without_team: false, director_scope: null },
+  director: { invite_roles: ['coach', 'guardian'], manage_members: true, manage_directors: false, manage_seasons: false, manage_plans: false, manage_branding: false, create_teams: [1], delete_players: false, create_players_without_team: false, director_scope: { sport_ids: [1], team_ids: [] } },
+  org_admin: { invite_roles: ['org_admin', 'director', 'coach', 'guardian'], manage_members: true, manage_directors: true, manage_seasons: true, manage_plans: true, manage_branding: true, create_teams: 'all', delete_players: true, create_players_without_team: true, director_scope: null },
 } as const
 const LABEL = { coach: 'Coach', director: 'Director técnico', org_admin: 'Administrador' } as const
 
@@ -67,7 +67,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
     }
     if (path === 'auth/logout') return ok(route, { ok: true })
     if (path === 'catalog/sports') return ok(route, [sport, basketSport])
-    if (pc === 'teams' && method === 'GET') return ok(route, role === 'coach' ? [team] : [team, basket])
+    if (pc === 'teams' && method === 'GET') return ok(route, role === 'coach' ? [{ ...team, can_manage: false }] : [{ ...team, can_manage: true }, { ...basket, can_manage: role === 'org_admin' }])
     if (pc === 'members' && method === 'GET') {
       if (role === 'coach') return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: { code: 'forbidden', message: 'No tiene permiso.' } }) })
       const coachRow = { id: 2, user_id: 2, name: 'Carlos Coach', email: 'coach@demo.gt', role: 'coach', role_label: 'Coach', status: 'active', last_login_at: null, teams: [{ id: 1, name: team.name, role: 'head_coach' }], director_scope: null }

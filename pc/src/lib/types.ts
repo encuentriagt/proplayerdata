@@ -32,6 +32,8 @@ export interface OrgPermissions {
   /** "all" (admin) | ids de deportes donde puede crear equipos | [] */
   create_teams: 'all' | number[]
   delete_players: boolean
+  /** Solo admin: registrar jugador sin equipo. */
+  create_players_without_team: boolean
   director_scope: { sport_ids: number[]; team_ids: number[] } | null
 }
 
@@ -84,13 +86,14 @@ export interface Team {
   color: string | null
   sport: Sport
   season: Season | null
+  /** Lo calcula la API: editar, borrar y asignar staff. */
+  can_manage: boolean
 }
 
 export interface TeamDetail extends Team {
   sport: Sport & { positions: Position[]; stat_types: StatType[] }
   /** El coach solo se ve a sí mismo. */
   staff: { user_id: number; name: string | null; role: 'head_coach' | 'assistant' }[]
-  can_manage?: boolean
 }
 
 export interface Player {

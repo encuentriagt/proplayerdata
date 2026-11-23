@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { CalendarDays, Dumbbell, Home, LogOut, Menu, Settings, Shirt, Trophy, Users, X } from 'lucide-react'
 import { hasAdminArea, permissionsFor, topRole, useAuth } from '../lib/auth'
 import { applyTheme, useBranding } from '../lib/branding'
@@ -7,6 +7,7 @@ import { OrgContext, useOrg, type OrgContextValue } from '../lib/org'
 import { setLastOrg } from '../lib/session'
 import { Alert, Spinner } from './ui'
 import { OrgLogo, PoweredBy } from './OrgLogo'
+import { BackLink } from './BackLink'
 import { ApiError } from '../lib/api'
 import { OrgMissing } from '../pages/OrgAuthShell'
 
@@ -72,18 +73,20 @@ export function OrgLayout() {
       </a>
       <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
         <header className="sticky top-0 z-30 flex items-center gap-3 bg-org px-4 py-3 text-on-org shadow lg:hidden">
-          <OrgLogo org={branding.data} size={36} onPrimary />
-          <p className="flex-1 truncate font-semibold">{branding.data.name}</p>
+          <Link to={`/${slug}`} className="flex min-w-0 flex-1 items-center gap-3" aria-label={`${branding.data.name}, ir al inicio`}>
+            <OrgLogo org={branding.data} size={36} onPrimary />
+            <span className="truncate font-semibold">{branding.data.name}</span>
+          </Link>
           <button className="rounded-lg p-2 hover:bg-black/10" aria-label={open ? 'Cerrar menú' : 'Abrir menú'} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
             {open ? <X aria-hidden /> : <Menu aria-hidden />}
           </button>
         </header>
 
         <aside className={`${open ? 'block' : 'hidden'} fixed inset-x-0 top-[60px] bottom-0 z-20 overflow-y-auto bg-white lg:static lg:block lg:min-h-dvh lg:border-r lg:border-black/10`}>
-          <div className="hidden items-center gap-3 bg-org p-4 text-on-org lg:flex">
+          <Link to={`/${slug}`} className="hidden items-center gap-3 bg-org p-4 text-on-org lg:flex" aria-label={`${branding.data.name}, ir al inicio`}>
             <OrgLogo org={branding.data} size={44} onPrimary />
-            <p className="font-semibold leading-tight">{branding.data.name}</p>
-          </div>
+            <span className="font-semibold leading-tight">{branding.data.name}</span>
+          </Link>
           <nav aria-label="Principal" className="flex flex-col gap-1 p-3">
             {nav.map(({ to, label, Icon, end }) => (
               <NavLink
@@ -113,6 +116,7 @@ export function OrgLayout() {
 
         <div className="flex min-h-dvh flex-col">
           <main id="contenido" className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-8">
+            <BackLink />
             <Outlet />
           </main>
           <footer className="px-4 py-4 text-center"><PoweredBy /></footer>

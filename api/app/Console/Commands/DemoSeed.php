@@ -84,6 +84,8 @@ class DemoSeed extends Command
             foreach ([$sub12, $juvenil] as $t) {
                 TeamStaff::create(['team_id' => $t->id, 'user_id' => $coach->id, 'role' => 'head_coach']);
             }
+            // Director técnico de fútbol (ve y maneja los dos equipos de fútbol, no el de básquet).
+            \App\Models\DirectorScope::create(['organization_id' => $org->id, 'user_id' => $director->id, 'sport_id' => $futbol->id]);
 
             $names = ['Ana López', 'Luis Pérez', 'María García', 'José Hernández', 'Sofía Morales', 'Diego Castillo', 'Valeria Ruiz', 'Mateo Díaz', 'Camila Reyes', 'Andrés Cruz', 'Lucía Ramírez', 'Pablo Ortiz', 'Daniela Flores', 'Javier Méndez', 'Isabel Vásquez', 'Tomás Rivera', 'Elena Gómez', 'Samuel Aguilar'];
             $players = [];
@@ -125,7 +127,7 @@ class DemoSeed extends Command
         });
 
         $this->info('Organización demo creada: Colegio Demo ppd (slug: colegio-demo)');
-        $this->line('Coach: ve "Fútbol Sub-12" y "Básquet Juvenil" (no ve "Fútbol Sub-15"). Padre vinculado a Ana López.');
+        $this->line('Director técnico: fútbol (Sub-12 y Sub-15). Coach: "Fútbol Sub-12" y "Básquet Juvenil". Padre vinculado a Ana López.');
         $this->newLine();
         $this->warn('ACCESOS (se muestran UNA sola vez; compártalos por un medio seguro):');
         foreach ($passwords as $email => $pass) {

@@ -97,8 +97,14 @@ class OrganizationAdminController extends Controller
         $data = $request->validate([
             'email' => ['required', 'email:rfc', 'max:191'],
             'role' => ['required', Rule::in(['org_admin', 'director', 'coach'])],
+            'sport_ids' => ['nullable', 'array'], 'sport_ids.*' => ['integer', Rule::exists('sports', 'id')],
+            'team_ids' => ['nullable', 'array'], 'team_ids.*' => ['integer', Rule::exists('teams', 'id')->where('organization_id', $organization->id)],
         ]);
-        [$inv, $token] = $this->invitations->create($organization, $data['email'], $data['role'], null, null, $request->user());
+        if ($data['role'] === 'director' && empty($data['sport_ids']) && empty($data['team_ids'])) {
+            return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Asigne al menos un deporte o un equipo al director técnico.']], 422);
+        }
+        [$inv, $token] = $this->invitations->create($organization, $data['email'], $data['role'], null, $data['team_ids'] ?? null, $request->user(),
+            $data['role'] === 'director' ? ($data['sport_ids'] ?? null) : null);
         $this->invitations->sendAfterResponse($inv, $token);
         Audit::log('invitation.created', $inv, ['role' => $inv->role, 'by' => 'super_admin'], $organization->id);
 

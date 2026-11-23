@@ -18,17 +18,20 @@ class TeamStaffController extends Controller
 {
     public function store(Request $request, Organization $organization, Team $team, OrgAccess $access): JsonResponse
     {
-        $access->authorize($access->isAdmin());
+        $access->authorize($access->canManageTeam($team));
         $data = $request->validate([
             'user_id' => ['required', 'integer'],
             'role' => ['sometimes', Rule::in(['head_coach', 'assistant'])],
         ]);
 
-        $isStaff = OrganizationMember::where('organization_id', $organization->id)
-            ->where('user_id', $data['user_id'])->where('status', 'active')
-            ->whereIn('role', ['coach', 'director', 'org_admin'])->exists();
-        if (! $isStaff) {
-            return response()->json(['error' => ['code' => 'not_a_member', 'message' => 'Ese usuario no es coach de su organización.']], 422);
+        // El admin asigna a cualquier miembro; el director solo a coaches que él administra.
+        $members = OrganizationMember::where('organization_id', $organization->id)
+            ->where('user_id', $data['user_id'])->where('status', 'active')->get();
+        $allowed = $access->isAdmin()
+            ? $members->isNotEmpty()
+            : $members->contains(fn ($m) => $m->role === \App\Enums\MemberRole::Coach && $access->canManageMember($m));
+        if (! $allowed) {
+            return response()->json(['error' => ['code' => 'not_a_member', 'message' => 'Ese usuario no es un coach que usted pueda asignar.']], 422);
         }
 
         $staff = TeamStaff::updateOrCreate(
@@ -42,7 +45,7 @@ class TeamStaffController extends Controller
 
     public function destroy(Organization $organization, Team $team, int $userId, OrgAccess $access): JsonResponse
     {
-        $access->authorize($access->isAdmin());
+        $access->authorize($access->canManageTeam($team));
         TeamStaff::where('team_id', $team->id)->where('user_id', $userId)->delete();
         Audit::log('team.staff_removed', $team, ['user_id' => $userId], $organization->id);
 

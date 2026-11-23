@@ -88,6 +88,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
 
     // ---- PC: Plataforma Coach (coach, director, org_admin) ----
     Route::prefix('pc/orgs/{organization:slug}')->middleware('org')->scopeBindings()->group(function () {
+        Route::get('access', \App\Http\Controllers\Pc\AccessController::class);
         Route::get('seasons', [SeasonController::class, 'index']);
         Route::post('seasons', [SeasonController::class, 'store'])->middleware('idempotent');
         Route::patch('seasons/{season}', [SeasonController::class, 'update']);
@@ -136,6 +137,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
 
         Route::get('members', [MemberController::class, 'index']);
         Route::patch('members/{member}', [MemberController::class, 'update']);
+        Route::put('members/{member}/scopes', [MemberController::class, 'scopes']);
         Route::post('members/{member}/reset-password', [MemberController::class, 'resetPassword'])->middleware('throttle:codes');
         Route::delete('members/{member}', [MemberController::class, 'destroy']);
     });

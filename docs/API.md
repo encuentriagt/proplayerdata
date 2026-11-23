@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.1 (2026-11-22)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.2 (2026-11-23)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -41,7 +41,7 @@ Enlaces de invitación: staff → `https://pc.ppdguate.com/{slug}/invitacion?tok
 
 | Método | Ruta | Cuerpo / Notas |
 |---|---|---|
-| POST | `/auth/login` | `{email, password}` + `X-App-Platform`. Respuesta: `token, token_type, expires_at, user{id,name,email,must_change_password,is_super_admin}, memberships[{organization_id, role, role_label, branding_editable, organization{marca}}], is_guardian, admin_totp (null\|setup\|verify)`. `branding_editable` es `true` solo para `org_admin` cuando el super admin permitió que la organización edite su marca. Errores: `invalid_credentials` (mismo mensaje exista o no el correo), `account_locked` (423, `retry_after_minutes`), `no_active_organization` (403), `platform_invalid` |
+| POST | `/auth/login` | `{email, password}` + `X-App-Platform`. Respuesta: `token, token_type, expires_at, user{id,name,email,must_change_password,is_super_admin}, memberships[{organization_id, role, role_label, branding_editable, permissions, organization{marca}}], is_guardian, admin_totp (null\|setup\|verify)`. `branding_editable` es `true` solo para `org_admin` cuando el super admin permitió que la organización edite su marca. Errores: `invalid_credentials` (mismo mensaje exista o no el correo), `account_locked` (423, `retry_after_minutes`), `no_active_organization` (403), `platform_invalid` |
 | GET | `/auth/me` | Igual que el login sin token |
 | POST | `/auth/logout` | Cierra la sesión actual |
 | POST ♻️ | `/auth/password` | `{current_password, password, password_confirmation}` (mín. 10, letras y números). Cierra las demás sesiones |
@@ -75,7 +75,23 @@ Tipos de aviso (`kind`): `callup`, `match_result`, `event_changed`, `event_cance
 ## 5. PC — Plataforma Coach: `/pc/orgs/{slug}/...`
 
 Requiere membresía activa en la organización (`org_admin`, `director` o `coach`). Si no es miembro: 404. Organización suspendida: 403 `organization_suspended`.
-Permisos: **admin** todo · **director** ve y registra en todos los equipos · **coach** solo sus equipos asignados. Lo que no puede hacer → 403 `forbidden`.
+Permisos (v1.4, ver `docs/ARQUITECTURA.md` §2): **admin** todo · **director técnico** solo su alcance (deportes y/o equipos asignados por el admin) · **coach** solo sus equipos asignados. Lo que no puede hacer → 403 `forbidden`.
+
+**Permisos para la interfaz** (`memberships[].permissions` en el login, o `GET access`):
+```json
+{
+  "invite_roles": ["coach","guardian"],          // roles que puede invitar
+  "manage_members": true,                        // ver/administrar miembros (director: solo sus coaches)
+  "manage_directors": false,                     // solo admin: alcance de directores
+  "manage_seasons": false, "manage_plans": false, "manage_branding": false,
+  "create_teams": [1, 5],                        // "all" (admin) | ids de deportes donde puede crear equipos | []
+  "delete_players": false,
+  "director_scope": {"sport_ids": [1, 5], "team_ids": [12]}   // null si no es director
+}
+```
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `access` | `{roles, permissions, team_ids}` del usuario en esta organización |
 
 ### Temporadas y equipos
 | Método | Ruta | Quién | Cuerpo |
@@ -84,11 +100,11 @@ Permisos: **admin** todo · **director** ve y registra en todos los equipos · *
 | POST ♻️ | `seasons` | admin | `{name, starts_on?, ends_on?, is_current?}` |
 | PATCH | `seasons/{id}` | admin | |
 | GET | `teams?sport_id=` | todos (coach: los suyos) | |
-| POST ♻️ | `teams` | admin | `{name, sport_id, season_id?, category?, gender?(male\|female\|mixed), color?}` |
-| GET | `teams/{id}` | quien lo ve | incluye `sport` completo y `staff` |
-| PATCH / DELETE | `teams/{id}` | admin | No se cambia el deporte si ya hay jugadores (`sport_locked`) |
-| POST | `teams/{id}/staff` | admin | `{user_id, role?(head_coach\|assistant)}` |
-| DELETE | `teams/{id}/staff/{userId}` | admin | |
+| POST ♻️ | `teams` | admin; director solo en deportes de `create_teams` | `{name, sport_id, season_id?, category?, gender?(male\|female\|mixed), color?}` |
+| GET | `teams/{id}` | quien lo ve | incluye `sport` completo, `staff` (el coach solo se ve a sí mismo) y `can_manage` |
+| PATCH / DELETE | `teams/{id}` | admin; director con el equipo en su alcance | No se cambia el deporte si ya hay jugadores (`sport_locked`) |
+| POST | `teams/{id}/staff` | admin (cualquier miembro); director (solo coaches que él administra) | `{user_id, role?(head_coach\|assistant)}` |
+| DELETE | `teams/{id}/staff/{userId}` | admin; director de ese equipo | |
 | GET | `teams/{id}/roster` | quien lo ve | jugadores con `jersey_number, position, active` |
 | POST | `teams/{id}/roster` | quien trabaja el equipo | `{player_id, jersey_number?, sport_position_id?}` |
 | PATCH / DELETE | `teams/{id}/roster/{playerId}` | quien trabaja el equipo | `{jersey_number?, sport_position_id?, active?}` |
@@ -140,13 +156,14 @@ Ficha del partido:
 | Método | Ruta | Quién | Notas |
 |---|---|---|---|
 | GET | `invitations` | admin: todas; otros: las suyas | pendientes |
-| POST ♻️ | `invitations` | admin: `org_admin\|director\|coach\|guardian`; coach/director: solo `guardian` de jugadores que ve | `{email, role, player_id?(obligatorio en guardian), team_ids?(coach)}`. Responde `invite_url` (se envía también por correo) |
+| POST ♻️ | `invitations` | según `permissions.invite_roles`: admin todos; director `coach\|guardian`; coach `guardian` (de jugadores que ve) | `{email, role, player_id?(obligatorio en guardian), team_ids?, sport_ids?}`. **coach**: `team_ids` = equipos que tendrá (director: solo de su alcance). **director**: `sport_ids` y/o `team_ids` = su alcance (al menos uno). Responde `invite_url` |
 | POST ♻️ | `invitations/{id}/resend` | admin o quien la creó | Genera un enlace nuevo (el anterior deja de servir), renueva la vigencia y reenvía el correo. Devuelve `invite_url` |
 | DELETE | `invitations/{id}` | admin o quien la creó | anula |
-| GET | `members` | admin | con equipos asignados |
-| PATCH | `members/{id}` | admin | `{status: active\|disabled}` (no a sí mismo) |
-| POST | `members/{id}/reset-password` | admin | Devuelve `reset_url` (vence en 24 h) para compartir por WhatsApp. No a sí mismo |
-| DELETE | `members/{id}` | admin | quita el rol y sus equipos |
+| GET | `members` | admin: todos (con `director_scope{sports,teams}` de cada director); director: solo los coaches que administra | con equipos asignados |
+| PATCH | `members/{id}` | admin; director (sus coaches) | `{status: active\|disabled}` (no a sí mismo) |
+| PUT | `members/{id}/scopes` | admin | Alcance de un **director técnico**: `{sport_ids:[...], team_ids:[...]}` (reemplaza el anterior) |
+| POST | `members/{id}/reset-password` | admin; director (sus coaches) | Devuelve `reset_url` (vence en 24 h) para compartir por WhatsApp. No a sí mismo |
+| DELETE | `members/{id}` | admin; director (sus coaches) | quita el rol (y sus equipos o su alcance) |
 | GET | `plans` | admin | planes vigentes + `meta.usage{pro{quota,used},premium{...}}` |
 | POST ♻️ | `plans` | admin | `{email, plan(pro\|premium), ends_at?, note?}` el correo debe ser de un padre de la organización. `quota_exceeded` si no hay cupo |
 | DELETE | `plans/{id}` | admin | revoca y libera cupo |
@@ -184,7 +201,7 @@ Requiere `is_super_admin` + TOTP verificado en la sesión (`/auth/totp/verify`).
 | POST ♻️ | `organizations` | `{name, slug, type(school\|team), color_primary?, color_secondary?, color_on_primary?, quota_pro?, quota_premium?, branding_editable_by_org?, contact_email?, contact_phone?, notes?, admin_email?}` → `meta.admin_invite_url` |
 | GET / PATCH | `organizations/{id}` | PATCH acepta lo mismo + `status: active\|suspended` |
 | POST | `organizations/{id}/branding/{logo\|crest\|cover}` | multipart `image` |
-| POST ♻️ | `organizations/{id}/invitations` | `{email, role(org_admin\|director\|coach)}` |
+| POST ♻️ | `organizations/{id}/invitations` | `{email, role(org_admin\|director\|coach), sport_ids?, team_ids?}` (director: al menos un deporte o equipo) |
 | GET | `organizations/{id}/members` | |
 | GET / POST | `sports` | POST `{code, name, periods, period_minutes?, max_on_field?, unlimited_substitutions?, sort?}` |
 | PATCH | `sports/{id}` | incluye `active:false` para retirar un deporte |

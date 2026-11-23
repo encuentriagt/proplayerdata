@@ -12,7 +12,7 @@ enum MemberRole: string
     {
         return match ($this) {
             self::OrgAdmin => 'Administrador',
-            self::Director => 'Director deportivo',
+            self::Director => 'Director técnico',
             self::Coach => 'Coach',
         };
     }

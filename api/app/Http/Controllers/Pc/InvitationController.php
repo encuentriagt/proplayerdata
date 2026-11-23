@@ -36,7 +36,7 @@ class InvitationController extends Controller
         return response()->json(['data' => $q->get()->map(fn (Invitation $i) => [
             'id' => $i->id, 'email' => $i->email, 'role' => $i->role,
             'role_label' => InvitationService::ROLE_LABELS[$i->role] ?? $i->role,
-            'player_id' => $i->player_id, 'team_ids' => $i->team_ids,
+            'player_id' => $i->player_id, 'team_ids' => $i->team_ids, 'sport_ids' => $i->sport_ids,
             'expires_at' => $i->expires_at->toIso8601String(),
         ])]);
     }
@@ -49,24 +49,39 @@ class InvitationController extends Controller
             'player_id' => ['required_if:role,guardian', 'nullable', 'integer'],
             'team_ids' => ['nullable', 'array', 'max:30'],
             'team_ids.*' => ['integer'],
+            'sport_ids' => ['nullable', 'array', 'max:30'],
+            'sport_ids.*' => ['integer'],
         ]);
+        $access->authorize(in_array($data['role'], $access->invitableRoles(), true));
+        $teamIds = array_values(array_unique(array_map('intval', $data['team_ids'] ?? [])));
+        $sportIds = array_values(array_unique(array_map('intval', $data['sport_ids'] ?? [])));
 
         if ($data['role'] === 'guardian') {
             $player = Player::where('organization_id', $organization->id)->find($data['player_id']);
             $access->authorize($player !== null && $access->canViewPlayer($player));
-            $data['team_ids'] = null;
+            $teamIds = $sportIds = [];
         } else {
-            $access->authorize($access->isAdmin());
             $data['player_id'] = null;
-            if (! empty($data['team_ids'])) {
-                $valid = Team::where('organization_id', $organization->id)->whereIn('id', $data['team_ids'])->count();
-                if ($valid !== count(array_unique($data['team_ids']))) {
-                    return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Hay equipos que no pertenecen a su organización.']], 422);
-                }
+            if ($teamIds && Team::where('organization_id', $organization->id)->whereIn('id', $teamIds)->count() !== count($teamIds)) {
+                return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Hay equipos que no pertenecen a su organización.']], 422);
+            }
+            if ($sportIds && \App\Models\Sport::whereIn('id', $sportIds)->count() !== count($sportIds)) {
+                return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Hay deportes que no existen.']], 422);
+            }
+            // El director solo asigna equipos de su alcance a los coaches que invita.
+            if (! $access->isAdmin() && array_diff($teamIds, $access->directedTeamIds())) {
+                return response()->json(['error' => ['code' => 'forbidden', 'message' => 'Solo puede asignar equipos que usted dirige.']], 403);
+            }
+            // sport_ids solo aplica a directores (alcance por deportes completos).
+            if ($data['role'] !== 'director') {
+                $sportIds = [];
+            }
+            if ($data['role'] === 'director' && ! $teamIds && ! $sportIds) {
+                return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Asigne al menos un deporte o un equipo al director técnico.', 'fields' => ['sport_ids' => ['Asigne al menos un deporte o un equipo.']]]], 422);
             }
         }
 
-        [$inv, $token] = $this->service->create($organization, $data['email'], $data['role'], $data['player_id'], $data['team_ids'] ?? null, $access->user);
+        [$inv, $token] = $this->service->create($organization, $data['email'], $data['role'], $data['player_id'], $teamIds ?: null, $access->user, $sportIds ?: null);
         $this->service->sendAfterResponse($inv, $token);
         Audit::log('invitation.created', $inv, ['role' => $inv->role, 'player_id' => $inv->player_id], $organization->id);
 
@@ -74,6 +89,8 @@ class InvitationController extends Controller
             'id' => $inv->id,
             'email' => $inv->email,
             'role' => $inv->role,
+            'team_ids' => $inv->team_ids,
+            'sport_ids' => $inv->sport_ids,
             'expires_at' => $inv->expires_at->toIso8601String(),
             'invite_url' => $this->service->url($inv, $token),
         ]], 201);

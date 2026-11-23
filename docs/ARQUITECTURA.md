@@ -1,6 +1,6 @@
-# ppd (ProPlayer Data) — Arquitectura v1.3
+# ppd (ProPlayer Data) — Arquitectura v1.4
 
-Versión 1.3 · 2026-11-21 (SIN partido en vivo: el coach llena la ficha al final; aviso a padres al guardar) · Autor: agente de backend (dirige el proyecto)
+Versión 1.4 · 2026-11-23 (roles: director técnico por alcance de deportes/equipos; coach solo lo asignado) · Autor: agente de backend (dirige el proyecto)
 Este documento es la fuente de verdad para TODOS los agentes (web, Flutter, diseño, panel).
 Si algo aquí cambia, se cambia primero en este archivo.
 
@@ -22,22 +22,24 @@ Slogan: "En vivo" (es solo marca: **no hay registro de partido en tiempo real**)
 
 ---
 
-## 2. Roles y permisos
+## 2. Roles y permisos (v1.4)
 
-| Rol | Dónde entra | Puede |
-|---|---|---|
-| `super_admin` | Panel | Crear/editar/suspender organizaciones, su marca blanca, sus admins, sus cupos de planes; asignar planes Pro/Premium a cualquier padre; ver todo; auditoría. |
-| `org_admin` | PC | Administrar SU organización: equipos, deportes, temporadas, coaches, directores, jugadores, padres, asignar planes dentro de su cupo, editar su marca (si el super admin lo permite). |
-| `director` | PC | Ver TODOS los deportes y equipos de su organización (lectura + reportes). Puede registrar lo mismo que un coach. |
-| `coach` | PC | Ver y trabajar SOLO en los equipos que la organización le asignó (y por lo tanto solo esos deportes). |
-| `guardian` (padre) | App | Ver la información de SUS hijos según su plan (Gratis / Pro / Premium). |
+| Rol | Dónde entra | Ve | Puede |
+|---|---|---|---|
+| `super_admin` | Panel | Todo ppd | Organizaciones, marca, cupos, catálogo de deportes, planes, auditoría. |
+| `org_admin` | PC | **Toda** su organización, incluidos los directores técnicos y su alcance | Invitar **cualquier rol** (admin, director técnico, coach, padre); asignar y cambiar el **alcance** de cada director; crear/editar equipos de cualquier deporte; asignar staff; temporadas; planes; marca (si se permite). |
+| `director` (director técnico) | PC | **Solo su alcance**: deportes completos y/o equipos sueltos que le asignó el admin (un director puede tener varios deportes, cada uno con sus coaches) | Dentro de su alcance: crear/editar/borrar equipos **de sus deportes**, invitar **coaches y padres**, asignar coaches a sus equipos, ver y administrar a **esos coaches**, calendario, convocatorias, asistencia y ficha. **No** crea ni ve otros directores ni admins. **No** asigna planes ni temporadas. |
+| `coach` | PC | **Solo los equipos que le asignaron** | Calendario, convocatorias, asistencia y ficha de sus equipos; **registrar, enrolar y desenrolar jugadores** de sus equipos; invitar padres de sus jugadores. **No** crea equipos ni deportes, **no** ve a otros coaches (en el staff de un equipo solo se ve a sí mismo) ni la lista de miembros. |
+| `guardian` (padre) | App | Solo sus hijos y solo los datos de su hijo | Según su plan (Gratis / Pro / Premium). |
 
 Reglas:
-- Un usuario puede tener roles en varias organizaciones (tabla `organization_members`).
-- Un coach puede tener varios equipos; un equipo puede tener varios coaches (`team_staff`).
-- Un padre puede tener varios hijos, incluso en organizaciones distintas.
-- TODA consulta de la API filtra por organización y por asignación. Nunca confiar en lo que mande el cliente.
-- Organización suspendida → nadie de esa organización entra (ni PC ni App); se muestra "Su organización no está activa. Comuníquese con su institución."
+- Un usuario puede tener varios roles y varias organizaciones (`organization_members`); los permisos se suman.
+- Alcance del director: tabla `director_scopes` (organization_id, user_id, sport_id | team_id). Un deporte completo incluye los equipos nuevos de ese deporte. Solo el admin lo cambia.
+- El director administra a un coach solo si **todos** los equipos de ese coach están dentro de su alcance (y el coach no es también director/admin).
+- Nadie de la organización crea deportes: el catálogo es general y lo maneja el super admin.
+- TODA consulta de la API filtra por organización y por alcance. Nunca confiar en lo que mande el cliente.
+- Organización suspendida → nadie de esa organización entra (ni PC ni App).
+- La PC muestra u oculta opciones con `permissions` (en `/auth/login`, `/auth/me` y `GET /pc/orgs/{slug}/access`), pero la API valida todo.
 
 ---
 

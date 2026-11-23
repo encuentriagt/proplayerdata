@@ -14,13 +14,13 @@ final class InvitationService
 {
     public const ROLE_LABELS = [
         'org_admin' => 'Administrador',
-        'director' => 'Director deportivo',
+        'director' => 'Director técnico',
         'coach' => 'Coach',
         'guardian' => 'Padre, madre o encargado',
     ];
 
     /** Crea la invitación (revoca las pendientes equivalentes) y devuelve [invitación, token en claro]. */
-    public function create(Organization $org, string $email, string $role, ?int $playerId, ?array $teamIds, ?User $by): array
+    public function create(Organization $org, string $email, string $role, ?int $playerId, ?array $teamIds, ?User $by, ?array $sportIds = null): array
     {
         $email = Str::lower(trim($email));
 
@@ -36,6 +36,7 @@ final class InvitationService
             'role' => $role,
             'player_id' => $playerId,
             'team_ids' => $teamIds ? array_values(array_unique(array_map('intval', $teamIds))) : null,
+            'sport_ids' => $sportIds ? array_values(array_unique(array_map('intval', $sportIds))) : null,
             'token_hash' => hash('sha256', $token),
             'expires_at' => now()->addDays((int) config('ppd.invitations.days_valid')),
             'created_by' => $by?->id,

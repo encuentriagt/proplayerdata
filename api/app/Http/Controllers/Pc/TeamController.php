@@ -32,17 +32,21 @@ class TeamController extends Controller
 
         $data = $team->payload();
         $data['sport'] = $team->sport->payload();
-        $data['staff'] = $team->staff()->with('user:id,name,email')->get()->map(fn ($s) => [
-            'user_id' => $s->user_id, 'name' => $s->user?->name, 'role' => $s->role,
-        ]);
+        // El coach no ve información de otros coaches: solo se ve a sí mismo en el staff.
+        $staff = $team->staff()->with('user:id,name,email')->get();
+        if (! $access->canManageTeam($team)) {
+            $staff = $staff->where('user_id', $access->user->id);
+        }
+        $data['staff'] = $staff->map(fn ($s) => ['user_id' => $s->user_id, 'name' => $s->user?->name, 'role' => $s->role])->values();
+        $data['can_manage'] = $access->canManageTeam($team);
 
         return response()->json(['data' => $data]);
     }
 
     public function store(Request $request, Organization $organization, OrgAccess $access): JsonResponse
     {
-        $access->authorize($access->isAdmin());
         $data = $this->validated($request, $organization);
+        $access->authorize($access->canCreateTeamInSport((int) $data['sport_id']));
 
         $team = $organization->teams()->create($data);
         Audit::log('team.created', $team, ['name' => $team->name], $organization->id);
@@ -52,8 +56,11 @@ class TeamController extends Controller
 
     public function update(Request $request, Organization $organization, Team $team, OrgAccess $access): JsonResponse
     {
-        $access->authorize($access->isAdmin());
+        $access->authorize($access->canManageTeam($team));
         $data = $this->validated($request, $organization, true);
+        if (isset($data['sport_id']) && (int) $data['sport_id'] !== $team->sport_id) {
+            $access->authorize($access->canCreateTeamInSport((int) $data['sport_id']));
+        }
 
         if (isset($data['sport_id']) && (int) $data['sport_id'] !== $team->sport_id && $team->roster()->exists()) {
             return response()->json(['error' => ['code' => 'sport_locked', 'message' => 'No se puede cambiar el deporte de un equipo que ya tiene jugadores.']], 422);
@@ -67,7 +74,7 @@ class TeamController extends Controller
 
     public function destroy(Organization $organization, Team $team, OrgAccess $access): JsonResponse
     {
-        $access->authorize($access->isAdmin());
+        $access->authorize($access->canManageTeam($team));
         $team->delete();
         Audit::log('team.deleted', $team, [], $organization->id);
 

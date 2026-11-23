@@ -84,8 +84,19 @@ class InvitationAcceptController extends Controller
                     ['organization_id' => $inv->organization_id, 'user_id' => $user->id, 'role' => $inv->role],
                     ['status' => 'active'],
                 );
-                foreach (Team::where('organization_id', $inv->organization_id)->whereIn('id', $inv->team_ids ?? [])->pluck('id') as $teamId) {
-                    TeamStaff::firstOrCreate(['team_id' => $teamId, 'user_id' => $user->id], ['role' => 'head_coach']);
+                $teamIds = Team::where('organization_id', $inv->organization_id)->whereIn('id', $inv->team_ids ?? [])->pluck('id');
+                if ($inv->role === 'director') {
+                    // El alcance del director: deportes completos y/o equipos sueltos.
+                    foreach ($inv->sport_ids ?? [] as $sportId) {
+                        \App\Models\DirectorScope::firstOrCreate(['organization_id' => $inv->organization_id, 'user_id' => $user->id, 'sport_id' => $sportId, 'team_id' => null]);
+                    }
+                    foreach ($teamIds as $teamId) {
+                        \App\Models\DirectorScope::firstOrCreate(['organization_id' => $inv->organization_id, 'user_id' => $user->id, 'sport_id' => null, 'team_id' => $teamId]);
+                    }
+                } else {
+                    foreach ($teamIds as $teamId) {
+                        TeamStaff::firstOrCreate(['team_id' => $teamId, 'user_id' => $user->id], ['role' => 'head_coach']);
+                    }
                 }
             }
 

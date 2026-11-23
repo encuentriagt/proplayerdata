@@ -104,7 +104,7 @@ class PcRequestsTest extends TestCase
         Mail::fake();
         $org = $this->makeOrg();
         $admin = $this->member($org, 'a@x.test', 'org_admin');
-        $r = $this->as($admin)->postJson($this->base.'/invitations', ['email' => 'd@x.test', 'role' => 'director'])->json('data');
+        $r = $this->as($admin)->postJson($this->base.'/invitations', ['email' => 'd@x.test', 'role' => 'director', 'sport_ids' => [\App\Models\Sport::where('code', 'futbol')->value('id')]])->json('data');
         $old = $this->tokenFrom($r['invite_url']);
         $new = $this->tokenFrom($this->as($admin)->postJson($this->base."/invitations/{$r['id']}/resend")->assertOk()->json('data.invite_url'));
         $this->assertNotSame($old, $new);

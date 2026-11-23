@@ -51,6 +51,7 @@ class PcTeamsPlayersTest extends TestCase
         $coach = $this->member($org, 'c@x.test', 'coach');
         $this->assign($t1, $coach);
         $director = $this->member($org, 'd@x.test', 'director');
+        \App\Models\DirectorScope::create(['organization_id' => $org->id, 'user_id' => $director->id, 'sport_id' => Sport::where('code', 'futbol')->value('id')]);
         $admin = $this->member($org, 'a@x.test', 'org_admin');
 
         $this->as($coach)->getJson($this->base.'/teams')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Sub-12');
@@ -75,7 +76,7 @@ class PcTeamsPlayersTest extends TestCase
         $admin = $this->member($org, 'a@x.test', 'org_admin');
         $futbol = Sport::where('code', 'futbol')->value('id');
 
-        $this->as($coach)->postJson($this->base.'/teams', ['name' => 'X', 'sport_id' => $futbol])->assertForbidden();
+        $this->as($coach)->postJson($this->base.'/teams', ['name' => 'Equipo X', 'sport_id' => $futbol])->assertForbidden();
 
         $id = $this->as($admin)->postJson($this->base.'/teams', ['name' => 'Sub-12', 'sport_id' => $futbol, 'category' => 'Sub-12', 'color' => '#112233'])
             ->assertCreated()->assertJsonPath('data.sport.code', 'futbol')->json('data.id');

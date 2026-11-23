@@ -194,7 +194,15 @@ class AuthController extends Controller
 
     private function membershipsPayload($memberships): array
     {
+        // Permisos por organización, calculados con TODOS los roles que el usuario tiene en ella.
+        $perms = [];
+        foreach ($memberships->groupBy('organization_id') as $orgId => $rows) {
+            $access = new \App\Support\OrgAccess($rows->first()->organization, $rows->first()->user ?? User::find($rows->first()->user_id), $rows->pluck('role')->all());
+            $perms[$orgId] = $access->permissions();
+        }
+
         return $memberships->map(fn (OrganizationMember $m) => [
+            'permissions' => $perms[$m->organization_id],
             'organization_id' => $m->organization_id,
             'role' => $m->role->value,
             'role_label' => $m->role->label(),

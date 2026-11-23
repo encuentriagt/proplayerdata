@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Invitation extends Model
 {
     protected $fillable = [
-        'organization_id', 'email', 'role', 'player_id', 'team_ids', 'token_hash',
+        'organization_id', 'email', 'role', 'player_id', 'team_ids', 'sport_ids', 'token_hash',
         'expires_at', 'accepted_at', 'accepted_by', 'revoked_at', 'created_by',
     ];
 
@@ -18,6 +18,7 @@ class Invitation extends Model
     {
         return [
             'team_ids' => 'array',
+            'sport_ids' => 'array',
             'expires_at' => 'datetime',
             'accepted_at' => 'datetime',
             'revoked_at' => 'datetime',

@@ -37,10 +37,22 @@ jobs:
           if [ -d ~/api.ppdguate.com/.well-known ]; then
             mkdir -p ~/ppd-api/public/.well-known && cp -rn ~/api.ppdguate.com/.well-known/. ~/ppd-api/public/.well-known/ && echo ".well-known copiado"
           fi
-          R=$(cpapi2 --output=json SubDomain changedocroot subdomain=api rootdomain=ppdguate.com dir=ppd-api/public 2>/dev/null)
-          echo "$R" | grep -q '"result":1' && echo "document root cambiado" || { echo "$R" | head -c 800; exit 1; }
+          CP=$(command -v cpapi2 || ls /usr/local/cpanel/bin/cpapi2 2>/dev/null || true)
+          OKCHG=no
+          if [ -n "$CP" ]; then
+            R=$("$CP" --output=json SubDomain changedocroot subdomain=api rootdomain=ppdguate.com dir=ppd-api/public 2>/dev/null || true)
+            echo "$R" | grep -q '"result":1' && OKCHG=yes && echo "document root cambiado con cpapi2"
+          fi
+          if [ "$OKCHG" = no ]; then
+            # Plan B: la carpeta que creó cPanel pasa a ser un enlace a ppd-api/public (mismo dueño: LiteSpeed lo sigue).
+            if [ -L ~/api.ppdguate.com ]; then echo "ya es enlace"; else
+              mv ~/api.ppdguate.com ~/ppdback/api.ppdguate.com.old-$(date +%Y%m%d%H%M%S)
+              ln -s ~/ppd-api/public ~/api.ppdguate.com
+              echo "enlace creado: ~/api.ppdguate.com -> ~/ppd-api/public"
+            fi
+          fi
+          ls -ld ~/api.ppdguate.com
           echo "--- después"; uapi DomainInfo domains_data 2>/dev/null | grep -B1 "domain: api.ppdguate.com" | grep documentroot
-          echo "--- carpeta sobrante (no se borra):"; ls -la ~/api.ppdguate.com 2>&1 | head
           REMOTE
 
       - name: Verificar

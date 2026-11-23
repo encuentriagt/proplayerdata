@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { CalendarDays, Home, LogOut, Menu, Settings, Shirt, Users, X } from 'lucide-react'
+import { CalendarDays, Dumbbell, Home, LogOut, Menu, Settings, Shirt, Trophy, Users, X } from 'lucide-react'
 import { hasAdminArea, permissionsFor, topRole, useAuth } from '../lib/auth'
 import { applyTheme, useBranding } from '../lib/branding'
 import { OrgContext, useOrg, type OrgContextValue } from '../lib/org'
@@ -13,6 +13,8 @@ import { OrgMissing } from '../pages/OrgAuthShell'
 const NAV = [
   { to: '', label: 'Inicio', Icon: Home, end: true },
   { to: 'calendario', label: 'Calendario', Icon: CalendarDays },
+  { to: 'partidos', label: 'Partidos', Icon: Trophy },
+  { to: 'entrenos', label: 'Entrenos', Icon: Dumbbell },
   { to: 'equipos', label: 'Equipos', Icon: Shirt },
   { to: 'jugadores', label: 'Jugadores', Icon: Users },
 ]

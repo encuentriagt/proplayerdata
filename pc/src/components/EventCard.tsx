@@ -5,7 +5,8 @@ import { EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY } from '../lib/labels'
 import { useOrg } from '../lib/org'
 import type { PcEvent } from '../lib/types'
 
-export function EventCard({ ev, showDate = true }: { ev: PcEvent; showDate?: boolean }) {
+/** `showType=false` en listas de un solo tipo (Partidos, Entrenos), donde la etiqueta sobra. */
+export function EventCard({ ev, showDate = true, showType = true }: { ev: PcEvent; showDate?: boolean; showType?: boolean }) {
   const { slug } = useOrg()
   const cancelled = ev.status === 'cancelled'
   return (
@@ -16,7 +17,7 @@ export function EventCard({ ev, showDate = true }: { ev: PcEvent; showDate?: boo
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`chip ${EVENT_TYPE_COLOR[ev.type]}`}>{EVENT_TYPE[ev.type]}</span>
+          {showType && <span className={`chip ${EVENT_TYPE_COLOR[ev.type]}`}>{EVENT_TYPE[ev.type]}</span>}
           {ev.team_name && <span className="chip bg-black/5 text-ink">{ev.team_name}</span>}
           {cancelled && <span className="chip bg-red-100 text-red-800">Cancelado</span>}
           {ev.type === 'match' && ev.status === 'scheduled' && !ev.result_published_at && new Date(ev.starts_at) < new Date() && (

@@ -85,7 +85,15 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
     if (pc === 'invitations' && method === 'GET') return ok(route, [])
     if (pc === 'events' && method === 'GET') {
       const list = Object.values(events).map(({ sport: _s, callups, attendance, lineup, actions, player_stats, ...e }) => e)
-      if (url.searchParams.get('pending_sheet') === '1') {
+      const q = url.searchParams
+      if (q.get('pending_sheet') !== '1') {
+        // Igual que la API: filtra por tipo, equipo y rango de fechas (hora de Guatemala).
+        const from = q.get('from'), to = q.get('to')
+        const day = (iso: string) => iso.slice(0, 10)
+        return ok(route, list.filter((e: any) => (!q.get('type') || e.type === q.get('type')) && (!q.get('team_id') || String(e.team_id) === q.get('team_id'))
+          && (!from || day(e.starts_at) >= from) && (!to || day(e.starts_at) <= to)))
+      }
+      if (q.get('pending_sheet') === '1') {
         return ok(route, list.filter((e: any) => e.type === 'match' && e.status !== 'cancelled' && !e.result_published_at && new Date(e.starts_at) < new Date()))
       }
       return ok(route, list)
@@ -94,7 +102,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
       const id = nextId++
       const e = {
         id, team_id: body.team_id, team_name: team.name, type: body.type, title: body.title,
-        display_title: body.title ?? (body.opponent_name ? `vs. ${body.opponent_name}` : 'Partido'),
+        display_title: body.title ?? (body.opponent_name ? `vs. ${body.opponent_name}` : ({ match: 'Partido', training: 'Entrenamiento', other: 'Actividad' } as any)[body.type]),
         starts_at: body.starts_at.replace(' ', 'T') + ':00-06:00', ends_at: null, location: body.location, opponent_name: body.opponent_name,
         home_away: body.home_away, status: 'scheduled', score_us: null, score_them: null, result_published_at: null, notes: body.notes,
         sport, callups: [], attendance: [], lineup: [], actions: [], player_stats: [],

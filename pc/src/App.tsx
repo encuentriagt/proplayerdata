@@ -8,6 +8,7 @@ import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { Home } from './pages/Home'
 import { Calendar } from './pages/Calendar'
+import { EventList } from './pages/EventList'
 import { EventFormPage } from './pages/EventForm'
 import { EventDetailPage } from './pages/EventDetail'
 import { Teams } from './pages/Teams'
@@ -36,6 +37,8 @@ export function App() {
       <Route path="/:slug" element={<OrgLayout />}>
         <Route index element={<Home />} />
         <Route path="calendario" element={<Calendar />} />
+        <Route path="partidos" element={<EventList key="match" type="match" />} />
+        <Route path="entrenos" element={<EventList key="training" type="training" />} />
         <Route path="eventos/nuevo" element={<EventFormPage />} />
         <Route path="eventos/:id" element={<EventDetailPage />} />
         <Route path="eventos/:id/editar" element={<EventFormPage />} />

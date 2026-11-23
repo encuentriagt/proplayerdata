@@ -37,11 +37,16 @@ jobs:
 
       - name: HTTPS
         run: |
-          for u in https://ppdguate.com/ https://api.ppdguate.com/api/public/health https://pc.ppdguate.com/ http://api.ppdguate.com/api/public/health; do
+          for u in http://pc.ppdguate.com/colegio-demo/login http://api.ppdguate.com/api/public/health; do
+            echo "$u -> $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$u" || true)"
+          done
+          for u in https://ppdguate.com/ https://api.ppdguate.com/api/public/health https://pc.ppdguate.com/ https://pc.ppdguate.com/colegio-demo/login; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$u" || true); echo "$u -> $code"
           done
           echo | openssl s_client -connect api.ppdguate.com:443 -servername api.ppdguate.com 2>/dev/null | openssl x509 -noout -subject -issuer -enddate || true
           echo | openssl s_client -connect pc.ppdguate.com:443 -servername pc.ppdguate.com 2>/dev/null | openssl x509 -noout -subject -enddate || true
+          echo "cadena pc: $(echo | openssl s_client -connect pc.ppdguate.com:443 -servername pc.ppdguate.com -verify_return_error 2>&1 | grep -E 'Verify return code' | head -1)"
+          echo "cadena api: $(echo | openssl s_client -connect api.ppdguate.com:443 -servername api.ppdguate.com -verify_return_error 2>&1 | grep -E 'Verify return code' | head -1)"
 
       - name: Limpiar llave
         if: always()

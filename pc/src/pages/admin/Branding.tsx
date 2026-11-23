@@ -13,7 +13,7 @@ type Kind = 'logo' | 'crest' | 'cover'
 const KIND_LABEL: Record<Kind, string> = { logo: 'Logo', crest: 'Escudo', cover: 'Portada del login' }
 
 export function AdminBranding() {
-  const { branding, slug, brandingEditable } = useOrg()
+  const { branding, slug } = useOrg()
   const qc = useQueryClient()
   const [colors, setColors] = useState({
     color_primary: branding.colors.primary ?? '#25984D',
@@ -36,8 +36,8 @@ export function AdminBranding() {
     if (save.error instanceof ApiError && save.error.code === 'branding_locked') void qc.invalidateQueries({ queryKey: ['me'] })
   }, [save.error, qc])
 
-  // branding_editable viene en /auth/me; el 403 branding_locked queda como respaldo por si cambió entretanto.
-  const locked = !brandingEditable || (save.error instanceof ApiError && save.error.code === 'branding_locked')
+  // La pestaña solo aparece con permissions.manage_branding; el 403 branding_locked queda como respaldo.
+  const locked = save.error instanceof ApiError && save.error.code === 'branding_locked'
   const ratio = isHex(colors.color_primary) && isHex(colors.color_on_primary) ? contrast(colors.color_primary, colors.color_on_primary) : 0
   const preview = themeFor({ colors: { primary: colors.color_primary, secondary: colors.color_secondary, on_primary: colors.color_on_primary } })
 

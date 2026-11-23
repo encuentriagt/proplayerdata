@@ -17,7 +17,7 @@ import { PlayerFormDialog } from './PlayerForm'
 export function PlayerDetailPage() {
   const { id } = useParams()
   const playerId = Number(id)
-  const { slug, isAdmin } = useOrg()
+  const { slug, can } = useOrg()
   const navigate = useNavigate()
   const player = usePlayer(playerId)
   const [editing, setEditing] = useState(false)
@@ -47,7 +47,7 @@ export function PlayerDetailPage() {
           {p.notes && <p className="mt-2 whitespace-pre-line text-sm text-black/70">{p.notes}</p>}
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
             <button className="btn-secondary" onClick={() => setEditing(true)}><Pencil className="size-4" aria-hidden /> Editar datos</button>
-            {isAdmin && <button className="btn-ghost text-red-700" onClick={() => setDeleting(true)}><Trash2 className="size-4" aria-hidden /> Borrar</button>}
+            {can.delete_players && <button className="btn-ghost text-red-700" onClick={() => setDeleting(true)}><Trash2 className="size-4" aria-hidden /> Borrar</button>}
           </div>
         </div>
       </div>

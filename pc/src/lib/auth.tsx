@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, type ReactN
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { onUnauthorized, request } from './api'
 import { clearToken, getToken, setToken } from './session'
-import type { LoginResult, Membership, Role, Session } from './types'
+import type { LoginResult, Membership, OrgPermissions, Role, Session } from './types'
 
 interface AuthValue {
   session: Session | null
@@ -85,24 +85,41 @@ export function useAuth(): AuthValue {
 
 const RANK: Record<Role, number> = { coach: 1, director: 2, org_admin: 3 }
 
-/** Rol más alto del usuario en la organización (un usuario puede tener varios). */
+/** Rol más alto, solo para mostrar la etiqueta ("Coach", "Director técnico"...). Nunca para decidir permisos. */
 export function topRole(memberships: Membership[]): Role | null {
   return memberships.reduce<Role | null>((best, m) => (!best || RANK[m.role] > RANK[best] ? m.role : best), null)
 }
 
-export interface Permissions {
-  role: Role | null
-  isAdmin: boolean
-  seesAllTeams: boolean
-  brandingEditable: boolean
+export const NO_PERMISSIONS: OrgPermissions = {
+  invite_roles: [], manage_members: false, manage_directors: false, manage_seasons: false, manage_plans: false,
+  manage_branding: false, create_teams: [], delete_players: false, director_scope: null,
 }
 
-export function permissionsFor(memberships: Membership[]): Permissions {
-  const role = topRole(memberships)
-  return {
-    role,
-    isAdmin: role === 'org_admin',
-    seesAllTeams: role === 'org_admin' || role === 'director',
-    brandingEditable: memberships.some((m) => m.role === 'org_admin' && m.branding_editable === true),
-  }
+/** Permisos de la organización tal como los manda la API (iguales en todas las membresías de esa organización). */
+export function permissionsFor(memberships: Membership[]): OrgPermissions {
+  return memberships.find((m) => m.permissions)?.permissions ?? NO_PERMISSIONS
+}
+
+export function canCreateTeams(p: OrgPermissions): boolean {
+  return p.create_teams === 'all' || p.create_teams.length > 0
+}
+
+export function canCreateTeamInSport(p: OrgPermissions, sportId: number): boolean {
+  return p.create_teams === 'all' || p.create_teams.includes(sportId)
+}
+
+/**
+ * ¿Puede editar/borrar/asignar staff de este equipo? En el detalle viene `can_manage`; en la lista se calcula
+ * con los permisos (admin: todos; director: equipos o deportes de su alcance). La API valida igual.
+ */
+export function canManageTeam(p: OrgPermissions, team: { id: number; sport: { id: number }; can_manage?: boolean }): boolean {
+  if (typeof team.can_manage === 'boolean') return team.can_manage
+  if (p.create_teams === 'all') return true
+  const s = p.director_scope
+  return !!s && (s.team_ids.includes(team.id) || s.sport_ids.includes(team.sport.id))
+}
+
+/** ¿Tiene algo que hacer en Administración? */
+export function hasAdminArea(p: OrgPermissions): boolean {
+  return p.manage_members || p.manage_seasons || p.manage_plans || p.manage_branding || canCreateTeams(p)
 }

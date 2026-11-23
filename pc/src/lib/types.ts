@@ -21,12 +21,26 @@ export interface User {
   is_super_admin: boolean
 }
 
+/** Permisos para la interfaz (memberships[].permissions o GET access). La API valida todo igual. */
+export interface OrgPermissions {
+  invite_roles: InviteRole[]
+  manage_members: boolean
+  manage_directors: boolean
+  manage_seasons: boolean
+  manage_plans: boolean
+  manage_branding: boolean
+  /** "all" (admin) | ids de deportes donde puede crear equipos | [] */
+  create_teams: 'all' | number[]
+  delete_players: boolean
+  director_scope: { sport_ids: number[]; team_ids: number[] } | null
+}
+
 export interface Membership {
   organization_id: number
   role: Role
   role_label: string
-  /** true solo para org_admin cuando el super admin permite editar la marca. */
   branding_editable?: boolean
+  permissions?: OrgPermissions
   organization: Branding
 }
 
@@ -74,7 +88,9 @@ export interface Team {
 
 export interface TeamDetail extends Team {
   sport: Sport & { positions: Position[]; stat_types: StatType[] }
+  /** El coach solo se ve a sí mismo. */
   staff: { user_id: number; name: string | null; role: 'head_coach' | 'assistant' }[]
+  can_manage?: boolean
 }
 
 export interface Player {
@@ -166,6 +182,8 @@ export interface Member {
   status: 'active' | 'invited' | 'disabled'
   last_login_at: string | null
   teams: { id: number; name: string | null; role: string }[]
+  /** Solo para directores técnicos (lo ve el admin). */
+  director_scope?: { sports: { id: number; code: string; name: string }[]; teams: { id: number; name: string }[] } | null
 }
 
 export type InviteRole = Role | 'guardian'
@@ -177,6 +195,7 @@ export interface Invitation {
   role_label: string
   player_id: number | null
   team_ids: number[] | null
+  sport_ids?: number[] | null
   expires_at: string
 }
 

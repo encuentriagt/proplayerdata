@@ -16,7 +16,8 @@ interface Props {
 
 /** Datos mínimos del menor: nombre, apellidos, fecha de nacimiento, género, documento (opcional) y notas. */
 export function PlayerFormDialog({ team, player, onClose }: Props) {
-  const { slug, isAdmin } = useOrg()
+  const { slug, can } = useOrg()
+  const teamOptional = can.create_teams === 'all'
   const navigate = useNavigate()
   const teams = useTeams()
   const [f, setF] = useState({
@@ -78,8 +79,8 @@ export function PlayerFormDialog({ team, player, onClose }: Props) {
 
         {!player && (
           <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
-            <SelectField label={isAdmin ? 'Equipo (opcional)' : 'Equipo'} value={f.team_id} onChange={(e) => set('team_id', e.target.value)} disabled={!!team} error={err('team_id')}>
-              {!team && <option value="">{isAdmin ? 'Sin equipo por ahora' : 'Elija un equipo'}</option>}
+            <SelectField label={teamOptional ? 'Equipo (opcional)' : 'Equipo'} value={f.team_id} onChange={(e) => set('team_id', e.target.value)} disabled={!!team} error={err('team_id')}>
+              {!team && <option value="">{teamOptional ? 'Sin equipo por ahora' : 'Elija un equipo'}</option>}
               {(team ? [team] : teamOptions).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </SelectField>
             <TextField label="Dorsal" type="number" inputMode="numeric" min={0} max={999} value={f.jersey_number}
@@ -89,7 +90,7 @@ export function PlayerFormDialog({ team, player, onClose }: Props) {
 
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" disabled={m.isPending || !f.first_name.trim() || !f.last_name.trim() || (!isAdmin && !player && !f.team_id)}>
+          <button className="btn-primary" disabled={m.isPending || !f.first_name.trim() || !f.last_name.trim() || (!teamOptional && !player && !f.team_id)}>
             {m.isPending ? 'Guardando…' : player ? 'Guarde los cambios' : 'Crear jugador'}
           </button>
         </div>

@@ -1,5 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
-import { OrgLayout, RequireAdmin } from './components/OrgLayout'
+import { Route, Routes } from 'react-router-dom'
+import { OrgLayout, RequireAdminArea } from './components/OrgLayout'
 import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
 import { AcceptInvitation } from './pages/AcceptInvitation'
@@ -14,7 +14,8 @@ import { Teams } from './pages/Teams'
 import { TeamDetailPage } from './pages/TeamDetail'
 import { Players } from './pages/Players'
 import { PlayerDetailPage } from './pages/PlayerDetail'
-import { AdminLayout } from './pages/admin/AdminLayout'
+import { AdminIndex, AdminLayout, RequirePermission } from './pages/admin/AdminLayout'
+import { useOrg } from './lib/org'
 import { AdminMembers } from './pages/admin/Members'
 import { AdminTeams } from './pages/admin/Teams'
 import { AdminSeasons } from './pages/admin/Seasons'
@@ -42,17 +43,23 @@ export function App() {
         <Route path="equipos/:id" element={<TeamDetailPage />} />
         <Route path="jugadores" element={<Players />} />
         <Route path="jugadores/:id" element={<PlayerDetailPage />} />
-        <Route path="admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
-          <Route index element={<Navigate to="miembros" replace />} />
-          <Route path="miembros" element={<AdminMembers />} />
+        <Route path="admin" element={<RequireAdminArea><AdminLayout /></RequireAdminArea>}>
+          <Route index element={<AdminIndex />} />
+          <Route path="miembros" element={<Guard k="manage_members"><AdminMembers /></Guard>} />
           <Route path="equipos" element={<AdminTeams />} />
-          <Route path="temporadas" element={<AdminSeasons />} />
-          <Route path="planes" element={<AdminPlans />} />
-          <Route path="marca" element={<AdminBranding />} />
-          <Route path="invitaciones" element={<AdminInvitations />} />
+          <Route path="temporadas" element={<Guard k="manage_seasons"><AdminSeasons /></Guard>} />
+          <Route path="planes" element={<Guard k="manage_plans"><AdminPlans /></Guard>} />
+          <Route path="marca" element={<Guard k="manage_branding"><AdminBranding /></Guard>} />
+          <Route path="invitaciones" element={<Guard k="manage_members"><AdminInvitations /></Guard>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   )
+}
+
+type BoolPerm = 'manage_members' | 'manage_seasons' | 'manage_plans' | 'manage_branding'
+function Guard({ k, children }: { k: BoolPerm; children: React.ReactNode }) {
+  const { can } = useOrg()
+  return <RequirePermission allowed={can[k]}>{children}</RequirePermission>
 }

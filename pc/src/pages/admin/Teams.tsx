@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { canCreateTeamInSport, canCreateTeams, canManageTeam } from '../../lib/auth'
 import { TEAM_GENDER } from '../../lib/labels'
 import { useOrg } from '../../lib/org'
 import { useMembers, usePcMutation, useSeasons, useSports, useTeam, useTeams } from '../../lib/queries'
@@ -10,8 +11,9 @@ import { Modal } from '../../components/Modal'
 import { Empty, ErrorAlert, SelectField, Spinner, TextField, fieldError } from '../../components/ui'
 
 export function AdminTeams() {
-  const { slug } = useOrg()
+  const { slug, can } = useOrg()
   const teams = useTeams()
+  const canCreate = canCreateTeams(can)
   const [editing, setEditing] = useState<Team | 'new' | null>(null)
   const [staffFor, setStaffFor] = useState<Team | null>(null)
   const [deleting, setDeleting] = useState<Team | null>(null)
@@ -21,9 +23,9 @@ export function AdminTeams() {
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="title text-2xl">Equipos</h2>
-        <button className="btn-primary" onClick={() => setEditing('new')}><Plus className="size-5" aria-hidden /> Nuevo equipo</button>
+        {canCreate && <button className="btn-primary" onClick={() => setEditing('new')}><Plus className="size-5" aria-hidden /> Crear equipo</button>}
       </div>
-      {teams.isLoading ? <Spinner /> : teams.isError ? <ErrorAlert error={teams.error} /> : !teams.data?.length ? <Empty>Cree el primer equipo.</Empty> : (
+      {teams.isLoading ? <Spinner /> : teams.isError ? <ErrorAlert error={teams.error} /> : !teams.data?.length ? <Empty>{canCreate ? 'Cree el primer equipo.' : 'No hay equipos en su alcance.'}</Empty> : (
         <ul className="card divide-y divide-black/5">
           {teams.data.map((t) => (
             <li key={t.id} className="flex flex-wrap items-center gap-3 p-3">
@@ -32,11 +34,11 @@ export function AdminTeams() {
                 <span className="block truncate font-semibold">{t.name}</span>
                 <span className="text-xs text-black/60">{[t.sport.name, t.category, t.gender && TEAM_GENDER[t.gender], t.season?.name].filter(Boolean).join(' · ')}</span>
               </Link>
-              <div className="flex gap-1">
+              {canManageTeam(can, t) && <div className="flex gap-1">
                 <button className="btn-secondary min-h-9 text-sm" onClick={() => setStaffFor(t)}><Users className="size-4" aria-hidden /> Staff</button>
                 <button className="btn-ghost min-h-9 px-2" aria-label={`Editar ${t.name}`} onClick={() => setEditing(t)}><Pencil className="size-4" aria-hidden /></button>
                 <button className="btn-ghost min-h-9 px-2 text-red-700" aria-label={`Borrar ${t.name}`} onClick={() => setDeleting(t)}><Trash2 className="size-4" aria-hidden /></button>
-              </div>
+              </div>}
             </li>
           ))}
         </ul>
@@ -53,7 +55,10 @@ export function AdminTeams() {
 }
 
 function TeamFormDialog({ team, onClose }: { team?: Team; onClose: () => void }) {
+  const { can } = useOrg()
   const sports = useSports()
+  // Solo los deportes donde puede crear equipos ("all" = todos). Al editar se conserva el deporte actual.
+  const sportOptions = (sports.data ?? []).filter((s) => canCreateTeamInSport(can, s.id) || s.id === team?.sport.id)
   const seasons = useSeasons()
   const current = seasons.data?.find((s) => s.is_current)
   const [f, setF] = useState({
@@ -82,7 +87,7 @@ function TeamFormDialog({ team, onClose }: { team?: Team; onClose: () => void })
         <SelectField label="Deporte" value={f.sport_id} onChange={(e) => set('sport_id', e.target.value)} required error={err('sport_id')}
           hint={team ? 'No se puede cambiar si el equipo ya tiene jugadores.' : undefined}>
           <option value="">Elija un deporte</option>
-          {sports.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {sportOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </SelectField>
         <div className="grid gap-3 sm:grid-cols-2">
           <TextField label="Categoría" value={f.category} onChange={(e) => set('category', e.target.value)} maxLength={60} error={err('category')} placeholder="ej. Sub-15" />
@@ -106,8 +111,9 @@ function TeamFormDialog({ team, onClose }: { team?: Team; onClose: () => void })
 }
 
 function StaffDialog({ team, onClose }: { team: Team; onClose: () => void }) {
+  const { can } = useOrg()
   const detail = useTeam(team.id)
-  const members = useMembers()
+  const members = useMembers(can.manage_members)
   const [userId, setUserId] = useState('')
   const [role, setRole] = useState<'head_coach' | 'assistant'>('head_coach')
   const add = usePcMutation({
@@ -117,7 +123,10 @@ function StaffDialog({ team, onClose }: { team: Team; onClose: () => void }) {
   const remove = usePcMutation<number>({ method: 'DELETE', path: (uid) => `teams/${team.id}/staff/${uid}`, invalidate: [['team', team.id], ['members']] })
 
   const staffIds = new Set(detail.data?.staff.map((s) => s.user_id))
-  const candidates = (members.data ?? []).filter((m) => m.status === 'active' && !staffIds.has(m.user_id))
+  // GET members ya viene filtrado por la API (el director solo recibe sus coaches); el director asigna solo coaches.
+  const candidates = (members.data ?? [])
+    .filter((m) => m.status === 'active' && !staffIds.has(m.user_id))
+    .filter((m) => can.manage_directors || m.role === 'coach')
     .filter((m, i, arr) => arr.findIndex((x) => x.user_id === m.user_id) === i)
 
   return (
@@ -144,7 +153,7 @@ function StaffDialog({ team, onClose }: { team: Team; onClose: () => void }) {
         </SelectField>
         <button className="btn-primary" disabled={!userId || add.isPending} onClick={() => add.mutate()}>Asignar</button>
       </div>
-      <p className="mt-2 text-xs text-black/60">¿No aparece? Invítelo primero desde Miembros.</p>
+      <p className="mt-2 text-xs text-black/60">{can.manage_directors ? '¿No aparece? Invítelo primero desde Miembros.' : '¿No aparece? Invite al coach desde Miembros; solo puede asignar coaches que usted administra.'}</p>
     </Modal>
   )
 }

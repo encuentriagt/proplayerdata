@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { CalendarDays, Home, LogOut, Menu, Settings, Shirt, Users, X } from 'lucide-react'
-import { permissionsFor, useAuth } from '../lib/auth'
+import { hasAdminArea, permissionsFor, topRole, useAuth } from '../lib/auth'
 import { applyTheme, useBranding } from '../lib/branding'
 import { OrgContext, useOrg, type OrgContextValue } from '../lib/org'
 import { setLastOrg } from '../lib/session'
@@ -26,7 +26,8 @@ export function OrgLayout() {
   const [open, setOpen] = useState(false)
 
   const memberships = membershipsFor(slug)
-  const perms = useMemo(() => permissionsFor(memberships), [memberships])
+  const can = useMemo(() => permissionsFor(memberships), [memberships])
+  const role = topRole(memberships)
 
   useEffect(() => applyTheme(branding.data), [branding.data])
   useEffect(() => setOpen(false), [location.pathname])
@@ -53,9 +54,9 @@ export function OrgLayout() {
     )
   }
 
-  const ctx: OrgContextValue = { slug, branding: branding.data, ...perms }
-  const roleLabel = memberships.find((m) => m.role === perms.role)?.role_label ?? ''
-  const nav = perms.isAdmin ? [...NAV, { to: 'admin', label: 'Administración', Icon: Settings }] : NAV
+  const ctx: OrgContextValue = { slug, branding: branding.data, role, can }
+  const roleLabel = memberships.find((m) => m.role === role)?.role_label ?? ''
+  const nav = hasAdminArea(can) ? [...NAV, { to: 'admin', label: 'Administración', Icon: Settings }] : NAV
 
   const onLogout = async () => {
     await logout()
@@ -119,9 +120,9 @@ export function OrgLayout() {
   )
 }
 
-export function RequireAdmin({ children }: { children: ReactNode }) {
-  const { isAdmin, slug } = useOrg()
-  return isAdmin ? <>{children}</> : <Navigate to={`/${slug}`} replace />
+export function RequireAdminArea({ children }: { children: ReactNode }) {
+  const { can, slug } = useOrg()
+  return hasAdminArea(can) ? <>{children}</> : <Navigate to={`/${slug}`} replace />
 }
 
 export function Centered({ children }: { children: ReactNode }) {

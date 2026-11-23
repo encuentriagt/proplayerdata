@@ -5,8 +5,10 @@ import { useAuth } from '../lib/auth'
 import { nowGt, ymd } from '../lib/dates'
 import { useOrg } from '../lib/org'
 import { useEvents, usePendingSheets } from '../lib/queries'
+import { useSport } from '../lib/sport'
+import { SportSwitcher } from '../components/SportSwitcher'
 import { EventCard } from '../components/EventCard'
-import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
+import { Empty, ErrorAlert, Spinner } from '../components/ui'
 
 export function Home() {
   const { slug } = useOrg()
@@ -15,15 +17,24 @@ export function Home() {
   const events = useEvents({ from: ymd(today), to: ymd(addDays(today, 21)) })
   const pendingQ = usePendingSheets()
 
+  const { teamIds, selected } = useSport()
   const now = Date.now()
-  const pending = [...(pendingQ.data ?? [])].reverse() // el más reciente primero
-  const upcoming = (events.data ?? []).filter((e) => e.status !== 'cancelled' && new Date(e.starts_at).getTime() >= now).slice(0, 8)
+  const inSport = (e: { team_id: number }) => teamIds.has(e.team_id)
+  const pending = [...(pendingQ.data ?? [])].filter(inSport).reverse() // el más reciente primero
+  const upcoming = (events.data ?? []).filter((e) => inSport(e) && e.status !== 'cancelled' && new Date(e.starts_at).getTime() >= now).slice(0, 8)
 
   const first = session?.user.name.split(' ')[0] ?? ''
 
   return (
     <>
-      <PageHeader title={`Hola, ${first}`} subtitle="Esto es lo que viene para sus equipos." />
+      {/* Saludo a la izquierda y el deporte a la derecha, también en el celular */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="title min-w-0 text-3xl sm:text-4xl">Hola, {first}</h1>
+          <SportSwitcher size="lg" />
+        </div>
+        <p className="mt-1 text-black/60">{selected ? `Esto es lo que viene en ${selected.name.toLowerCase()}.` : 'Esto es lo que viene para sus equipos.'}</p>
+      </div>
 
       <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <QuickLink to={`/${slug}/partidos`} Icon={Trophy} label="Partidos" />

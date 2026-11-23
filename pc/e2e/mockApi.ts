@@ -19,14 +19,14 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
   const user = { id: 1, name: role === 'coach' ? 'Carlos Coach' : role === 'director' ? 'Diana Directora' : 'Ana Admin', email: 'coach@demo.gt', must_change_password: false, is_super_admin: false }
   const session = { user, memberships: [{ organization_id: 1, role, role_label: LABEL[role], branding_editable: role === 'org_admin', permissions: PERMS[role], organization: org }], is_guardian: false }
   const sport = {
-    id: 1, code: 'football', name: 'Fútbol', periods: 2, period_minutes: 40, max_on_field: 11, unlimited_substitutions: false,
+    id: 1, code: 'futbol', name: 'Fútbol', periods: 2, period_minutes: 40, max_on_field: 11, unlimited_substitutions: false,
     positions: [{ id: 1, code: 'POR', name: 'Portero' }, { id: 3, code: 'DEL', name: 'Delantero' }],
     stat_types: [{ id: 1, code: 'goal', name: 'Gol', scores: 1 }, { id: 2, code: 'assist', name: 'Asistencia', scores: 0 }, { id: 3, code: 'yellow_card', name: 'Amarilla', scores: 0 }],
   }
-  const team = { id: 1, name: 'Sub-15 Masculino', category: 'Sub-15', gender: 'male', color: '#0B3D91', sport: { id: 1, code: 'football', name: 'Fútbol' }, season: null }
-  const basketSport = { id: 2, code: 'basketball', name: 'Básquetbol', periods: 4, period_minutes: 10, max_on_field: 5, unlimited_substitutions: true, positions: [], stat_types: [{ id: 9, code: 'point_2', name: 'Doble', scores: 2 }] }
-  const basket = { id: 2, name: 'Básquet Juvenil', category: 'Juvenil', gender: 'mixed', color: '#F2B705', sport: { id: 2, code: 'basketball', name: 'Básquetbol' }, season: null }
-  let scope: any = { sports: [{ id: 1, code: 'football', name: 'Fútbol' }], teams: [] }
+  const team = { id: 1, name: 'Sub-15 Masculino', category: 'Sub-15', gender: 'male', color: '#0B3D91', sport: { id: 1, code: 'futbol', name: 'Fútbol' }, season: null }
+  const basketSport = { id: 2, code: 'basquetbol', name: 'Básquetbol', periods: 4, period_minutes: 10, max_on_field: 5, unlimited_substitutions: true, positions: [], stat_types: [{ id: 9, code: 'point_2', name: 'Doble', scores: 2 }] }
+  const basket = { id: 2, name: 'Básquet Juvenil', category: 'Juvenil', gender: 'mixed', color: '#F2B705', sport: { id: 2, code: 'basquetbol', name: 'Básquetbol' }, season: null }
+  let scope: any = { sports: [{ id: 1, code: 'futbol', name: 'Fútbol' }], teams: [] }
   const roster = [
     { id: 15, first_name: 'Ana', last_name: 'López', full_name: 'Ana López', birthdate: '2011-03-02', gender: 'female', photo_url: null, jersey_number: 9, position: { id: 3, code: 'DEL', name: 'Delantero' }, active: true },
     { id: 18, first_name: 'Luis', last_name: 'Pérez', full_name: 'Luis Pérez', birthdate: '2011-06-10', gender: 'male', photo_url: null, jersey_number: 1, position: { id: 1, code: 'POR', name: 'Portero' }, active: true },

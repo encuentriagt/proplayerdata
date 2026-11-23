@@ -7,7 +7,8 @@ import { Plus } from 'lucide-react'
 import { request } from '../lib/api'
 import { capitalize, nowGt, toGt, ymd } from '../lib/dates'
 import { pcPath, useOrg } from '../lib/org'
-import { useTeams } from '../lib/queries'
+import { useSport } from '../lib/sport'
+import { SportSwitcher } from '../components/SportSwitcher'
 import type { PcEvent } from '../lib/types'
 import { EventCard } from '../components/EventCard'
 import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
@@ -30,7 +31,7 @@ export function EventList({ type }: { type: Kind }) {
   const tab: Tab = params.get('ver') === 'anteriores' ? 'anteriores' : 'proximos'
   const teamId = Number(params.get('equipo')) || undefined
   const [blocks, setBlocks] = useState(1)
-  const teams = useTeams()
+  const sport = useSport()
   const t = TEXT[type]
 
   const set = (k: string, v?: string) => {
@@ -58,7 +59,7 @@ export function EventList({ type }: { type: Kind }) {
   const loading = results.some((r) => r.isLoading)
   const error = results.find((r) => r.isError)?.error
   // Próximos: de hoy en adelante (incluye lo de hoy aunque ya haya pasado la hora). Anteriores: hasta ayer, el más reciente primero.
-  const all = results.flatMap((r) => r.data ?? [])
+  const all = results.flatMap((r) => r.data ?? []).filter((e) => sport.teamIds.has(e.team_id))
   const list = tab === 'proximos' ? all : [...all].sort((a, b) => b.starts_at.localeCompare(a.starts_at))
 
   // Agrupar por mes para que la lista se lea fácil.
@@ -73,7 +74,10 @@ export function EventList({ type }: { type: Kind }) {
   return (
     <>
       <PageHeader title={t.title} actions={
-        <Link to={nuevoHref} className="btn-primary"><Plus className="size-5" aria-hidden /> {t.nuevo}</Link>
+        <>
+          <SportSwitcher />
+          <Link to={nuevoHref} className="btn-primary"><Plus className="size-5" aria-hidden /> {t.nuevo}</Link>
+        </>
       } />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -86,7 +90,7 @@ export function EventList({ type }: { type: Kind }) {
         <select className="input ml-auto min-h-10 w-auto py-1 text-sm" aria-label="Filtrar por equipo" value={teamId ?? ''}
           onChange={(e) => set('equipo', e.target.value || undefined)}>
           <option value="">Todos los equipos</option>
-          {teams.data?.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          {sport.teams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </select>
       </div>
 

@@ -1,0 +1,56 @@
+name: Corregir carpeta de api.ppdguate.com (una sola vez)
+
+# Al recrear el subdominio desde cPanel quedó apuntando a ~/api.ppdguate.com en vez de ~/ppd-api/public.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escriba CORREGIR para cambiar el document root de api a ppd-api/public'
+        required: true
+
+jobs:
+  fix:
+    if: github.event.inputs.confirmar == 'CORREGIR'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Preparar SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s' "$SSH_KEY" | tr -d ' \r\n\t' | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Cambiar document root
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -e
+          echo "--- antes"; uapi DomainInfo domains_data 2>/dev/null | grep -B1 "domain: api.ppdguate.com" | grep documentroot
+          # Conservar la validación del SSL (.well-known) si cPanel la dejó en la carpeta nueva.
+          if [ -d ~/api.ppdguate.com/.well-known ]; then
+            mkdir -p ~/ppd-api/public/.well-known && cp -rn ~/api.ppdguate.com/.well-known/. ~/ppd-api/public/.well-known/ && echo ".well-known copiado"
+          fi
+          R=$(cpapi2 --output=json SubDomain changedocroot subdomain=api rootdomain=ppdguate.com dir=ppd-api/public 2>/dev/null)
+          echo "$R" | grep -q '"result":1' && echo "document root cambiado" || { echo "$R" | head -c 800; exit 1; }
+          echo "--- después"; uapi DomainInfo domains_data 2>/dev/null | grep -B1 "domain: api.ppdguate.com" | grep documentroot
+          echo "--- carpeta sobrante (no se borra):"; ls -la ~/api.ppdguate.com 2>&1 | head
+          REMOTE
+
+      - name: Verificar
+        run: |
+          sleep 20
+          for i in 1 2 3; do
+            code=$(curl -s -o /tmp/h.json -w '%{http_code}' https://api.ppdguate.com/api/public/health || true)
+            echo "intento $i: $code $(cat /tmp/h.json 2>/dev/null | head -c 200)"; [ "$code" = "200" ] && exit 0; sleep 20
+          done
+
+      - name: Limpiar llave
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

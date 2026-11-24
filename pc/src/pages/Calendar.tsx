@@ -40,8 +40,8 @@ export function Calendar() {
   }, [view, anchor])
 
   const sport = useSport()
-  const events = useEvents({ from: ymd(from), to: ymd(to), team_id: teamId, type })
-  const shown = (events.data ?? []).filter((e) => sport.teamIds.has(e.team_id))
+  const events = useEvents({ from: ymd(from), to: ymd(to), team_id: teamId, type, sport_id: sport.selected?.id ?? -1 })
+  const shown = events.data ?? []
 
   const move = (dir: 1 | -1) => {
     const d = view === 'semana' ? addWeeks(anchor, dir) : addMonths(anchor, dir)

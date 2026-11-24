@@ -11,6 +11,7 @@ type Tab = { to: string; label: string; show: (p: OrgPermissions, managesSomeTea
 // Cada pestaña según los permisos que manda la API (no según el rol).
 const TABS: Tab[] = [
   { to: 'miembros', label: 'Miembros', show: (p) => p.manage_members },
+  { to: 'deportes', label: 'Deportes', show: (p) => p.manage_sports },
   { to: 'equipos', label: 'Equipos', show: (p, some) => canCreateTeams(p) || some },
   { to: 'temporadas', label: 'Temporadas', show: (p) => p.manage_seasons },
   { to: 'planes', label: 'Planes', show: (p) => p.manage_plans },

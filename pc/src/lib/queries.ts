@@ -3,7 +3,7 @@ import { useRef } from 'react'
 import { ApiError, newIdempotencyKey, request, requestIdempotent, type RequestOptions } from './api'
 import { pcPath, useOrg } from './org'
 import type {
-  EventDetail, EventType, Invitation, Member, PcEvent, PlanGrant, PlanUsage, Player, PlayerDetail,
+  EventDetail, EventType, Invitation, Position, StatType, Member, PcEvent, PlanGrant, PlanUsage, Player, PlayerDetail,
   RosterEntry, Season, Sport, Team, TeamDetail,
 } from './types'
 
@@ -43,6 +43,17 @@ export function useSeasons() {
   return useQuery({ queryKey: [slug, 'seasons'], queryFn: async () => (await request<Season[]>(path('seasons'))).data })
 }
 
+/** Deportes activados por la organización que el miembro ve (admin: todos los activados; director/coach: su alcance). */
+export function useOrgSports() {
+  const { slug, path } = usePc()
+  return useQuery({
+    queryKey: [slug, 'sports'],
+    queryFn: async () => (await request<(Sport & { positions: Position[]; stat_types: StatType[] })[]>(path('sports'))).data,
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** Catálogo general de ppd (todos los deportes). Solo para que el admin elija cuáles activar. */
 export function useSports() {
   return useQuery({
     queryKey: ['catalog', 'sports'],
@@ -51,7 +62,7 @@ export function useSports() {
   })
 }
 
-export function useEvents(params: { from: string; to: string; team_id?: number; type?: EventType }) {
+export function useEvents(params: { from: string; to: string; team_id?: number; type?: EventType; sport_id?: number }) {
   const { slug, path } = usePc()
   return useQuery({
     queryKey: [slug, 'events', params],
@@ -60,11 +71,11 @@ export function useEvents(params: { from: string; to: string; team_id?: number; 
 }
 
 /** Partidos ya jugados (últimos 120 días), no cancelados y sin resultado publicado. */
-export function usePendingSheets() {
+export function usePendingSheets(sportId?: number) {
   const { slug, path } = usePc()
   return useQuery({
-    queryKey: [slug, 'events', 'pending_sheet'],
-    queryFn: async () => (await request<PcEvent[]>(path('events'), { query: { pending_sheet: 1 } })).data,
+    queryKey: [slug, 'events', 'pending_sheet', sportId],
+    queryFn: async () => (await request<PcEvent[]>(path('events'), { query: { pending_sheet: 1, sport_id: sportId } })).data,
   })
 }
 

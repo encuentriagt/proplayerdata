@@ -29,7 +29,9 @@ export interface OrgPermissions {
   manage_seasons: boolean
   manage_plans: boolean
   manage_branding: boolean
-  /** "all" (admin) | ids de deportes donde puede crear equipos | [] */
+  /** Solo admin: activar/desactivar deportes de la organización. */
+  manage_sports: boolean
+  /** "all" (admin: todos los activados) | ids de deportes donde puede crear equipos | [] */
   create_teams: 'all' | number[]
   delete_players: boolean
   /** Solo admin: registrar jugador sin equipo. */

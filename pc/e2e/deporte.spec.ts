@@ -17,25 +17,25 @@ test('selector de deporte: Inicio muestra el deporte y Partidos solo el elegido'
     }
   })
 
-  // Junto al saludo: el deporte con su ícono (orden alfabético: Basketball primero)
-  const switcher = page.getByRole('button', { name: /Deporte: Basketball/ })
+  // Junto al saludo: el deporte con su ícono (el primero en el orden del catálogo: Soccer)
+  const switcher = page.getByRole('button', { name: /Deporte: Soccer/ })
   await expect(switcher).toBeVisible()
-  await expect(switcher).toContainText('🏀')
+  await expect(switcher).toContainText('⚽')
 
   await page.goto('/colegio-demo/partidos')
-  await expect(page.getByText('vs. Rival Básquet')).toBeVisible()
-  await expect(page.getByText('vs. Rival Fútbol')).toHaveCount(0)
-
-  // Cambiar a Soccer
-  await page.getByRole('button', { name: /Cambiar deporte/ }).click()
-  await page.getByRole('option', { name: /Soccer/ }).click()
   await expect(page.getByText('vs. Rival Fútbol')).toBeVisible()
   await expect(page.getByText('vs. Rival Básquet')).toHaveCount(0)
-  await expect(page.getByLabel('Filtrar por equipo').locator('option')).toHaveText(['Todos los equipos', 'Sub-15 Masculino'])
+
+  // Cambiar a Basketball
+  await page.getByRole('button', { name: /Cambiar deporte/ }).click()
+  await page.getByRole('option', { name: /Basketball/ }).click()
+  await expect(page.getByText('vs. Rival Básquet')).toBeVisible()
+  await expect(page.getByText('vs. Rival Fútbol')).toHaveCount(0)
+  await expect(page.getByLabel('Filtrar por equipo').locator('option')).toHaveText(['Todos los equipos', 'Básquet Juvenil'])
 
   // Se recuerda al volver a Inicio
   await page.goto('/colegio-demo')
-  await expect(page.getByRole('button', { name: /Deporte: Soccer/ })).toContainText('⚽')
+  await expect(page.getByRole('button', { name: /Deporte: Basketball/ })).toContainText('🏀')
 })
 
 test('con un solo deporte se muestra el ícono sin menú', async ({ page }) => {

@@ -28,11 +28,11 @@ test('login → equipo → crear partido → convocar → ficha → publicar', a
 
   // Crear partido
   await page.getByRole('link', { name: 'Nueva actividad' }).click()
-  await page.getByLabel('Inicio').fill('2026-11-20T09:00')
+  await page.getByLabel('Inicio', { exact: true }).fill('2026-11-20T09:00')
   await page.getByLabel('Rival').fill('Liceo Norte')
   await page.getByLabel('Condición').selectOption('home')
   await page.getByLabel('Lugar').fill('Cancha 1')
-  await page.getByRole('button', { name: 'Crear actividad' }).click()
+  await page.getByRole('button', { name: 'Crear partido' }).click()
   await expect(page.getByRole('heading', { name: 'vs. Liceo Norte' })).toBeVisible()
   const create = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
   expect(create.headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/)
@@ -123,4 +123,51 @@ test('organización inactiva muestra el aviso', async ({ page }) => {
   }))
   await page.goto('/cerrado/login')
   await expect(page.getByText('Su organización no está activa. Comuníquese con su institución.')).toBeVisible()
+})
+
+test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo', async ({ page }) => {
+  const api = mockApi(page)
+  await page.goto('/colegio-demo/login')
+  await page.getByLabel('Correo electrónico').fill('coach@demo.gt')
+  await page.getByLabel('Contraseña', { exact: true }).fill('Secreta12345')
+  await page.getByRole('button', { name: 'Ingresar' }).click()
+  await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Nueva actividad' })).toHaveCount(0)
+
+  // Partidos: lista vacía → nuevo partido → aparece en la lista
+  await page.getByRole('main').getByRole('link', { name: 'Partidos' }).click()
+  await expect(page.getByRole('heading', { name: 'Partidos' })).toBeVisible()
+  await expect(page.getByText('No hay partidos programados.')).toBeVisible()
+  await page.getByRole('link', { name: 'Nuevo partido' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Nuevo partido' })).toBeVisible()
+  const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
+  await page.getByLabel('Equipo').selectOption('1')
+  await page.getByLabel('Inicio', { exact: true }).fill(`${manana}T10:00`)
+  await page.getByLabel('Rival').fill('Colegio Sur')
+  await page.getByRole('button', { name: 'Crear partido' }).click()
+  await expect(page.getByRole('heading', { name: 'vs. Colegio Sur' })).toBeVisible()
+  expect(api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))?.body.type).toBe('match')
+
+  // Desde el detalle, "Volver" regresa a la lista de partidos (el formulario se reemplazó al crear)
+  await page.getByRole('button', { name: 'Volver' }).click()
+  await expect(page.getByRole('heading', { name: 'Partidos' })).toBeVisible()
+  await expect(page.getByText('vs. Colegio Sur')).toBeVisible()
+  // Y "Inicio" lleva al menú principal
+  await page.getByRole('link', { name: 'Inicio', exact: true }).first().click()
+  await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Volver' })).toHaveCount(0)
+  // El logo del encabezado también lleva a Inicio
+  await page.goto('/colegio-demo/partidos')
+  await page.getByRole('link', { name: /ir al inicio/ }).first().click()
+  await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
+  await page.goto('/colegio-demo/partidos')
+  expect(api.calls.some((c) => c.path.endsWith('/events') && c.method === 'GET')).toBe(true)
+
+  // Entrenos: el partido no aparece; "Nuevo entreno" abre el formulario con el tipo entreno
+  await page.goto('/colegio-demo/entrenos')
+  await expect(page.getByRole('heading', { name: 'Entrenos' })).toBeVisible()
+  await expect(page.getByText('vs. Colegio Sur')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Nuevo entreno' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Nuevo entreno' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Crear entreno' })).toBeVisible()
 })

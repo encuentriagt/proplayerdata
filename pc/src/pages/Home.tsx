@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { addDays } from 'date-fns'
-import { CalendarPlus, ClipboardList, Shirt, UserPlus } from 'lucide-react'
+import { ClipboardList, Dumbbell, Shirt, Trophy, UserPlus } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { nowGt, ymd } from '../lib/dates'
 import { useOrg } from '../lib/org'
@@ -25,8 +25,9 @@ export function Home() {
     <>
       <PageHeader title={`Hola, ${first}`} subtitle="Esto es lo que viene para sus equipos." />
 
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <QuickLink to={`/${slug}/eventos/nuevo`} Icon={CalendarPlus} label="Nueva actividad" />
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <QuickLink to={`/${slug}/partidos`} Icon={Trophy} label="Partidos" />
+        <QuickLink to={`/${slug}/entrenos`} Icon={Dumbbell} label="Entrenos" />
         <QuickLink to={`/${slug}/calendario`} Icon={ClipboardList} label="Calendario" />
         <QuickLink to={`/${slug}/equipos`} Icon={Shirt} label="Equipos" />
         <QuickLink to={`/${slug}/jugadores`} Icon={UserPlus} label="Jugadores" />
@@ -52,7 +53,7 @@ export function Home() {
   )
 }
 
-function QuickLink({ to, Icon, label }: { to: string; Icon: typeof CalendarPlus; label: string }) {
+function QuickLink({ to, Icon, label }: { to: string; Icon: typeof Trophy; label: string }) {
   return (
     <Link to={to} className="card flex min-h-20 flex-col items-center justify-center gap-1 p-3 text-center font-semibold hover:ring-2 hover:ring-org/40">
       <Icon className="size-6 text-org-accent" aria-hidden />

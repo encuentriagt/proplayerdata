@@ -93,7 +93,7 @@ export function EventFormPage() {
 
   return (
     <>
-      <PageHeader title={editing ? 'Editar actividad' : 'Nueva actividad'} subtitle="Las horas son de Guatemala." />
+      <PageHeader title={editing ? 'Editar actividad' : f.type === 'match' ? 'Nuevo partido' : f.type === 'training' ? 'Nuevo entreno' : 'Nueva actividad'} subtitle="Las horas son de Guatemala." />
       <form onSubmit={submit} className="card max-w-2xl space-y-4 p-4 sm:p-6" noValidate>
         <ErrorAlert error={m.error} />
 
@@ -141,7 +141,7 @@ export function EventFormPage() {
         <div className="flex flex-wrap justify-end gap-2 pt-2">
           <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
           <button className="btn-primary" disabled={m.isPending || !f.team_id || !f.starts_at}>
-            {m.isPending ? 'Guardando…' : editing ? 'Guarde los cambios' : 'Crear actividad'}
+            {m.isPending ? 'Guardando…' : editing ? 'Guarde los cambios' : f.type === 'match' ? 'Crear partido' : f.type === 'training' ? 'Crear entreno' : 'Crear actividad'}
           </button>
         </div>
       </form>

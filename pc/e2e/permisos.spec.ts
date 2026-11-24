@@ -46,8 +46,8 @@ test('director técnico: sus coaches, crear equipos solo de su deporte, sin temp
   await expect(page.getByRole('button', { name: 'Editar Sub-15 Masculino' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Editar Básquet Juvenil' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Crear equipo' }).click()
-  const opciones = await page.getByLabel('Deporte').locator('option').allTextContents()
-  expect(opciones).toEqual(['Elija un deporte', 'Fútbol'])
+  // toHaveText reintenta hasta que carga el catálogo (evita leer la lista vacía)
+  await expect(page.getByLabel('Deporte').locator('option')).toHaveText(['Elija un deporte', 'Fútbol'])
   await page.getByRole('button', { name: 'Cancelar' }).click()
 
   // Sin create_players_without_team: el equipo es obligatorio

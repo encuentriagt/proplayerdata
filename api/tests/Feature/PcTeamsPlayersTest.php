@@ -23,9 +23,9 @@ class PcTeamsPlayersTest extends TestCase
         $this->as($this->member($org, 'c@x.test', 'coach'));
         $r = $this->getJson('/api/catalog/sports')->assertOk();
         $codes = collect($r->json('data'))->pluck('code')->all();
-        $this->assertContains('futbol', $codes);
-        $this->assertContains('basquetbol', $codes);
-        $basket = collect($r->json('data'))->firstWhere('code', 'basquetbol');
+        $this->assertContains('soccer', $codes);
+        $this->assertContains('basketball', $codes);
+        $basket = collect($r->json('data'))->firstWhere('code', 'basketball');
         $this->assertSame(3, collect($basket['stat_types'])->firstWhere('code', 'point_3')['scores']);
     }
 
@@ -51,7 +51,7 @@ class PcTeamsPlayersTest extends TestCase
         $coach = $this->member($org, 'c@x.test', 'coach');
         $this->assign($t1, $coach);
         $director = $this->member($org, 'd@x.test', 'director');
-        \App\Models\DirectorScope::create(['organization_id' => $org->id, 'user_id' => $director->id, 'sport_id' => Sport::where('code', 'futbol')->value('id')]);
+        \App\Models\DirectorScope::create(['organization_id' => $org->id, 'user_id' => $director->id, 'sport_id' => Sport::where('code', 'soccer')->value('id')]);
         $admin = $this->member($org, 'a@x.test', 'org_admin');
 
         $this->as($coach)->getJson($this->base.'/teams')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Sub-12');
@@ -74,12 +74,13 @@ class PcTeamsPlayersTest extends TestCase
         $org = $this->makeOrg();
         $coach = $this->member($org, 'c@x.test', 'coach');
         $admin = $this->member($org, 'a@x.test', 'org_admin');
-        $futbol = Sport::where('code', 'futbol')->value('id');
+        $futbol = Sport::where('code', 'soccer')->value('id');
+        $org->sports()->attach($futbol);
 
         $this->as($coach)->postJson($this->base.'/teams', ['name' => 'Equipo X', 'sport_id' => $futbol])->assertForbidden();
 
         $id = $this->as($admin)->postJson($this->base.'/teams', ['name' => 'Sub-12', 'sport_id' => $futbol, 'category' => 'Sub-12', 'color' => '#112233'])
-            ->assertCreated()->assertJsonPath('data.sport.code', 'futbol')->json('data.id');
+            ->assertCreated()->assertJsonPath('data.sport.code', 'soccer')->json('data.id');
 
         $this->as($admin)->postJson($this->base."/teams/{$id}/staff", ['user_id' => $coach->id])->assertCreated();
         $this->as($coach)->getJson($this->base.'/teams')->assertJsonCount(1, 'data');
@@ -126,18 +127,19 @@ class PcTeamsPlayersTest extends TestCase
     public function test_plantilla_y_posicion_del_deporte(): void
     {
         $org = $this->makeOrg();
-        $t1 = $this->team($org, 'Sub-12', 'futbol');
+        $t1 = $this->team($org, 'Sub-12', 'soccer');
         $admin = $this->member($org, 'a@x.test', 'org_admin');
         $p = $this->player($org);
-        $posBasket = \App\Models\SportPosition::whereHas('sport', fn ($q) => $q->where('code', 'basquetbol'))->value('id');
-        $posFutbol = \App\Models\SportPosition::whereHas('sport', fn ($q) => $q->where('code', 'futbol'))->where('code', 'POR')->value('id');
+        $posBasket = \App\Models\SportPosition::whereHas('sport', fn ($q) => $q->where('code', 'basketball'))->value('id');
+        $posFutbol = \App\Models\SportPosition::whereHas('sport', fn ($q) => $q->where('code', 'soccer'))->where('code', 'POR')->value('id');
 
         $this->as($admin)->postJson($this->base."/teams/{$t1->id}/roster", ['player_id' => $p->id, 'sport_position_id' => $posBasket])->assertStatus(422);
         $this->as($admin)->postJson($this->base."/teams/{$t1->id}/roster", ['player_id' => $p->id, 'sport_position_id' => $posFutbol, 'jersey_number' => 9])->assertCreated();
         $this->as($admin)->getJson($this->base."/teams/{$t1->id}/roster")->assertJsonPath('data.0.jersey_number', 9)->assertJsonPath('data.0.position.code', 'POR');
 
         // No se puede cambiar el deporte si ya hay jugadores.
-        $this->as($admin)->patchJson($this->base."/teams/{$t1->id}", ['sport_id' => Sport::where('code', 'basquetbol')->value('id')])
+        $org->sports()->syncWithoutDetaching([Sport::where('code', 'basketball')->value('id')]);
+        $this->as($admin)->patchJson($this->base."/teams/{$t1->id}", ['sport_id' => Sport::where('code', 'basketball')->value('id')])
             ->assertStatus(422)->assertJsonPath('error.code', 'sport_locked');
     }
 

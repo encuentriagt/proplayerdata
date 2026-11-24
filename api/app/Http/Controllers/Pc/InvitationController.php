@@ -65,8 +65,8 @@ class InvitationController extends Controller
             if ($teamIds && Team::where('organization_id', $organization->id)->whereIn('id', $teamIds)->count() !== count($teamIds)) {
                 return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Hay equipos que no pertenecen a su organización.']], 422);
             }
-            if ($sportIds && \App\Models\Sport::whereIn('id', $sportIds)->count() !== count($sportIds)) {
-                return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Hay deportes que no existen.']], 422);
+            if ($sportIds && array_diff($sportIds, $access->enabledSportIds())) {
+                return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Hay deportes que no están activados en su organización.']], 422);
             }
             // El director solo asigna equipos de su alcance a los coaches que invita.
             if (! $access->isAdmin() && array_diff($teamIds, $access->directedTeamIds())) {

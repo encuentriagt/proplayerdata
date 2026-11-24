@@ -104,7 +104,8 @@ class PcRequestsTest extends TestCase
         Mail::fake();
         $org = $this->makeOrg();
         $admin = $this->member($org, 'a@x.test', 'org_admin');
-        $r = $this->as($admin)->postJson($this->base.'/invitations', ['email' => 'd@x.test', 'role' => 'director', 'sport_ids' => [\App\Models\Sport::where('code', 'futbol')->value('id')]])->json('data');
+        $org->sports()->attach(\App\Models\Sport::where('code', 'soccer')->value('id'));
+        $r = $this->as($admin)->postJson($this->base.'/invitations', ['email' => 'd@x.test', 'role' => 'director', 'sport_ids' => [\App\Models\Sport::where('code', 'soccer')->value('id')]])->json('data');
         $old = $this->tokenFrom($r['invite_url']);
         $new = $this->tokenFrom($this->as($admin)->postJson($this->base."/invitations/{$r['id']}/resend")->assertOk()->json('data.invite_url'));
         $this->assertNotSame($old, $new);
@@ -116,7 +117,7 @@ class PcRequestsTest extends TestCase
     public function test_evento_trae_catalogo_y_filtro_fichas_pendientes(): void
     {
         $org = $this->makeOrg();
-        $team = $this->team($org, 'Sub-12', 'basquetbol');
+        $team = $this->team($org, 'Sub-12', 'basketball');
         $admin = $this->member($org, 'a@x.test', 'org_admin');
         $mk = fn ($days, $published = false, $status = 'scheduled') => Event::create([
             'organization_id' => $org->id, 'team_id' => $team->id, 'type' => 'match', 'status' => $status,
@@ -128,7 +129,7 @@ class PcRequestsTest extends TestCase
         $mk(4);
 
         $this->as($admin)->getJson($this->base."/events/{$pendiente->id}")->assertOk()
-            ->assertJsonPath('data.sport.code', 'basquetbol')->assertJsonPath('data.sport.stat_types.2.code', 'point_3');
+            ->assertJsonPath('data.sport.code', 'basketball')->assertJsonPath('data.sport.stat_types.2.code', 'point_3');
         $this->as($admin)->getJson($this->base.'/events?pending_sheet=1')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $pendiente->id);
     }
 

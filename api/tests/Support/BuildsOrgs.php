@@ -34,9 +34,12 @@ trait BuildsOrgs
         return $u;
     }
 
-    protected function team(Organization $org, string $name = 'Sub-12', string $sport = 'futbol'): Team
+    protected function team(Organization $org, string $name = 'Sub-12', string $sport = 'soccer'): Team
     {
-        return $org->teams()->create(['name' => $name, 'sport_id' => Sport::where('code', $sport)->value('id')]);
+        $sportId = Sport::where('code', $sport)->value('id');
+        $org->sports()->syncWithoutDetaching([$sportId]);
+
+        return $org->teams()->create(['name' => $name, 'sport_id' => $sportId]);
     }
 
     protected function assign(Team $team, User $user): void

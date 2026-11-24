@@ -89,6 +89,8 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     // ---- PC: Plataforma Coach (coach, director, org_admin) ----
     Route::prefix('pc/orgs/{organization:slug}')->middleware('org')->scopeBindings()->group(function () {
         Route::get('access', \App\Http\Controllers\Pc\AccessController::class);
+        Route::get('sports', [\App\Http\Controllers\Pc\SportController::class, 'index']);
+        Route::put('sports', [\App\Http\Controllers\Pc\SportController::class, 'update']);
         Route::get('seasons', [SeasonController::class, 'index']);
         Route::post('seasons', [SeasonController::class, 'store'])->middleware('idempotent');
         Route::patch('seasons/{season}', [SeasonController::class, 'update']);

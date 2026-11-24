@@ -46,6 +46,9 @@ class TeamController extends Controller
     public function store(Request $request, Organization $organization, OrgAccess $access): JsonResponse
     {
         $data = $this->validated($request, $organization);
+        if (! $access->isSportEnabled((int) $data['sport_id'])) {
+            return $this->sportNotEnabled();
+        }
         $access->authorize($access->canCreateTeamInSport((int) $data['sport_id']));
 
         $team = $organization->teams()->create($data);
@@ -59,6 +62,9 @@ class TeamController extends Controller
         $access->authorize($access->canManageTeam($team));
         $data = $this->validated($request, $organization, true);
         if (isset($data['sport_id']) && (int) $data['sport_id'] !== $team->sport_id) {
+            if (! $access->isSportEnabled((int) $data['sport_id'])) {
+                return $this->sportNotEnabled();
+            }
             $access->authorize($access->canCreateTeamInSport((int) $data['sport_id']));
         }
 
@@ -79,6 +85,13 @@ class TeamController extends Controller
         Audit::log('team.deleted', $team, [], $organization->id);
 
         return response()->json(['data' => ['ok' => true]]);
+    }
+
+    private function sportNotEnabled(): JsonResponse
+    {
+        return \App\Support\ApiError::response('sport_not_enabled', 'Ese deporte no está activado en su organización. El administrador lo activa en Administración → Deportes.', 422, [
+            'fields' => ['sport_id' => ['Deporte no activado.']],
+        ]);
     }
 
     private function validated(Request $request, Organization $organization, bool $partial = false): array

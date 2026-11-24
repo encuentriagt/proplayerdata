@@ -20,7 +20,7 @@ class PlansAndAppTest extends TestCase
     {
         $org = $this->makeOrg();
         $org->update(['quota_pro' => 1, 'quota_premium' => 1]);
-        $team = $this->team($org, 'Sub-12', 'futbol');
+        $team = $this->team($org, 'Sub-12', 'soccer');
         $admin = $this->member($org, 'a@x.test', 'org_admin');
         $coach = $this->member($org, 'c@x.test', 'coach');
         $this->assign($team, $coach);
@@ -49,7 +49,7 @@ class PlansAndAppTest extends TestCase
         $this->as($papa)->getJson('/api/app/children')->assertOk()->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.organization.slug', 'colegio-demo')
             ->assertJsonPath('data.0.plan_level', 'free')
-            ->assertJsonPath('data.0.teams.0.sport.code', 'futbol');
+            ->assertJsonPath('data.0.teams.0.sport.code', 'soccer');
         $this->as($papa)->getJson('/api/app/plan')->assertOk()->assertJsonPath('data.level', 'free')->assertJsonMissingPath('data.price');
     }
 

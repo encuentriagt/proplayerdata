@@ -29,6 +29,8 @@ final class OrgAccess
 
     private ?array $scopeCache = null;
 
+    private ?array $enabledSportsCache = null;
+
     /** @param MemberRole[] $roles */
     public function __construct(
         public readonly Organization $organization,
@@ -133,7 +135,36 @@ final class OrgAccess
     /** Crear equipos de un deporte: admin, o director con ese deporte completo asignado. */
     public function canCreateTeamInSport(int $sportId): bool
     {
+        if (! $this->isSportEnabled($sportId)) {
+            return false;
+        }
+
         return $this->isAdmin() || in_array($sportId, $this->directorScope()['sport_ids'], true);
+    }
+
+    /** Deportes que la organización activó (ids). */
+    public function enabledSportIds(): array
+    {
+        return $this->enabledSportsCache ??= \Illuminate\Support\Facades\DB::table('organization_sports')
+            ->where('organization_id', $this->organization->id)->pluck('sport_id')->map(fn ($i) => (int) $i)->all();
+    }
+
+    public function isSportEnabled(int $sportId): bool
+    {
+        return in_array($sportId, $this->enabledSportIds(), true);
+    }
+
+    /** Deportes activados que este miembro ve: admin todos; director su alcance; coach los de sus equipos. */
+    public function visibleSportIds(): array
+    {
+        $enabled = $this->enabledSportIds();
+        if ($this->isAdmin()) {
+            return $enabled;
+        }
+        $teamSports = Team::whereIn('id', $this->teamIds() ?: [0])->distinct()->pluck('sport_id')->map(fn ($i) => (int) $i)->all();
+        $mine = array_unique(array_merge($teamSports, $this->directorScope()['sport_ids']));
+
+        return array_values(array_intersect($enabled, $mine));
     }
 
     public function canViewPlayer(Player $player): bool
@@ -195,6 +226,7 @@ final class OrgAccess
             'manage_directors' => $this->isAdmin(),
             'manage_seasons' => $this->isAdmin(),
             'manage_plans' => $this->isAdmin(),
+            'manage_sports' => $this->isAdmin(),
             'manage_branding' => $this->isAdmin() && $this->organization->branding_editable_by_org,
             'create_teams' => $this->isAdmin() ? 'all' : $this->directorScope()['sport_ids'],
             'delete_players' => $this->isAdmin(),

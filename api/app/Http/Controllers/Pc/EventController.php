@@ -32,6 +32,7 @@ class EventController extends Controller
             'from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from'],
             'team_id' => ['nullable', 'integer'], 'type' => ['nullable', Rule::in(['match', 'training', 'other'])],
             'pending_sheet' => ['nullable', 'boolean'],
+            'sport_id' => ['nullable', 'integer'],
         ]);
         $pending = $request->boolean('pending_sheet');
         if ($pending) {
@@ -50,6 +51,9 @@ class EventController extends Controller
         if (! empty($data['team_id'])) {
             $access->authorize(in_array((int) $data['team_id'], $teamIds, true));
             $teamIds = [(int) $data['team_id']];
+        }
+        if (! empty($data['sport_id'])) {
+            $teamIds = \App\Models\Team::whereIn('id', $teamIds ?: [0])->where('sport_id', (int) $data['sport_id'])->pluck('id')->all();
         }
 
         $events = Event::with('team:id,name')

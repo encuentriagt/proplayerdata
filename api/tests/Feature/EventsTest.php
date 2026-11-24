@@ -18,8 +18,8 @@ class EventsTest extends TestCase
     private function setupTeam(): array
     {
         $org = $this->makeOrg();
-        $team = $this->team($org, 'Sub-12', 'futbol');
-        $otro = $this->team($org, 'Sub-15', 'futbol');
+        $team = $this->team($org, 'Sub-12', 'soccer');
+        $otro = $this->team($org, 'Sub-15', 'soccer');
         $coach = $this->member($org, 'c@x.test', 'coach');
         $this->assign($team, $coach);
         $ana = $this->player($org, $team, 'Ana');

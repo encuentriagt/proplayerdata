@@ -37,9 +37,15 @@ export function EventFormPage() {
   }, [editing, paramTeam, sport])
   const existing = useEvent(editing ? Number(id) : undefined)
 
+  // Desde Partidos o Entrenos llega ?tipo=: el formulario es solo de ese tipo. Al editar, el tipo tampoco cambia.
+  // El selector de tipo solo aparece en "Nueva actividad" del Calendario (allí se crean las de tipo "Otro").
+  const tipoParam = params.get('tipo')
+  const presetType = tipoParam && tipoParam in EVENT_TYPE ? (tipoParam as EventType) : null
+  const showTypePicker = !editing && !presetType
+
   const [f, setF] = useState<FormState>(() => ({
     team_id: params.get('equipo') ?? '',
-    type: (params.get('tipo') as EventType) || 'match',
+    type: presetType ?? 'match',
     starts_at: params.get('fecha') ? `${params.get('fecha')}T16:00` : '',
     ends_at: '',
     title: '',
@@ -101,7 +107,7 @@ export function EventFormPage() {
 
   return (
     <>
-      <PageHeader title={editing ? 'Editar actividad' : f.type === 'match' ? 'Nuevo partido' : f.type === 'training' ? 'Nuevo entreno' : 'Nueva actividad'} subtitle="Las horas son de Guatemala." />
+      <PageHeader title={editing ? (f.type === 'match' ? 'Editar partido' : f.type === 'training' ? 'Editar entreno' : 'Editar actividad') : f.type === 'match' ? 'Nuevo partido' : f.type === 'training' ? 'Nuevo entreno' : 'Nueva actividad'} subtitle="Las horas son de Guatemala." />
       <form onSubmit={submit} className="card max-w-2xl space-y-4 p-4 sm:p-6" noValidate>
         <ErrorAlert error={m.error} />
 
@@ -110,7 +116,7 @@ export function EventFormPage() {
           {teamOptions.map((t) => <option key={t.id} value={t.id}>{t.name}{t.category ? ` · ${t.category}` : ''}</option>)}
         </SelectField>
 
-        <fieldset>
+        {showTypePicker && <fieldset>
           <legend className="label">Tipo</legend>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(EVENT_TYPE) as EventType[]).map((t) => (
@@ -120,7 +126,7 @@ export function EventFormPage() {
               </label>
             ))}
           </div>
-        </fieldset>
+        </fieldset>}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField label="Inicio" type="datetime-local" value={f.starts_at} onChange={(e) => set('starts_at', e.target.value)} onBlur={suggestEnd} required error={err('starts_at')} />

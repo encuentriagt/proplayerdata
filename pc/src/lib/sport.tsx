@@ -16,8 +16,9 @@ export function sportIcon(code?: string | null): string {
 }
 
 interface SportContextValue {
-  /** Deportes del colegio (hoy: los de sus equipos visibles). */
+  /** Deportes activados por la organización que el miembro ve (GET sports). */
   sports: Sport[]
+  loading: boolean
   selected: Sport | null
   select: (id: number) => void
   /** Equipos del deporte elegido. */
@@ -29,13 +30,7 @@ const SportContext = createContext<SportContextValue | null>(null)
 const key = (slug: string) => `ppd.pc.sport.${slug}`
 
 /** Deporte que se está viendo; se recuerda por organización en este navegador. */
-export function SportProvider({ slug, teams, children }: { slug: string; teams: Team[]; children: ReactNode }) {
-  const sports = useMemo(() => {
-    const m = new Map<number, Sport>()
-    teams.forEach((t) => { if (!m.has(t.sport.id)) m.set(t.sport.id, t.sport) })
-    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'))
-  }, [teams])
-
+export function SportProvider({ slug, sports, teams, loading, children }: { slug: string; sports: Sport[]; teams: Team[]; loading: boolean; children: ReactNode }) {
   const [selectedId, setSelectedId] = useState<number | null>(() => Number(localStorage.getItem(key(slug))) || null)
   const selected = sports.find((s) => s.id === selectedId) ?? sports[0] ?? null
 
@@ -47,12 +42,13 @@ export function SportProvider({ slug, teams, children }: { slug: string; teams: 
     const sportTeams = selected ? teams.filter((t) => t.sport.id === selected.id) : []
     return {
       sports,
+      loading,
       selected,
       select: (id) => { localStorage.setItem(key(slug), String(id)); setSelectedId(id) },
       teams: sportTeams,
       teamIds: new Set(sportTeams.map((t) => t.id)),
     }
-  }, [sports, selected, teams, slug])
+  }, [sports, selected, teams, slug, loading])
 
   return <SportContext.Provider value={value}>{children}</SportContext.Provider>
 }

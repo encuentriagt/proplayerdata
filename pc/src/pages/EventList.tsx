@@ -48,7 +48,7 @@ export function EventList({ type }: { type: Kind }) {
 
   const results = useQueries({
     queries: ranges.map(([from, to]) => {
-      const query = { from: ymd(from), to: ymd(to), type, team_id: teamId }
+      const query = { from: ymd(from), to: ymd(to), type, team_id: teamId, sport_id: sport.selected?.id ?? -1 }
       return {
         queryKey: [slug, 'events', query],
         queryFn: async () => (await request<PcEvent[]>(pcPath(slug, 'events'), { query })).data,
@@ -59,7 +59,7 @@ export function EventList({ type }: { type: Kind }) {
   const loading = results.some((r) => r.isLoading)
   const error = results.find((r) => r.isError)?.error
   // Próximos: de hoy en adelante (incluye lo de hoy aunque ya haya pasado la hora). Anteriores: hasta ayer, el más reciente primero.
-  const all = results.flatMap((r) => r.data ?? []).filter((e) => sport.teamIds.has(e.team_id))
+  const all = results.flatMap((r) => r.data ?? [])
   const list = tab === 'proximos' ? all : [...all].sort((a, b) => b.starts_at.localeCompare(a.starts_at))
 
   // Agrupar por mes para que la lista se lea fácil.

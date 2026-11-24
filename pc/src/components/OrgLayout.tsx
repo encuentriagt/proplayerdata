@@ -9,7 +9,7 @@ import { Alert, Spinner } from './ui'
 import { OrgLogo, PoweredBy } from './OrgLogo'
 import { BackLink } from './BackLink'
 import { SportProvider } from '../lib/sport'
-import { useTeams } from '../lib/queries'
+import { useOrgSports, useTeams } from '../lib/queries'
 import { ApiError } from '../lib/api'
 import { OrgMissing } from '../pages/OrgAuthShell'
 
@@ -129,8 +129,13 @@ export function OrgLayout() {
 }
 
 function WithSport({ slug, children }: { slug: string; children: ReactNode }) {
+  const sports = useOrgSports()
   const teams = useTeams()
-  return <SportProvider slug={slug} teams={teams.data ?? []}>{children}</SportProvider>
+  return (
+    <SportProvider slug={slug} sports={sports.data ?? []} teams={teams.data ?? []} loading={sports.isLoading}>
+      {children}
+    </SportProvider>
+  )
 }
 
 export function RequireAdminArea({ children }: { children: ReactNode }) {

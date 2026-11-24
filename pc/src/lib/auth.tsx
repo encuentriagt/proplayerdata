@@ -92,7 +92,7 @@ export function topRole(memberships: Membership[]): Role | null {
 
 export const NO_PERMISSIONS: OrgPermissions = {
   invite_roles: [], manage_members: false, manage_directors: false, manage_seasons: false, manage_plans: false,
-  manage_branding: false, create_teams: [], delete_players: false, create_players_without_team: false, director_scope: null,
+  manage_branding: false, manage_sports: false, create_teams: [], delete_players: false, create_players_without_team: false, director_scope: null,
 }
 
 /** Permisos de la organización tal como los manda la API (iguales en todas las membresías de esa organización). */
@@ -110,5 +110,5 @@ export function canCreateTeamInSport(p: OrgPermissions, sportId: number): boolea
 
 /** ¿Tiene algo que hacer en Administración? */
 export function hasAdminArea(p: OrgPermissions): boolean {
-  return p.manage_members || p.manage_seasons || p.manage_plans || p.manage_branding || canCreateTeams(p)
+  return p.manage_members || p.manage_seasons || p.manage_plans || p.manage_branding || p.manage_sports || canCreateTeams(p)
 }

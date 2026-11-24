@@ -14,14 +14,15 @@ export function Home() {
   const { slug } = useOrg()
   const { session } = useAuth()
   const today = nowGt()
-  const events = useEvents({ from: ymd(today), to: ymd(addDays(today, 21)) })
-  const pendingQ = usePendingSheets()
+  const { selected, sports, loading: sportsLoading } = useSport()
+  const { can } = useOrg()
+  // Sin deporte elegido no se pide nada (evita mezclar deportes).
+  const events = useEvents({ from: ymd(today), to: ymd(addDays(today, 21)), sport_id: selected?.id ?? -1 })
+  const pendingQ = usePendingSheets(selected?.id ?? -1)
 
-  const { teamIds, selected } = useSport()
   const now = Date.now()
-  const inSport = (e: { team_id: number }) => teamIds.has(e.team_id)
-  const pending = [...(pendingQ.data ?? [])].filter(inSport).reverse() // el más reciente primero
-  const upcoming = (events.data ?? []).filter((e) => inSport(e) && e.status !== 'cancelled' && new Date(e.starts_at).getTime() >= now).slice(0, 8)
+  const pending = [...(pendingQ.data ?? [])].reverse() // el más reciente primero
+  const upcoming = (events.data ?? []).filter((e) => e.status !== 'cancelled' && new Date(e.starts_at).getTime() >= now).slice(0, 8)
 
   const first = session?.user.name.split(' ')[0] ?? ''
 
@@ -44,7 +45,17 @@ export function Home() {
         <QuickLink to={`/${slug}/jugadores`} Icon={UserPlus} label="Jugadores" />
       </div>
 
-      {events.isLoading || pendingQ.isLoading ? <Spinner /> : events.isError || pendingQ.isError ? <ErrorAlert error={events.error ?? pendingQ.error} /> : (
+      {!sportsLoading && !sports.length && (
+        <div className="mb-6">
+          <Empty>
+            Su organización aún no tiene deportes activados.{' '}
+            {can.manage_sports
+              ? <Link to={`/${slug}/admin/deportes`} className="font-semibold text-org-accent underline">Actívelos en Administración → Deportes</Link>
+              : 'Consulte con el administrador de su institución.'}
+          </Empty>
+        </div>
+      )}
+      {!sports.length ? null : events.isLoading || pendingQ.isLoading ? <Spinner /> : events.isError || pendingQ.isError ? <ErrorAlert error={events.error ?? pendingQ.error} /> : (
         <div className="grid gap-6 lg:grid-cols-2">
           <section aria-labelledby="pend">
             <h2 id="pend" className="title mb-3 text-2xl">Fichas pendientes</h2>

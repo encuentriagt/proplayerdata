@@ -4,7 +4,7 @@ import { Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { canCreateTeamInSport, canCreateTeams } from '../../lib/auth'
 import { TEAM_GENDER } from '../../lib/labels'
 import { useOrg } from '../../lib/org'
-import { useMembers, usePcMutation, useSeasons, useSports, useTeam, useTeams } from '../../lib/queries'
+import { useMembers, useOrgSports, usePcMutation, useSeasons, useTeam, useTeams } from '../../lib/queries'
 import type { Team } from '../../lib/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Modal } from '../../components/Modal'
@@ -56,8 +56,8 @@ export function AdminTeams() {
 
 function TeamFormDialog({ team, onClose }: { team?: Team; onClose: () => void }) {
   const { can } = useOrg()
-  const sports = useSports()
-  // Solo los deportes donde puede crear equipos ("all" = todos). Al editar se conserva el deporte actual.
+  const sports = useOrgSports()
+  // Solo deportes activados donde puede crear equipos ("all" = todos los activados). Al editar se conserva el actual.
   const sportOptions = (sports.data ?? []).filter((s) => canCreateTeamInSport(can, s.id) || s.id === team?.sport.id)
   const seasons = useSeasons()
   const current = seasons.data?.find((s) => s.is_current)

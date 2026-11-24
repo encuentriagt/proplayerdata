@@ -23,6 +23,7 @@ import { AdminSeasons } from './pages/admin/Seasons'
 import { AdminPlans } from './pages/admin/Plans'
 import { AdminBranding } from './pages/admin/Branding'
 import { AdminInvitations } from './pages/admin/Invitations'
+import { AdminSports } from './pages/admin/Sports'
 import { NotFound } from './pages/NotFound'
 
 export function App() {
@@ -49,6 +50,7 @@ export function App() {
         <Route path="admin" element={<RequireAdminArea><AdminLayout /></RequireAdminArea>}>
           <Route index element={<AdminIndex />} />
           <Route path="miembros" element={<Guard k="manage_members"><AdminMembers /></Guard>} />
+          <Route path="deportes" element={<Guard k="manage_sports"><AdminSports /></Guard>} />
           <Route path="equipos" element={<AdminTeams />} />
           <Route path="temporadas" element={<Guard k="manage_seasons"><AdminSeasons /></Guard>} />
           <Route path="planes" element={<Guard k="manage_plans"><AdminPlans /></Guard>} />
@@ -61,7 +63,7 @@ export function App() {
   )
 }
 
-type BoolPerm = 'manage_members' | 'manage_seasons' | 'manage_plans' | 'manage_branding'
+type BoolPerm = 'manage_members' | 'manage_seasons' | 'manage_plans' | 'manage_branding' | 'manage_sports'
 function Guard({ k, children }: { k: BoolPerm; children: React.ReactNode }) {
   const { can } = useOrg()
   return <RequirePermission allowed={can[k]}>{children}</RequirePermission>

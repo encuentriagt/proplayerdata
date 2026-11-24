@@ -5,7 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { fmt } from '../../lib/dates'
 import { ROLE_LABEL } from '../../lib/labels'
 import { useOrg } from '../../lib/org'
-import { useMembers, usePcMutation, useSports, useTeams } from '../../lib/queries'
+import { useMembers, useOrgSports, usePcMutation, useTeams } from '../../lib/queries'
 import type { Member, Role } from '../../lib/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { InviteLink, ResetLink } from '../../components/InviteLink'
@@ -129,7 +129,7 @@ export function AdminMembers() {
 function ScopePicker({ sportIds, teamIds, onSports, onTeams, error }: {
   sportIds: number[]; teamIds: number[]; onSports: (ids: number[]) => void; onTeams: (ids: number[]) => void; error?: string
 }) {
-  const sports = useSports()
+  const sports = useOrgSports() // solo deportes activados por la organización
   const teams = useTeams()
   const toggle = (ids: number[], id: number, on: boolean) => (on ? [...ids, id] : ids.filter((x) => x !== id))
   // Un equipo de un deporte ya elegido completo queda incluido: no hace falta marcarlo aparte.

@@ -45,6 +45,12 @@ class Organization extends Model
         return $this->hasMany(Team::class);
     }
 
+    /** Deportes del catálogo que la organización activó (tabla organization_sports). */
+    public function sports(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Sport::class, 'organization_sports')->withTimestamps();
+    }
+
     public function players(): HasMany
     {
         return $this->hasMany(Player::class);

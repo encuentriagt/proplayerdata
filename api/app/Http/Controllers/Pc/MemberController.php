@@ -79,7 +79,7 @@ class MemberController extends Controller
             return response()->json(['error' => ['code' => 'not_a_director', 'message' => 'Ese miembro no es director técnico.']], 422);
         }
         $data = $request->validate([
-            'sport_ids' => ['present', 'array', 'max:30'], 'sport_ids.*' => ['integer', Rule::exists('sports', 'id')],
+            'sport_ids' => ['present', 'array', 'max:30'], 'sport_ids.*' => ['integer', Rule::exists('organization_sports', 'sport_id')->where('organization_id', $organization->id)],
             'team_ids' => ['present', 'array', 'max:100'], 'team_ids.*' => ['integer', Rule::exists('teams', 'id')->where('organization_id', $organization->id)],
         ]);
 

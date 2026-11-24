@@ -1,6 +1,6 @@
-# ppd (ProPlayer Data) — Arquitectura v1.4
+# ppd (ProPlayer Data) — Arquitectura v1.5
 
-Versión 1.4 · 2026-11-23 (roles: director técnico por alcance de deportes/equipos; coach solo lo asignado) · Autor: agente de backend (dirige el proyecto)
+Versión 1.5 · 2026-11-24 (deportes activados por organización; deportes nombrados en inglés) · v1.4: director técnico por alcance de deportes/equipos · Autor: agente de backend (dirige el proyecto)
 Este documento es la fuente de verdad para TODOS los agentes (web, Flutter, diseño, panel).
 Si algo aquí cambia, se cambia primero en este archivo.
 
@@ -36,7 +36,7 @@ Reglas:
 - Un usuario puede tener varios roles y varias organizaciones (`organization_members`); los permisos se suman.
 - Alcance del director: tabla `director_scopes` (organization_id, user_id, sport_id | team_id). Un deporte completo incluye los equipos nuevos de ese deporte. Solo el admin lo cambia.
 - El director administra a un coach solo si **todos** los equipos de ese coach están dentro de su alcance (y el coach no es también director/admin).
-- Nadie de la organización crea deportes: el catálogo es general y lo maneja el super admin.
+- Nadie de la organización crea deportes: el catálogo es general y lo maneja el super admin. El **admin** del colegio **activa** los deportes del catálogo que usa (tabla `organization_sports`); equipos y alcances de directores solo pueden usar deportes activados. No se desactiva un deporte que tiene equipos.
 - TODA consulta de la API filtra por organización y por alcance. Nunca confiar en lo que mande el cliente.
 - Organización suspendida → nadie de esa organización entra (ni PC ni App).
 - La PC muestra u oculta opciones con `permissions` (en `/auth/login`, `/auth/me` y `GET /pc/orgs/{slug}/access`), pero la API valida todo.
@@ -80,7 +80,8 @@ Cada organización tiene: nombre, `slug`, logo (PNG/SVG), escudo opcional, color
 ## 5. Deportes (multideporte)
 
 Catálogo administrado desde el Panel (no código):
-- `sports`: fútbol, fútbol sala, básquetbol, voleibol, fútbol americano, béisbol, etc.
+- `sports`: Soccer, Futsal, Basketball, Volleyball, American Football, Baseball, etc. **Código y nombre del deporte en inglés** (`soccer`, `futsal`, `basketball`, `volleyball`, `american_football`, `baseball`): es la única excepción a "textos en español".
+- `organization_sports`: qué deportes del catálogo activó cada organización (lo decide su admin).
 - `sport_positions`: posiciones por deporte (POR, DEF, MED, DEL / Base, Escolta, Alero… ).
 - `sport_stat_types`: estadísticas por deporte, con:
   - `code` (goal, assist, yellow_card, red_card, point_1, point_2, point_3, rebound, foul, …)
@@ -195,7 +196,7 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 
 - Leer este documento antes de escribir código. Cambios de alcance → se actualiza aquí primero.
 - Ningún cliente (PC, Panel, App) guarda llaves ni secretos.
-- Textos con trato de **usted**, español de Guatemala.
+- Textos con trato de **usted**, español de Guatemala. Única excepción: el código y el nombre de los deportes del catálogo van en inglés (sección 5).
 - En la App: cero menciones de precios o pagos (sección 3).
 - Toda pantalla toma colores/logo de la marca de la organización (sección 4); ppd solo como "Powered by ppd".
 - Los clientes no deciden permisos: la API responde 403 y el cliente muestra el mensaje.
@@ -321,9 +322,9 @@ Objetivo: mover la API a un VPS en horas, sin tocar PC ni App (solo apuntan a `a
 
 ---
 
-## 17. Estado del backend (2026-11-22)
+## 17. Estado del backend (2026-11-24)
 
-Hecho y con pruebas (78, en SQLite y MariaDB 11.4): login y sesiones, TOTP del super admin, organizaciones con marca blanca, miembros e invitaciones, deportes/temporadas/equipos/plantillas/jugadores, calendario, convocatorias, asistencia, ficha del partido con aviso a padres, notificaciones (bandeja + push), planes Gratis/Pro/Premium con cupos, API de la App, Panel de super admin, auditoría, respaldo y mantenimiento diario.
+Hecho y con pruebas (100, en SQLite y MariaDB 11.4): login y sesiones, TOTP del super admin, organizaciones con marca blanca, miembros e invitaciones, deportes/temporadas/equipos/plantillas/jugadores, calendario, convocatorias, asistencia, ficha del partido con aviso a padres, notificaciones (bandeja + push), planes Gratis/Pro/Premium con cupos, API de la App, Panel de super admin, auditoría, respaldo y mantenimiento diario.
 Referencia de endpoints para los agentes: **`docs/API.md`**.
 
 Pendiente (no bloquea a la PC ni al Panel):

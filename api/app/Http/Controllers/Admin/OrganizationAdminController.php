@@ -103,6 +103,10 @@ class OrganizationAdminController extends Controller
         if ($data['role'] === 'director' && empty($data['sport_ids']) && empty($data['team_ids'])) {
             return response()->json(['error' => ['code' => 'validation_failed', 'message' => 'Asigne al menos un deporte o un equipo al director técnico.']], 422);
         }
+        // El super admin puede dar a un director deportes que la organización aún no activó: se activan.
+        if ($data['role'] === 'director' && ! empty($data['sport_ids'])) {
+            $organization->sports()->syncWithoutDetaching(array_map('intval', $data['sport_ids']));
+        }
         [$inv, $token] = $this->invitations->create($organization, $data['email'], $data['role'], null, $data['team_ids'] ?? null, $request->user(),
             $data['role'] === 'director' ? ($data['sport_ids'] ?? null) : null);
         $this->invitations->sendAfterResponse($inv, $token);

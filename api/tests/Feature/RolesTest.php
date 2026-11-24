@@ -21,13 +21,13 @@ class RolesTest extends TestCase
     private function escenario(): array
     {
         $org = $this->makeOrg();
-        $futbol = Sport::where('code', 'futbol')->value('id');
-        $basquet = Sport::where('code', 'basquetbol')->value('id');
-        $voley = Sport::where('code', 'voleibol')->value('id');
-        $f12 = $this->team($org, 'Fútbol Sub-12', 'futbol');
-        $f15 = $this->team($org, 'Fútbol Sub-15', 'futbol');
-        $bJ = $this->team($org, 'Básquet Juvenil', 'basquetbol');
-        $vM = $this->team($org, 'Voleibol Mayor', 'voleibol');
+        $futbol = Sport::where('code', 'soccer')->value('id');
+        $basquet = Sport::where('code', 'basketball')->value('id');
+        $voley = Sport::where('code', 'volleyball')->value('id');
+        $f12 = $this->team($org, 'Fútbol Sub-12', 'soccer');
+        $f15 = $this->team($org, 'Fútbol Sub-15', 'soccer');
+        $bJ = $this->team($org, 'Básquet Juvenil', 'basketball');
+        $vM = $this->team($org, 'Voleibol Mayor', 'volleyball');
 
         $admin = $this->member($org, 'admin@x.test', 'org_admin');
         $dtFutbol = $this->member($org, 'dt.futbol@x.test', 'director');
@@ -59,7 +59,7 @@ class RolesTest extends TestCase
         $this->assertCount(6, $m);
         $dt = $m->firstWhere('email', 'dt.basquet@x.test');
         $this->assertSame('Director técnico', $dt['role_label']);
-        $this->assertSame(['Básquetbol'], collect($dt['director_scope']['sports'])->pluck('name')->all());
+        $this->assertSame(['Basketball'], collect($dt['director_scope']['sports'])->pluck('name')->all());
         $this->assertSame(['Voleibol Mayor'], collect($dt['director_scope']['teams'])->pluck('name')->all());
     }
 
@@ -73,7 +73,7 @@ class RolesTest extends TestCase
         $this->as($e['dtFutbol'])->getJson($this->base."/teams/{$e['bJ']->id}")->assertForbidden();
 
         // Un equipo nuevo de su deporte entra solo a su alcance.
-        $nuevo = $this->team($e['org'], 'Fútbol Sub-10', 'futbol');
+        $nuevo = $this->team($e['org'], 'Fútbol Sub-10', 'soccer');
         $this->as($e['dtFutbol'])->getJson($this->base."/teams/{$nuevo->id}")->assertOk();
     }
 
@@ -147,7 +147,7 @@ class RolesTest extends TestCase
         $dt = OrganizationMember::where('user_id', $e['dtFutbol']->id)->first();
         $this->as($e['dtOtro'])->putJson($this->base."/members/{$dt->id}/scopes", ['sport_ids' => [], 'team_ids' => []])->assertForbidden();
         $this->as($e['admin'])->putJson($this->base."/members/{$dt->id}/scopes", ['sport_ids' => [$e['basquet']], 'team_ids' => [$e['f12']->id]])
-            ->assertOk()->assertJsonPath('data.director_scope.sports.0.name', 'Básquetbol');
+            ->assertOk()->assertJsonPath('data.director_scope.sports.0.name', 'Basketball');
         $this->assertSame(['Básquet Juvenil', 'Fútbol Sub-12'], $this->names($this->as($e['dtFutbol'])->getJson($this->base.'/teams')));
         $coach = OrganizationMember::where('user_id', $e['coachF']->id)->first();
         $this->as($e['admin'])->putJson($this->base."/members/{$coach->id}/scopes", ['sport_ids' => [], 'team_ids' => []])->assertStatus(422);

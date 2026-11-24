@@ -75,8 +75,9 @@ class DemoSeed extends Command
             }
 
             $season = $org->seasons()->create(['name' => 'Temporada 2026-2027', 'starts_on' => '2026-08-01', 'ends_on' => '2027-06-30', 'is_current' => true]);
-            $futbol = Sport::with('positions')->where('code', 'futbol')->firstOrFail();
-            $basquet = Sport::with('positions')->where('code', 'basquetbol')->firstOrFail();
+            $futbol = Sport::with('positions')->where('code', 'soccer')->firstOrFail();
+            $basquet = Sport::with('positions')->where('code', 'basketball')->firstOrFail();
+            $org->sports()->syncWithoutDetaching([$futbol->id, $basquet->id]);
 
             $sub12 = $org->teams()->create(['name' => 'Fútbol Sub-12', 'sport_id' => $futbol->id, 'season_id' => $season->id, 'category' => 'Sub-12', 'gender' => 'mixed', 'color' => '#0A3D91']);
             $sub15 = $org->teams()->create(['name' => 'Fútbol Sub-15', 'sport_id' => $futbol->id, 'season_id' => $season->id, 'category' => 'Sub-15', 'gender' => 'male']);

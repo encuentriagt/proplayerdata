@@ -8,6 +8,8 @@ import { setLastOrg } from '../lib/session'
 import { Alert, Spinner } from './ui'
 import { OrgLogo, PoweredBy } from './OrgLogo'
 import { BackLink } from './BackLink'
+import { SportProvider } from '../lib/sport'
+import { useOrgSports, useTeams } from '../lib/queries'
 import { ApiError } from '../lib/api'
 import { OrgMissing } from '../pages/OrgAuthShell'
 
@@ -117,12 +119,22 @@ export function OrgLayout() {
         <div className="flex min-h-dvh flex-col">
           <main id="contenido" className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-8">
             <BackLink />
-            <Outlet />
+            <WithSport slug={slug}><Outlet /></WithSport>
           </main>
           <footer className="px-4 py-4 text-center"><PoweredBy /></footer>
         </div>
       </div>
     </OrgContext.Provider>
+  )
+}
+
+function WithSport({ slug, children }: { slug: string; children: ReactNode }) {
+  const sports = useOrgSports()
+  const teams = useTeams()
+  return (
+    <SportProvider slug={slug} sports={sports.data ?? []} teams={teams.data ?? []} loading={sports.isLoading}>
+      {children}
+    </SportProvider>
   )
 }
 

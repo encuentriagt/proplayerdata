@@ -9,7 +9,9 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { capitalize, nowGt, toGt, ymd } from '../lib/dates'
 import { EVENT_TYPE, EVENT_TYPE_COLOR } from '../lib/labels'
 import { useOrg } from '../lib/org'
-import { useEvents, useTeams } from '../lib/queries'
+import { useEvents } from '../lib/queries'
+import { useSport } from '../lib/sport'
+import { SportSwitcher } from '../components/SportSwitcher'
 import type { EventType, PcEvent } from '../lib/types'
 import { EventCard } from '../components/EventCard'
 import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
@@ -37,8 +39,9 @@ export function Calendar() {
     return [startOfMonth(anchor), endOfMonth(anchor)]
   }, [view, anchor])
 
-  const teams = useTeams()
-  const events = useEvents({ from: ymd(from), to: ymd(to), team_id: teamId, type })
+  const sport = useSport()
+  const events = useEvents({ from: ymd(from), to: ymd(to), team_id: teamId, type, sport_id: sport.selected?.id ?? -1 })
+  const shown = events.data ?? []
 
   const move = (dir: 1 | -1) => {
     const d = view === 'semana' ? addWeeks(anchor, dir) : addMonths(anchor, dir)
@@ -51,9 +54,10 @@ export function Calendar() {
 
   return (
     <>
-      <PageHeader title="Calendario" actions={
+      <PageHeader title="Calendario" actions={<>
+        <SportSwitcher />
         <Link to={`/${slug}/eventos/nuevo${teamId ? `?equipo=${teamId}` : ''}`} className="btn-primary"><Plus className="size-5" aria-hidden /> Nueva actividad</Link>
-      } />
+      </>} />
 
       <div className="card mb-4 flex flex-wrap items-center gap-2 p-2">
         <div role="tablist" aria-label="Vista" className="flex rounded-xl bg-black/5 p-1">
@@ -72,7 +76,7 @@ export function Calendar() {
           <select className="input min-h-10 w-auto py-1 text-sm" aria-label="Filtrar por equipo" value={teamId ?? ''}
             onChange={(e) => set({ equipo: e.target.value || undefined })}>
             <option value="">Todos los equipos</option>
-            {teams.data?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {sport.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
           <select className="input min-h-10 w-auto py-1 text-sm" aria-label="Filtrar por tipo" value={type ?? ''}
             onChange={(e) => set({ tipo: e.target.value || undefined })}>
@@ -83,9 +87,9 @@ export function Calendar() {
       </div>
 
       {events.isLoading ? <Spinner /> : events.isError ? <ErrorAlert error={events.error} /> : view === 'lista' ? (
-        <ListView events={events.data ?? []} />
+        <ListView events={shown} />
       ) : (
-        <GridView events={events.data ?? []} from={from} to={to} anchor={anchor} compact={view === 'mes'} />
+        <GridView events={shown} from={from} to={to} anchor={anchor} compact={view === 'mes'} />
       )}
     </>
   )

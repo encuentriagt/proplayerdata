@@ -18,7 +18,7 @@ function event(over: Partial<EventDetail> = {}): EventDetail {
     id: 7, team_id: 1, team_name: 'Sub-15', type: 'match', title: null, display_title: 'vs. Rival', starts_at: '2026-11-21T10:00:00-06:00',
     ends_at: null, location: null, opponent_name: 'Rival', home_away: 'home', status: 'scheduled', score_us: null, score_them: null,
     result_published_at: null, notes: null,
-    sport: { id: 1, code: 'football', name: 'Fútbol', positions: [], stat_types: statTypes }, callups: [], attendance: [], lineup: [], actions: [], player_stats: [], ...over,
+    sport: { id: 1, code: 'soccer', name: 'Soccer', positions: [], stat_types: statTypes }, callups: [], attendance: [], lineup: [], actions: [], player_stats: [], ...over,
   }
 }
 

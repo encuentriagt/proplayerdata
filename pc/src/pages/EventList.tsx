@@ -7,7 +7,8 @@ import { Plus } from 'lucide-react'
 import { request } from '../lib/api'
 import { capitalize, nowGt, toGt, ymd } from '../lib/dates'
 import { pcPath, useOrg } from '../lib/org'
-import { useTeams } from '../lib/queries'
+import { useSport } from '../lib/sport'
+import { SportSwitcher } from '../components/SportSwitcher'
 import type { PcEvent } from '../lib/types'
 import { EventCard } from '../components/EventCard'
 import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
@@ -30,7 +31,7 @@ export function EventList({ type }: { type: Kind }) {
   const tab: Tab = params.get('ver') === 'anteriores' ? 'anteriores' : 'proximos'
   const teamId = Number(params.get('equipo')) || undefined
   const [blocks, setBlocks] = useState(1)
-  const teams = useTeams()
+  const sport = useSport()
   const t = TEXT[type]
 
   const set = (k: string, v?: string) => {
@@ -47,7 +48,7 @@ export function EventList({ type }: { type: Kind }) {
 
   const results = useQueries({
     queries: ranges.map(([from, to]) => {
-      const query = { from: ymd(from), to: ymd(to), type, team_id: teamId }
+      const query = { from: ymd(from), to: ymd(to), type, team_id: teamId, sport_id: sport.selected?.id ?? -1 }
       return {
         queryKey: [slug, 'events', query],
         queryFn: async () => (await request<PcEvent[]>(pcPath(slug, 'events'), { query })).data,
@@ -73,7 +74,10 @@ export function EventList({ type }: { type: Kind }) {
   return (
     <>
       <PageHeader title={t.title} actions={
-        <Link to={nuevoHref} className="btn-primary"><Plus className="size-5" aria-hidden /> {t.nuevo}</Link>
+        <>
+          <SportSwitcher />
+          <Link to={nuevoHref} className="btn-primary"><Plus className="size-5" aria-hidden /> {t.nuevo}</Link>
+        </>
       } />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -86,7 +90,7 @@ export function EventList({ type }: { type: Kind }) {
         <select className="input ml-auto min-h-10 w-auto py-1 text-sm" aria-label="Filtrar por equipo" value={teamId ?? ''}
           onChange={(e) => set('equipo', e.target.value || undefined)}>
           <option value="">Todos los equipos</option>
-          {teams.data?.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          {sport.teams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </select>
       </div>
 

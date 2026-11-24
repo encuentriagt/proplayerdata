@@ -4,9 +4,9 @@ import type { Page, Route } from '@playwright/test'
 type MockRole = 'coach' | 'director' | 'org_admin'
 
 const PERMS = {
-  coach: { invite_roles: ['guardian'], manage_members: false, manage_directors: false, manage_seasons: false, manage_plans: false, manage_branding: false, create_teams: [], delete_players: false, create_players_without_team: false, director_scope: null },
-  director: { invite_roles: ['coach', 'guardian'], manage_members: true, manage_directors: false, manage_seasons: false, manage_plans: false, manage_branding: false, create_teams: [1], delete_players: false, create_players_without_team: false, director_scope: { sport_ids: [1], team_ids: [] } },
-  org_admin: { invite_roles: ['org_admin', 'director', 'coach', 'guardian'], manage_members: true, manage_directors: true, manage_seasons: true, manage_plans: true, manage_branding: true, create_teams: 'all', delete_players: true, create_players_without_team: true, director_scope: null },
+  coach: { invite_roles: ['guardian'], manage_members: false, manage_directors: false, manage_seasons: false, manage_plans: false, manage_branding: false, manage_sports: false, create_teams: [], delete_players: false, create_players_without_team: false, director_scope: null },
+  director: { invite_roles: ['coach', 'guardian'], manage_members: true, manage_directors: false, manage_seasons: false, manage_plans: false, manage_branding: false, manage_sports: false, create_teams: [1], delete_players: false, create_players_without_team: false, director_scope: { sport_ids: [1], team_ids: [] } },
+  org_admin: { invite_roles: ['org_admin', 'director', 'coach', 'guardian'], manage_members: true, manage_directors: true, manage_seasons: true, manage_plans: true, manage_branding: true, manage_sports: true, create_teams: 'all', delete_players: true, create_players_without_team: true, director_scope: null },
 } as const
 const LABEL = { coach: 'Coach', director: 'Director técnico', org_admin: 'Administrador' } as const
 
@@ -19,21 +19,25 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
   const user = { id: 1, name: role === 'coach' ? 'Carlos Coach' : role === 'director' ? 'Diana Directora' : 'Ana Admin', email: 'coach@demo.gt', must_change_password: false, is_super_admin: false }
   const session = { user, memberships: [{ organization_id: 1, role, role_label: LABEL[role], branding_editable: role === 'org_admin', permissions: PERMS[role], organization: org }], is_guardian: false }
   const sport = {
-    id: 1, code: 'football', name: 'Fútbol', periods: 2, period_minutes: 40, max_on_field: 11, unlimited_substitutions: false,
+    id: 1, code: 'soccer', name: 'Soccer', periods: 2, period_minutes: 40, max_on_field: 11, unlimited_substitutions: false,
     positions: [{ id: 1, code: 'POR', name: 'Portero' }, { id: 3, code: 'DEL', name: 'Delantero' }],
     stat_types: [{ id: 1, code: 'goal', name: 'Gol', scores: 1 }, { id: 2, code: 'assist', name: 'Asistencia', scores: 0 }, { id: 3, code: 'yellow_card', name: 'Amarilla', scores: 0 }],
   }
-  const team = { id: 1, name: 'Sub-15 Masculino', category: 'Sub-15', gender: 'male', color: '#0B3D91', sport: { id: 1, code: 'football', name: 'Fútbol' }, season: null }
-  const basketSport = { id: 2, code: 'basketball', name: 'Básquetbol', periods: 4, period_minutes: 10, max_on_field: 5, unlimited_substitutions: true, positions: [], stat_types: [{ id: 9, code: 'point_2', name: 'Doble', scores: 2 }] }
-  const basket = { id: 2, name: 'Básquet Juvenil', category: 'Juvenil', gender: 'mixed', color: '#F2B705', sport: { id: 2, code: 'basketball', name: 'Básquetbol' }, season: null }
-  let scope: any = { sports: [{ id: 1, code: 'football', name: 'Fútbol' }], teams: [] }
+  const team = { id: 1, name: 'Sub-15 Masculino', category: 'Sub-15', gender: 'male', color: '#0B3D91', sport: { id: 1, code: 'soccer', name: 'Soccer' }, season: null }
+  const basketSport = { id: 2, code: 'basketball', name: 'Basketball', periods: 4, period_minutes: 10, max_on_field: 5, unlimited_substitutions: true, positions: [], stat_types: [{ id: 9, code: 'point_2', name: 'Doble', scores: 2 }] }
+  const basket = { id: 2, name: 'Básquet Juvenil', category: 'Juvenil', gender: 'mixed', color: '#F2B705', sport: { id: 2, code: 'basketball', name: 'Basketball' }, season: null }
+  const volleySport = { id: 3, code: 'volleyball', name: 'Volleyball', periods: 5, period_minutes: null, max_on_field: 6, unlimited_substitutions: true, positions: [], stat_types: [{ id: 20, code: 'point', name: 'Punto', scores: 1 }] }
+  // Deportes activados por la organización (GET/PUT sports). Soccer y Basketball tienen equipos.
+  let enabled = [1, 2]
+  const visibleSports = () => [sport, basketSport, volleySport].filter((x) => enabled.includes(x.id) && (role === 'org_admin' || x.id === 1))
+  let scope: any = { sports: [{ id: 1, code: 'soccer', name: 'Soccer' }], teams: [] }
   const roster = [
     { id: 15, first_name: 'Ana', last_name: 'López', full_name: 'Ana López', birthdate: '2011-03-02', gender: 'female', photo_url: null, jersey_number: 9, position: { id: 3, code: 'DEL', name: 'Delantero' }, active: true },
     { id: 18, first_name: 'Luis', last_name: 'Pérez', full_name: 'Luis Pérez', birthdate: '2011-06-10', gender: 'male', photo_url: null, jersey_number: 1, position: { id: 1, code: 'POR', name: 'Portero' }, active: true },
   ]
   const events: Record<number, any> = {}
   let nextId = 100
-  const calls: { method: string; path: string; body: any; headers: Record<string, string> }[] = []
+  const calls: { method: string; path: string; query: URLSearchParams; body: any; headers: Record<string, string> }[] = []
 
   const ok = (route: Route, data: unknown, status = 200, meta?: unknown) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(meta ? { data, meta } : { data }) })
@@ -44,7 +48,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
     const path = url.pathname.replace(/^\/api\//, '')
     const method = req.method()
     const body = req.postData() ? JSON.parse(req.postData()!) : null
-    calls.push({ method, path, body, headers: req.headers() })
+    calls.push({ method, path, query: url.searchParams, body, headers: req.headers() })
     const pc = path.replace(/^pc\/orgs\/colegio-demo\//, '')
 
     if (path === 'public/orgs/colegio-demo/branding') return ok(route, org)
@@ -66,7 +70,14 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
       return ok(route, { ok: true, email: user.email })
     }
     if (path === 'auth/logout') return ok(route, { ok: true })
-    if (path === 'catalog/sports') return ok(route, [sport, basketSport])
+    if (path === 'catalog/sports') return ok(route, [sport, basketSport, volleySport])
+    if (pc === 'sports' && method === 'GET') return ok(route, visibleSports())
+    if (pc === 'sports' && method === 'PUT') {
+      const removed = enabled.filter((x) => !body.sport_ids.includes(x)).filter((x) => x === 1 || x === 2)
+      if (removed.length) return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'sport_in_use', message: 'No se puede desactivar un deporte que tiene equipos.', sport_ids: removed } }) })
+      enabled = body.sport_ids
+      return ok(route, visibleSports())
+    }
     if (pc === 'teams' && method === 'GET') return ok(route, role === 'coach' ? [{ ...team, can_manage: false }] : [{ ...team, can_manage: true }, { ...basket, can_manage: role === 'org_admin' }])
     if (pc === 'members' && method === 'GET') {
       if (role === 'coach') return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: { code: 'forbidden', message: 'No tiene permiso.' } }) })
@@ -90,7 +101,9 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
         // Igual que la API: filtra por tipo, equipo y rango de fechas (hora de Guatemala).
         const from = q.get('from'), to = q.get('to')
         const day = (iso: string) => iso.slice(0, 10)
+        const sportOf = (tid: number) => (tid === 2 ? 2 : 1)
         return ok(route, list.filter((e: any) => (!q.get('type') || e.type === q.get('type')) && (!q.get('team_id') || String(e.team_id) === q.get('team_id'))
+          && (!q.get('sport_id') || String(sportOf(e.team_id)) === q.get('sport_id'))
           && (!from || day(e.starts_at) >= from) && (!to || day(e.starts_at) <= to)))
       }
       if (q.get('pending_sheet') === '1') {

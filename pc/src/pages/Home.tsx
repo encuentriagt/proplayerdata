@@ -5,15 +5,20 @@ import { useAuth } from '../lib/auth'
 import { nowGt, ymd } from '../lib/dates'
 import { useOrg } from '../lib/org'
 import { useEvents, usePendingSheets } from '../lib/queries'
+import { useSport } from '../lib/sport'
+import { SportSwitcher } from '../components/SportSwitcher'
 import { EventCard } from '../components/EventCard'
-import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
+import { Empty, ErrorAlert, Spinner } from '../components/ui'
 
 export function Home() {
   const { slug } = useOrg()
   const { session } = useAuth()
   const today = nowGt()
-  const events = useEvents({ from: ymd(today), to: ymd(addDays(today, 21)) })
-  const pendingQ = usePendingSheets()
+  const { selected, sports, loading: sportsLoading } = useSport()
+  const { can } = useOrg()
+  // Sin deporte elegido no se pide nada (evita mezclar deportes).
+  const events = useEvents({ from: ymd(today), to: ymd(addDays(today, 21)), sport_id: selected?.id ?? -1 })
+  const pendingQ = usePendingSheets(selected?.id ?? -1)
 
   const now = Date.now()
   const pending = [...(pendingQ.data ?? [])].reverse() // el más reciente primero
@@ -23,7 +28,14 @@ export function Home() {
 
   return (
     <>
-      <PageHeader title={`Hola, ${first}`} subtitle="Esto es lo que viene para sus equipos." />
+      {/* Saludo a la izquierda y el deporte a la derecha, también en el celular */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="title min-w-0 text-3xl sm:text-4xl">Hola, {first}</h1>
+          <SportSwitcher size="lg" />
+        </div>
+        <p className="mt-1 text-black/60">{selected ? `Esto es lo que viene en ${selected.name.toLowerCase()}.` : 'Esto es lo que viene para sus equipos.'}</p>
+      </div>
 
       <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <QuickLink to={`/${slug}/partidos`} Icon={Trophy} label="Partidos" />
@@ -33,7 +45,17 @@ export function Home() {
         <QuickLink to={`/${slug}/jugadores`} Icon={UserPlus} label="Jugadores" />
       </div>
 
-      {events.isLoading || pendingQ.isLoading ? <Spinner /> : events.isError || pendingQ.isError ? <ErrorAlert error={events.error ?? pendingQ.error} /> : (
+      {!sportsLoading && !sports.length && (
+        <div className="mb-6">
+          <Empty>
+            Su organización aún no tiene deportes activados.{' '}
+            {can.manage_sports
+              ? <Link to={`/${slug}/admin/deportes`} className="font-semibold text-org-accent underline">Actívelos en Administración → Deportes</Link>
+              : 'Consulte con el administrador de su institución.'}
+          </Empty>
+        </div>
+      )}
+      {!sports.length ? null : events.isLoading || pendingQ.isLoading ? <Spinner /> : events.isError || pendingQ.isError ? <ErrorAlert error={events.error ?? pendingQ.error} /> : (
         <div className="grid gap-6 lg:grid-cols-2">
           <section aria-labelledby="pend">
             <h2 id="pend" className="title mb-3 text-2xl">Fichas pendientes</h2>

@@ -5,6 +5,7 @@ import { fromInputValue, toInputValue } from '../lib/dates'
 import { EVENT_TYPE, HOME_AWAY } from '../lib/labels'
 import { useOrg } from '../lib/org'
 import { useEvent, usePcMutation, useTeams } from '../lib/queries'
+import { useSport } from '../lib/sport'
 import type { EventType, HomeAway, PcEvent } from '../lib/types'
 import { ErrorAlert, PageHeader, SelectField, Spinner, TextAreaField, TextField, fieldError } from '../components/ui'
 
@@ -27,6 +28,13 @@ export function EventFormPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const teams = useTeams()
+  const sport = useSport()
+  const teamOptions = editing ? teams.data ?? [] : sport.teams
+  // Si se llega con ?equipo= de otro deporte (p. ej. desde el detalle de un equipo), se cambia a ese deporte.
+  const paramTeam = teams.data?.find((t) => String(t.id) === params.get('equipo'))
+  useEffect(() => {
+    if (!editing && paramTeam && sport.selected && paramTeam.sport.id !== sport.selected.id) sport.select(paramTeam.sport.id)
+  }, [editing, paramTeam, sport])
   const existing = useEvent(editing ? Number(id) : undefined)
 
   const [f, setF] = useState<FormState>(() => ({
@@ -51,8 +59,8 @@ export function EventFormPage() {
   }, [existing.data])
 
   useEffect(() => {
-    if (!editing && !f.team_id && teams.data?.length === 1) setF((s) => ({ ...s, team_id: String(teams.data![0].id) }))
-  }, [teams.data, editing, f.team_id])
+    if (!editing && !f.team_id && teamOptions.length === 1) setF((s) => ({ ...s, team_id: String(teamOptions[0].id) }))
+  }, [teamOptions, editing, f.team_id])
 
   const body = () => ({
     ...(editing ? {} : { team_id: Number(f.team_id) }),
@@ -99,7 +107,7 @@ export function EventFormPage() {
 
         <SelectField label="Equipo" value={f.team_id} onChange={(e) => set('team_id', e.target.value)} disabled={editing} required error={err('team_id')}>
           <option value="">Elija un equipo</option>
-          {teams.data?.map((t) => <option key={t.id} value={t.id}>{t.name}{t.category ? ` · ${t.category}` : ''}</option>)}
+          {teamOptions.map((t) => <option key={t.id} value={t.id}>{t.name}{t.category ? ` · ${t.category}` : ''}</option>)}
         </SelectField>
 
         <fieldset>

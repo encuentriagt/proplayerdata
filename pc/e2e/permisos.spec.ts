@@ -41,13 +41,13 @@ test('director técnico: sus coaches, crear equipos solo de su deporte, sin temp
   await expect(page.getByText('Rol: Coach')).toBeVisible()
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
 
-  // Equipos: solo puede administrar los de su alcance (Fútbol); crear solo en Fútbol
+  // Equipos: solo puede administrar los de su alcance (Soccer); crear solo en Soccer
   await nav.getByRole('link', { name: 'Equipos' }).click()
   await expect(page.getByRole('button', { name: 'Editar Sub-15 Masculino' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Editar Básquet Juvenil' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Crear equipo' }).click()
   // toHaveText reintenta hasta que carga el catálogo (evita leer la lista vacía)
-  await expect(page.getByLabel('Deporte').locator('option')).toHaveText(['Elija un deporte', 'Fútbol'])
+  await expect(page.getByLabel('Deporte').locator('option')).toHaveText(['Elija un deporte', 'Soccer'])
   await page.getByRole('button', { name: 'Cancelar' }).click()
 
   // Sin create_players_without_team: el equipo es obligatorio
@@ -70,12 +70,12 @@ test('admin: asigna deportes y equipos a un director técnico', async ({ page })
   const api = mockApi(page, 'org_admin')
   await entrar(page)
   await page.goto('/colegio-demo/admin/miembros')
-  await expect(page.getByText('Alcance: Fútbol (todo el deporte)')).toBeVisible()
+  await expect(page.getByText('Alcance: Soccer (todo el deporte)')).toBeVisible()
   await page.getByRole('button', { name: 'Asignar deportes/equipos' }).click()
   // Agrega el equipo suelto de básquet
   await page.getByRole('checkbox', { name: /Básquet Juvenil/ }).check()
   await page.getByRole('button', { name: 'Guardar alcance' }).click()
-  await expect(page.getByText('Alcance: Fútbol (todo el deporte) · Básquet Juvenil')).toBeVisible()
+  await expect(page.getByText('Alcance: Soccer (todo el deporte) · Básquet Juvenil')).toBeVisible()
   const put = api.calls.find((c) => c.method === 'PUT' && c.path.endsWith('/members/3/scopes'))!
   expect(put.body).toEqual({ sport_ids: [1], team_ids: [2] })
 
@@ -84,6 +84,6 @@ test('admin: asigna deportes y equipos a un director técnico', async ({ page })
   await page.getByLabel('Correo').fill('nuevo@demo.gt')
   await page.getByLabel('Rol').selectOption('director')
   await expect(page.getByRole('button', { name: 'Crear invitación' })).toBeDisabled()
-  await page.getByRole('dialog').getByRole('checkbox', { name: 'Básquetbol', exact: true }).check()
+  await page.getByRole('dialog').getByRole('checkbox', { name: 'Basketball', exact: true }).check()
   await expect(page.getByRole('button', { name: 'Crear invitación' })).toBeEnabled()
 })

@@ -140,6 +140,9 @@ test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo',
   await expect(page.getByText('No hay partidos programados.')).toBeVisible()
   await page.getByRole('link', { name: 'Nuevo partido' }).first().click()
   await expect(page.getByRole('heading', { name: 'Nuevo partido' })).toBeVisible()
+  // Desde Partidos el formulario es solo de partido: no se ofrece Entrenamiento ni Otro
+  await expect(page.getByRole('group', { name: 'Tipo' })).toHaveCount(0)
+  await expect(page.getByText('Entrenamiento', { exact: true })).toHaveCount(0)
   const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
   await page.getByLabel('Equipo').selectOption('1')
   await page.getByLabel('Inicio', { exact: true }).fill(`${manana}T10:00`)
@@ -170,4 +173,12 @@ test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo',
   await page.getByRole('link', { name: 'Nuevo entreno' }).first().click()
   await expect(page.getByRole('heading', { name: 'Nuevo entreno' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Crear entreno' })).toBeVisible()
+  // Desde Entrenos: sin selector de tipo y sin campos de partido
+  await expect(page.getByRole('group', { name: 'Tipo' })).toHaveCount(0)
+  await expect(page.getByLabel('Rival')).toHaveCount(0)
+
+  // En "Nueva actividad" del Calendario sí se elige el tipo (incluye "Otro")
+  await page.goto('/colegio-demo/eventos/nuevo')
+  await expect(page.getByRole('group', { name: 'Tipo' })).toBeVisible()
+  await expect(page.getByText('Otro', { exact: true })).toBeVisible()
 })

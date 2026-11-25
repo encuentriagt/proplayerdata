@@ -124,12 +124,14 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
         }
         const day = (iso: string) => iso.slice(0, 10)
         const sportOf = (tid: number) => (tid === 2 ? 2 : 1)
-        return ok(route, list.filter((e: any) => (!q.get('type') || e.type === q.get('type')) && (!q.get('team_id') || String(e.team_id) === q.get('team_id'))
+        const base = (e: any) => (!q.get('type') || e.type === q.get('type')) && (!q.get('team_id') || String(e.team_id) === q.get('team_id'))
           && (!q.get('sport_id') || String(sportOf(e.team_id)) === q.get('sport_id'))
-          && (!from || day(e.starts_at) >= from) && (!to || day(e.starts_at) <= to)))
+        // Propuesta al backend: undated_drafts=1 devuelve los borradores sin fecha
+        if (q.get('undated_drafts') === '1') return ok(route, list.filter((e: any) => base(e) && e.is_draft && !e.starts_at))
+        return ok(route, list.filter((e: any) => base(e) && !!e.starts_at && (!from || day(e.starts_at) >= from) && (!to || day(e.starts_at) <= to)))
       }
       if (q.get('pending_sheet') === '1') {
-        return ok(route, list.filter((e: any) => e.type === 'match' && e.status !== 'cancelled' && !e.result_published_at && new Date(e.starts_at) < new Date()))
+        return ok(route, list.filter((e: any) => e.type === 'match' && e.status !== 'cancelled' && !e.result_published_at && !!e.starts_at && new Date(e.starts_at) < new Date()))
       }
       return ok(route, list)
     }
@@ -137,8 +139,8 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
       const id = nextId++
       const e = {
         id, team_id: body.team_id, team_name: team.name, type: body.type, title: body.title,
-        display_title: body.title ?? (body.type === 'match' ? (body.opponent_name ? `${[team, basket].find((t) => t.id === body.team_id)?.name} vs ${body.opponent_name}` : 'Partido') : ({ training: 'Entrenamiento', other: 'Actividad' } as any)[body.type]),
-        starts_at: body.starts_at.replace(' ', 'T') + ':00-06:00', ends_at: null, location: body.location, opponent_name: body.opponent_name,
+        display_title: body.title ?? (body.type === 'match' ? (body.opponent_name ? `${[team, basket].find((t) => t.id === body.team_id)?.name} vs ${body.opponent_name}` : `${[team, basket].find((t) => t.id === body.team_id)?.name} · Partido`) : ({ training: 'Entrenamiento', other: 'Actividad' } as any)[body.type]),
+        starts_at: body.starts_at ? body.starts_at.replace(' ', 'T') + ':00-06:00' : null, ends_at: null, location: body.location, opponent_name: body.opponent_name,
         home_away: body.home_away, status: 'scheduled', score_us: null, score_them: null, result_published_at: null, notes: body.notes,
         is_draft: body.publish === false, published_at: body.publish === false ? null : new Date().toISOString(),
         sport, callups: (body.callups ?? []).map((c: any) => ({ player_id: c.player_id, player_name: null, status: c.status ?? 'called', guardian_response: 'pending', responded_at: null })),
@@ -153,7 +155,13 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
       if (!e) return ok(route, null, 404)
       if (!m[2] && method === 'GET') return ok(route, e)
       if (!m[2] && method === 'DELETE') { delete events[e.id]; return ok(route, { ok: true }) }
-      if (!m[2] && method === 'PATCH') { Object.assign(e, body); return ok(route, e) }
+      if (!m[2] && method === 'PATCH') {
+        Object.assign(e, body)
+        if (body.starts_at) e.starts_at = body.starts_at.replace(' ', 'T') + ':00-06:00'
+        if (body.opponent_name !== undefined && e.type === 'match') e.display_title = body.opponent_name ? `${[team, basket].find((t) => t.id === e.team_id)?.name} vs ${body.opponent_name}` : 'Partido'
+        return ok(route, e)
+      }
+      if (m[2] === 'publish' && !e.starts_at) return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'validation_failed', message: 'Falta la fecha.' } }) })
       if (m[2] === 'publish') { e.is_draft = false; e.published_at ??= new Date().toISOString(); return ok(route, e) }
       if (m[2] === 'callups') {
         const prev = new Set(e.callups.map((c: any) => c.player_id))

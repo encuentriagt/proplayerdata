@@ -47,28 +47,34 @@ export function EventList({ type }: { type: Kind }) {
     ? [[today, addDays(today, WINDOW)]]
     : Array.from({ length: blocks }, (_, i) => [addDays(today, -WINDOW * (i + 1)), addDays(today, -WINDOW * i - 1)])
 
+  const base = { type, team_id: teamId, sport_id: sport.selected?.id ?? -1 }
+  const queries: Record<string, string | number | undefined>[] = ranges.map(([from, to]) => ({ ...base, from: ymd(from), to: ymd(to) }))
+  // Borradores sin fecha (no entran en ningún rango): se piden aparte y van primero en Próximos.
+  if (tab === 'proximos') queries.unshift({ ...base, undated_drafts: 1 })
   const results = useQueries({
-    queries: ranges.map(([from, to]) => {
-      const query = { from: ymd(from), to: ymd(to), type, team_id: teamId, sport_id: sport.selected?.id ?? -1 }
-      return {
-        queryKey: [slug, 'events', query],
-        queryFn: async () => (await request<PcEvent[]>(pcPath(slug, 'events'), { query })).data,
-      }
-    }),
+    queries: queries.map((query) => ({
+      queryKey: [slug, 'events', query],
+      queryFn: async () => (await request<PcEvent[]>(pcPath(slug, 'events'), { query })).data,
+    })),
   })
 
   const loading = results.some((r) => r.isLoading)
   const error = results.find((r) => r.isError)?.error
   // Próximos: de hoy en adelante (incluye lo de hoy aunque ya haya pasado la hora). Anteriores: hasta ayer, el más reciente primero.
-  const all = results.flatMap((r) => r.data ?? [])
-  const list = tab === 'proximos' ? all : [...all].sort((a, b) => b.starts_at.localeCompare(a.starts_at))
+  const seen = new Set<number>()
+  const all = results.flatMap((r) => r.data ?? []).filter((e) => !seen.has(e.id) && seen.add(e.id))
+  const list = tab === 'proximos' ? all : [...all].sort((a, b) => (b.starts_at ?? '').localeCompare(a.starts_at ?? ''))
 
-  // Agrupar por mes para que la lista se lea fácil.
-  const groups = new Map<string, PcEvent[]>()
+  // Agrupar por mes para que la lista se lea fácil; los borradores sin fecha, en "Sin fecha" (primero).
+  const groups = new Map<string, { title: string; items: PcEvent[] }>()
   list.forEach((e) => {
-    const k = format(toGt(e.starts_at), 'yyyy-MM')
-    groups.set(k, [...(groups.get(k) ?? []), e])
+    const k = e.starts_at ? format(toGt(e.starts_at), 'yyyy-MM') : '0000-sin-fecha'
+    const title = e.starts_at ? capitalize(format(toGt(e.starts_at), 'MMMM yyyy', { locale: es })) : 'Sin fecha'
+    const g = groups.get(k) ?? { title, items: [] }
+    g.items.push(e)
+    groups.set(k, g)
   })
+  const ordered = [...groups.entries()].sort(([a], [b]) => (tab === 'proximos' ? a.localeCompare(b) : a === '0000-sin-fecha' ? -1 : b.localeCompare(a)))
 
   const nuevoHref = `/${slug}/eventos/nuevo?tipo=${type}${teamId ? `&equipo=${teamId}` : ''}`
 
@@ -102,9 +108,9 @@ export function EventList({ type }: { type: Kind }) {
         </Empty>
       ) : (
         <div className="space-y-5">
-          {[...groups.entries()].map(([month, items]) => (
-            <section key={month} aria-label={capitalize(format(toGt(items[0].starts_at), 'MMMM yyyy', { locale: es }))}>
-              <h2 className="mb-2 text-sm font-bold uppercase text-black/60">{capitalize(format(toGt(items[0].starts_at), 'MMMM yyyy', { locale: es }))}</h2>
+          {ordered.map(([key, { title, items }]) => (
+            <section key={key} aria-label={title}>
+              <h2 className="mb-2 text-sm font-bold uppercase text-black/60">{title}</h2>
               <div className="space-y-2">{items.map((e) => <EventCard key={e.id} ev={e} showType={false} />)}</div>
             </section>
           ))}

@@ -22,7 +22,7 @@ export function Home() {
 
   const now = Date.now()
   const pending = [...(pendingQ.data ?? [])].reverse() // el más reciente primero
-  const upcoming = (events.data ?? []).filter((e) => e.status !== 'cancelled' && new Date(e.starts_at).getTime() >= now).slice(0, 8)
+  const upcoming = (events.data ?? []).filter((e) => e.status !== 'cancelled' && !!e.starts_at && new Date(e.starts_at).getTime() >= now).slice(0, 8)
 
   const first = session?.user.name.split(' ')[0] ?? ''
 

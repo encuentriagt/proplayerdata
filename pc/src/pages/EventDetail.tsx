@@ -46,7 +46,14 @@ export function EventDetailPage() {
     { key: 'asistencia', label: 'Asistencia' },
     ...(e.type === 'match' ? [{ key: 'ficha' as Tab, label: 'Ficha' }] : []),
   ]
-  const isPast = new Date(e.starts_at) < new Date()
+  const isPast = !!e.starts_at && new Date(e.starts_at) < new Date()
+  // Publicar un borrador: fecha, rival (partido) y al menos un convocado. Se completa con "Editar".
+  const publishMissing = [
+    !e.starts_at && 'fecha y hora',
+    e.type === 'match' && !e.opponent_name && 'rival',
+    e.type === 'match' && !e.callups.some((c) => c.status === 'called') && 'al menos un convocado',
+  ].filter(Boolean) as string[]
+  const canPublish = publishMissing.length === 0
   const defaultTab: Tab = e.type === 'match' && isPast ? 'ficha' : isPast ? 'asistencia' : 'convocatoria'
   const requested = params.get('tab') as Tab | null
   const tab: Tab = requested && tabs.some((t) => t.key === requested) ? requested : defaultTab
@@ -69,12 +76,12 @@ export function EventDetailPage() {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-stone-200 p-3">
           <span className="chip bg-stone-600 text-white">No publicado</span>
           <p className="flex-1 text-sm">Es un borrador: los padres no lo ven en la App y no se ha avisado a nadie.</p>
-          {e.callups.some((c) => c.status === 'called') ? (
+          {canPublish ? (
             <button className="btn-primary" onClick={() => { publish.reset(); setConfirmPublish(true) }}>Publicar</button>
           ) : (
             <span className="flex flex-col items-end gap-1">
               <button className="btn-primary" disabled title="Para publicar, convoque al menos a un jugador">Publicar</button>
-              <span className="text-xs text-amber-900">Convoque al menos a un jugador para publicar.</span>
+              <span className="text-xs text-amber-900">Para publicar falta: {publishMissing.join(', ')}.</span>
             </span>
           )}
         </div>
@@ -91,7 +98,7 @@ export function EventDetailPage() {
           <div>
             <h1 className={`title text-3xl sm:text-4xl ${e.status === 'cancelled' ? 'line-through opacity-60' : ''}`}>{eventTitle(e)}</h1>
             <p className="mt-1 text-black/70">
-              {capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM, HH:mm"))}
+              {e.starts_at ? capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM, HH:mm")) : 'Sin fecha todavía'}
               {e.ends_at && ` – ${fmt(e.ends_at, 'HH:mm')}`}
               {e.home_away && e.type === 'match' && ` · ${HOME_AWAY[e.home_away]}`}
             </p>

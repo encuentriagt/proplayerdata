@@ -134,7 +134,8 @@ export interface PcEvent {
   type: EventType
   title: string | null
   display_title: string
-  starts_at: string
+  /** null solo en borradores sin fecha (se agrega después). */
+  starts_at: string | null
   ends_at: string | null
   location: string | null
   opponent_name: string | null

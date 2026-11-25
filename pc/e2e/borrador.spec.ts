@@ -63,7 +63,7 @@ test('Publicar un borrador desde el detalle', async ({ page }) => {
   await page.getByRole('button', { name: 'Borrador', exact: true }).click()
   // Sin convocados no se puede publicar
   await expect(page.getByRole('button', { name: 'Publicar', exact: true })).toBeDisabled()
-  await expect(page.getByText('Convoque al menos a un jugador para publicar.')).toBeVisible()
+  await expect(page.getByText('Para publicar falta: al menos un convocado.')).toBeVisible()
   await page.getByRole('tab', { name: 'Convocatoria' }).click()
   await page.getByRole('group', { name: 'Convocatoria de Ana López' }).getByRole('button', { name: 'Convocado' }).click()
   await page.getByRole('button', { name: 'Guarde la convocatoria' }).click()
@@ -255,21 +255,36 @@ test('Reloj de hora: primero la hora, luego pasa solo a minutos; Cancelar no cam
   await expect(page.getByLabel('Hora', { exact: true })).toHaveText('7:45 a. m.')
 })
 
-test('Borrador sin convocados ni rival: basta con fecha y hora; se indica qué falta', async ({ page }) => {
+test('Borrador solo con el equipo: sale en Partidos como "Sin fecha"; para publicar se completa', async ({ page }) => {
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
+  // El coach tiene un solo equipo: queda elegido y Borrador ya está activo
   const borrador = page.getByRole('button', { name: 'Borrador', exact: true })
-  await expect(borrador).toBeDisabled()
-  await expect(page.getByText('Para guardar el borrador falta: fecha y hora.')).toBeVisible()
-  await expect(page.getByText('Para publicar falta: fecha, hora, rival y al menos un convocado.')).toBeVisible()
-  await fechaHora(page, manana(), '16:00')
-  await expect(page.getByText('Para guardar el borrador falta')).toHaveCount(0)
   await expect(borrador).toBeEnabled()
+  await expect(page.getByText('Para guardar el borrador falta')).toHaveCount(0)
+  await expect(page.getByText('Para publicar falta: fecha, hora, rival y al menos un convocado.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Crear partido y publicar' })).toBeDisabled()
   await borrador.click()
   await expect(page.getByText('Borrador guardado. No se avisó a nadie')).toBeVisible()
+  await expect(page.getByText('Sin fecha todavía')).toBeVisible()
   const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
-  expect(post.body.publish).toBe(false)
+  expect(post.body).toMatchObject({ team_id: 1, publish: false, starts_at: null })
   expect(post.body).not.toHaveProperty('callups')
+  // Publicar desde el detalle pide lo que falta
+  await expect(page.getByRole('button', { name: 'Publicar', exact: true })).toBeDisabled()
+  await expect(page.getByText('Para publicar falta: fecha y hora, rival, al menos un convocado.')).toBeVisible()
+
+  // En Partidos: grupo "Sin fecha" con la tarjeta gris "No publicado"
+  await page.goto('/colegio-demo/partidos')
+  await expect(page.getByRole('heading', { name: 'Sin fecha' })).toBeVisible()
+  await expect(page.getByText('No publicado')).toBeVisible()
+  expect(api.calls.some((c) => c.method === 'GET' && c.path.endsWith('/events') && c.query.get('undated_drafts') === '1')).toBe(true)
+
+  // Si pone fecha, también la hora
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
+  await page.getByLabel('Fecha', { exact: true }).click()
+  await page.getByRole('dialog', { name: /Elegir fecha/ }).getByRole('button', { name: 'Mañana' }).click()
+  await expect(page.getByText('Para guardar el borrador falta: hora.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Borrador', exact: true })).toBeDisabled()
 })

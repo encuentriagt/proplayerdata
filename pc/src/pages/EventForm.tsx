@@ -76,15 +76,16 @@ export function EventFormPage() {
   const [startDate = '', startTime = ''] = f.starts_at.split('T')
   const endTime = f.ends_at.split('T')[1] ?? ''
   const startOk = !!startDate && !!startTime
-  // Borrador: equipo, fecha y hora (la API exige la fecha). Rival y convocados se pueden agregar después.
-  // Publicar: además rival y al menos un convocado (regla del dueño).
-  const missingDraft = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora'].filter(Boolean) as string[]
+  // Borrador: solo el equipo (fecha, hora, rival y convocados se agregan después). Si pone fecha, también la hora y viceversa.
+  // Publicar: equipo, fecha, hora, rival y al menos un convocado (regla del dueño).
+  const missingDraft = [!f.team_id && 'equipo', startTime && !startDate && 'fecha', startDate && !startTime && 'hora'].filter(Boolean) as string[]
   // Partido: sin fin, condición ni título (el título es siempre "Equipo vs Rival"). No se envían esos campos,
   // así al editar no se borra lo que tuviera un partido anterior.
   const body = () => ({
     ...(editing ? {} : { team_id: Number(f.team_id) }),
     type: f.type,
-    starts_at: fromInputValue(f.starts_at),  // "yyyy-MM-ddTHH:mm" → "yyyy-MM-dd HH:mm" (hora de Guatemala)
+    // "yyyy-MM-ddTHH:mm" → "yyyy-MM-dd HH:mm" (hora de Guatemala); null en un borrador sin fecha.
+    starts_at: startOk ? fromInputValue(f.starts_at) : null,
     location: f.location.trim() || null,
     notes: f.notes.trim() || null,
     ...(isMatch
@@ -107,7 +108,7 @@ export function EventFormPage() {
       setCalled(existing.data.callups.filter((c) => c.status === 'called').map((c) => c.player_id))
     } else if (!editing) setCalled([])
   }, [f.team_id, editing, existing.data])
-  const missingPublish = [...missingDraft, !f.opponent_name.trim() && 'rival', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
+  const missingPublish = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora', !f.opponent_name.trim() && 'rival', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
   const callupsBody = () => called.map((player_id) => ({ player_id, status: 'called' as const }))
 
   const qc = useQueryClient()

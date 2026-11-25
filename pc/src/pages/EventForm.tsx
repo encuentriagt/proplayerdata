@@ -10,6 +10,7 @@ import { pcPath, useOrg } from '../lib/org'
 import { useEvent, usePcMutation, useRoster, useTeams } from '../lib/queries'
 import { useSport } from '../lib/sport'
 import type { EventType, HomeAway, PcEvent } from '../lib/types'
+import { DatePicker, TimeSelect } from '../components/DateTimeFields'
 import { Avatar, ErrorAlert, PageHeader, SelectField, Spinner, TextAreaField, TextField, fieldError } from '../components/ui'
 
 interface FormState {
@@ -72,17 +73,20 @@ export function EventFormPage() {
   }, [teamOptions, editing, f.team_id])
 
   const isMatch = f.type === 'match'
+  const [startDate = '', startTime = ''] = f.starts_at.split('T')
+  const endTime = f.ends_at.split('T')[1] ?? ''
+  const startOk = !!startDate && !!startTime
   // Partido: sin fin, condición ni título (el título es siempre "Equipo vs Rival"). No se envían esos campos,
   // así al editar no se borra lo que tuviera un partido anterior.
   const body = () => ({
     ...(editing ? {} : { team_id: Number(f.team_id) }),
     type: f.type,
-    starts_at: fromInputValue(f.starts_at),
+    starts_at: fromInputValue(f.starts_at),  // "yyyy-MM-ddTHH:mm" → "yyyy-MM-dd HH:mm" (hora de Guatemala)
     location: f.location.trim() || null,
     notes: f.notes.trim() || null,
     ...(isMatch
       ? { opponent_name: f.opponent_name.trim() || null }
-      : { ends_at: fromInputValue(f.ends_at), title: f.title.trim() || null, opponent_name: null, home_away: null }),
+      : { ends_at: endTime && startDate ? `${startDate} ${endTime}` : null, title: f.title.trim() || null, opponent_name: null, home_away: null }),
   })
 
   // Convocatoria en el formulario: al crear un partido y al editar un borrador.
@@ -172,8 +176,15 @@ export function EventFormPage() {
     else m.mutate()
   }
 
-  const suggestEnd = () => {
-    if (!isMatch && f.starts_at && !f.ends_at) set('ends_at', format(addHours(parseISO(f.starts_at), f.type === 'match' ? 2 : 1.5), "yyyy-MM-dd'T'HH:mm"))
+  // Fecha y hora por separado (calendario propio + selector de hora). El fin es solo hora, el mismo día.
+  const setStartDate = (d: string) => set('starts_at', `${d}T${startTime}`)
+  const setStartTime = (t: string) => {
+    set('starts_at', `${startDate}T${t}`)
+    // Entreno: sugerir fin 1 h 30 después si no tiene (sin pasar de medianoche).
+    if (!isMatch && t && !endTime) {
+      const end = format(addHours(parseISO(`2000-01-01T${t}`), 1.5), 'HH:mm')
+      if (end > t) set('ends_at', `${startDate}T${end}`)
+    }
   }
 
   return (
@@ -199,9 +210,12 @@ export function EventFormPage() {
           </div>
         </fieldset>}
 
-        <div className={isMatch ? '' : 'grid gap-4 sm:grid-cols-2'}>
-          <TextField label={isMatch ? 'Fecha y hora' : 'Inicio'} type="datetime-local" value={f.starts_at} onChange={(e) => set('starts_at', e.target.value)} onBlur={suggestEnd} required error={err('starts_at')} />
-          {!isMatch && <TextField label="Fin (opcional)" type="datetime-local" value={f.ends_at} onChange={(e) => set('ends_at', e.target.value)} error={err('ends_at')} />}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <DatePicker label="Fecha" value={startDate} onChange={setStartDate} error={err('starts_at')} />
+          </div>
+          <TimeSelect label={isMatch ? 'Hora' : 'Hora de inicio'} value={startTime} onChange={setStartTime} />
+          {!isMatch && <TimeSelect label="Hora de fin (opcional)" optional value={endTime} onChange={(t) => set('ends_at', t ? `${startDate}T${t}` : '')} error={err('ends_at')} />}
         </div>
 
         {isMatch && (
@@ -263,19 +277,19 @@ export function EventFormPage() {
           <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
           {isMatch && (!editing || isDraft) ? (
             <>
-              <button type="button" className="btn-secondary" disabled={busy || !f.team_id || !f.starts_at || !f.opponent_name.trim()}
+              <button type="button" className="btn-secondary" disabled={busy || !f.team_id || !startOk || !f.opponent_name.trim()}
                 onClick={() => (editing ? void saveDraft(false) : createDraft.mutate())}>
                 {createDraft.isPending || savingDraft === 'draft' ? 'Guardando…' : editing ? 'Guardar borrador' : 'Borrador'}
               </button>
               {/* Regla: para publicar un partido hace falta al menos un convocado. */}
-              <button type="button" className="btn-primary" disabled={busy || !f.team_id || !f.starts_at || !f.opponent_name.trim() || called.length === 0}
+              <button type="button" className="btn-primary" disabled={busy || !f.team_id || !startOk || !f.opponent_name.trim() || called.length === 0}
                 title={called.length === 0 ? 'Para publicar, convoque al menos a un jugador' : undefined}
                 onClick={() => (editing ? void saveDraft(true) : createPublished.mutate())}>
                 {createPublished.isPending || savingDraft === 'publish' ? 'Publicando…' : editing ? 'Guardar y publicar' : 'Crear partido y publicar'}
               </button>
             </>
           ) : (
-            <button className="btn-primary" disabled={busy || !f.team_id || !f.starts_at}>
+            <button className="btn-primary" disabled={busy || !f.team_id || !startOk}>
               {busy ? 'Guardando…' : editing ? 'Guarde los cambios' : f.type === 'training' ? 'Crear entreno' : 'Crear actividad'}
             </button>
           )}

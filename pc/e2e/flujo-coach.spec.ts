@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mockApi } from './mockApi'
+import { fechaHora } from './helpers'
 
 /** Para publicar hace falta al menos un convocado (regla del dueño). */
 async function convocar(page: Page, nombre = 'Ana López') {
@@ -35,7 +36,7 @@ test('login → equipo → crear partido → convocar → ficha → publicar', a
 
   // Crear partido
   await page.getByRole('link', { name: 'Nueva actividad' }).click()
-  await page.getByLabel('Fecha y hora').fill('2026-11-20T09:00')
+  await fechaHora(page, '2026-11-20', '09:00')
   await page.getByLabel('Rival').fill('Liceo Norte')
   await page.getByLabel('Lugar').fill('Cancha 1')
   await convocar(page, 'Luis Pérez')
@@ -152,7 +153,7 @@ test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo',
   await expect(page.getByText('Entrenamiento', { exact: true })).toHaveCount(0)
   const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
   await page.getByLabel('Equipo').selectOption('1')
-  await page.getByLabel('Fecha y hora').fill(`${manana}T10:00`)
+  await fechaHora(page, manana, '10:00')
   await page.getByLabel('Rival').fill('Colegio Sur')
   await convocar(page)
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
@@ -204,7 +205,7 @@ test('Nuevo partido: sin fin, condición ni título; convocar y "Crear partido y
   for (const campo of ['Fin (opcional)', 'Condición', 'Título (opcional)']) await expect(page.getByLabel(campo)).toHaveCount(0)
 
   const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
-  await page.getByLabel('Fecha y hora').fill(`${manana}T10:00`)
+  await fechaHora(page, manana, '10:00')
   // Sin rival no se puede publicar
   await expect(page.getByRole('button', { name: 'Crear partido y publicar' })).toBeDisabled()
   await page.getByLabel('Rival').fill('Colegio Sur')

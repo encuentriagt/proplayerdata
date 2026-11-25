@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mockApi } from './mockApi'
+import { fechaHora } from './helpers'
 
 /** Para publicar hace falta al menos un convocado (regla del dueño). */
 async function convocar(page: Page, nombre = 'Ana López') {
@@ -21,7 +22,7 @@ test('Borrador: se guarda sin publicar, se ve gris con "No publicado", se edita 
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
-  await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
+  await fechaHora(page, manana(), '10:00')
   await page.getByLabel('Rival').fill('Colegio Sur')
   await page.getByRole('button', { name: 'Convocar jugadores' }).click()
   await page.getByRole('checkbox', { name: /Ana López/ }).check()
@@ -57,7 +58,7 @@ test('Publicar un borrador desde el detalle', async ({ page }) => {
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
-  await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
+  await fechaHora(page, manana(), '10:00')
   await page.getByLabel('Rival').fill('Liceo Norte')
   await page.getByRole('button', { name: 'Borrador', exact: true }).click()
   // Sin convocados no se puede publicar
@@ -78,7 +79,7 @@ test('Tarjetas sin menú ⋮; un partido publicado se cancela antes de borrarlo'
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
-  await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
+  await fechaHora(page, manana(), '10:00')
   await page.getByLabel('Rival').fill('Instituto Este')
   await convocar(page)
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
@@ -134,7 +135,7 @@ test('Un partido guardado (publicado o borrador) aparece en Partidos, no solo en
   await entrar(page)
   for (const [rival, boton] of [['Colegio Sur', 'Crear partido y publicar'], ['Liceo Norte', 'Borrador']] as const) {
     await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
-    await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
+    await fechaHora(page, manana(), '10:00')
     await page.getByLabel('Rival').fill(rival)
     if (boton === 'Crear partido y publicar') await convocar(page)
     await page.getByRole('button', { name: boton, exact: true }).click()
@@ -157,7 +158,7 @@ test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nomb
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
-  await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
+  await fechaHora(page, manana(), '10:00')
   await page.getByLabel('Rival').fill('Colegio Sur')
   await convocar(page)
   await convocar(page, 'Luis Pérez')
@@ -208,7 +209,7 @@ test('Un borrador se borra directo (nadie lo ha visto)', async ({ page }) => {
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
-  await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
+  await fechaHora(page, manana(), '10:00')
   await page.getByLabel('Rival').fill('Colegio Sur')
   await page.getByRole('button', { name: 'Borrador', exact: true }).click()
   await expect(page.getByText('Para borrarlo, primero cancele')).toHaveCount(0)
@@ -217,4 +218,21 @@ test('Un borrador se borra directo (nadie lo ha visto)', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Calendario' })).toBeVisible()
   expect(api.calls.some((c) => c.method === 'PATCH')).toBe(false)
   expect(api.calls.some((c) => c.method === 'DELETE' && /\/events\/\d+$/.test(c.path))).toBe(true)
+})
+
+test('Fecha con calendario propio y hora por separado; en entreno se sugiere la hora de fin', async ({ page }) => {
+  const api = mockApi(page)
+  await entrar(page)
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=training')
+  await expect(page.getByLabel('Fecha', { exact: true })).toContainText('Elija la fecha')
+  // Botón "Mañana" del calendario
+  await page.getByLabel('Fecha', { exact: true }).click()
+  await page.getByRole('dialog', { name: /Elegir fecha/ }).getByRole('button', { name: 'Mañana' }).click()
+  await page.getByLabel('Hora de inicio', { exact: true }).selectOption('15:30')
+  await expect(page.getByLabel('Hora de fin (opcional)')).toHaveValue('17:00')
+  await expect(page.getByLabel('Hora de inicio', { exact: true }).locator('option:checked')).toHaveText('3:30 p. m.')
+  await page.getByRole('button', { name: 'Crear entreno' }).click()
+  const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
+  expect(post.body.starts_at).toBe(`${manana()} 15:30`)
+  expect(post.body.ends_at).toBe(`${manana()} 17:00`)
 })

@@ -3,6 +3,7 @@ import { ATTENDANCE, ATTENDANCE_ORDER, normalizeAttendance } from '../../lib/lab
 import { usePcMutation, useRoster } from '../../lib/queries'
 import type { AttendanceStatus, EventDetail } from '../../lib/types'
 import { Alert, Avatar, Empty, ErrorAlert, Spinner } from '../../components/ui'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 export function AttendanceTab({ event }: { event: EventDetail }) {
   const roster = useRoster(event.team_id)
@@ -10,6 +11,7 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
   // Sin clave = sin marcar. Se puede quitar una marca tocando de nuevo el botón elegido.
   const [sel, setSel] = useState<Partial<Record<number, AttendanceStatus>>>(initial)
   const [ok, setOk] = useState(false)
+  const [confirm, setConfirm] = useState(false)
   useEffect(() => setSel(initial), [initial])
 
   const save = usePcMutation<void, { count: number }>({
@@ -22,7 +24,7 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
       ],
     }),
     invalidate: [['event', event.id]],
-    onSuccess: () => setOk(true),
+    onSuccess: () => { setOk(true); setConfirm(false) },
   })
 
   if (roster.isLoading) return <Spinner />
@@ -101,11 +103,17 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
       <p className="text-xs text-black/60">A = asiste · NA = no asiste (con aviso) · L = lesión · NJ = no justificado</p>
 
       <div className="sticky bottom-0 -mx-4 bg-ppd-bg/95 px-4 py-3 backdrop-blur">
-        <button className="btn-primary w-full sm:w-auto" disabled={!dirty || save.isPending || !hasChanges} onClick={() => save.mutate()}>
+        <button className="btn-primary w-full sm:w-auto" disabled={!dirty || save.isPending || !hasChanges} onClick={() => (event.is_draft ? save.mutate() : (save.reset(), setConfirm(true)))}>
           {save.isPending ? 'Publicando…' : 'Guardar y publicar asistencia'}
         </button>
         {missing > 0 && <p className="mt-1 text-xs text-black/60">Faltan {missing} por marcar (se guardan solo los marcados).</p>}
       </div>
+
+      <ConfirmDialog open={confirm} title="¿Enviar la asistencia?" confirmLabel="Enviar" busy={save.isPending}
+        onConfirm={() => save.mutate()} onCancel={() => setConfirm(false)}>
+        Se enviará un aviso a la App de los padres o encargados de cada jugador marcado ({Object.values(sel).filter(Boolean).length} jugador{Object.values(sel).filter(Boolean).length === 1 ? '' : 'es'}) con su asistencia.
+        <ErrorAlert error={save.error} />
+      </ConfirmDialog>
     </div>
   )
 }

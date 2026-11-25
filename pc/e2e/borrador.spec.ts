@@ -155,7 +155,14 @@ test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nomb
   await page.getByRole('group', { name: 'Asistencia de Luis Pérez' }).getByRole('button', { name: 'No justificado' }).click()
   await expect(page.getByText('1 Lesión')).toBeVisible()
   await expect(page.getByText('1 No justificado')).toBeVisible()
+  // Confirmación antes de enviar: cancelar no envía nada
   await page.getByRole('button', { name: 'Guardar y publicar asistencia' }).click()
+  await expect(page.getByText('¿Enviar la asistencia?')).toBeVisible()
+  await expect(page.getByText(/aviso a la App de los padres o encargados de cada jugador marcado \(2 jugadores\)/)).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click()
+  expect(api.calls.some((c) => c.method === 'PUT' && c.path.endsWith('/attendance'))).toBe(false)
+  await page.getByRole('button', { name: 'Guardar y publicar asistencia' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
   await expect(page.getByText('Asistencia guardada y publicada. Los padres ya la ven en la App.')).toBeVisible()
   expect(api.calls.filter((c) => c.method === 'PUT' && c.path.endsWith('/attendance')).at(-1)?.body.records).toEqual([
     { player_id: 15, status: 'injured' }, { player_id: 18, status: 'absent' },
@@ -164,6 +171,7 @@ test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nomb
   // Quitar una marca ya guardada: se envía status null para borrar ese registro
   await page.getByRole('group', { name: 'Asistencia de Luis Pérez' }).getByRole('button', { name: /No justificado \(tocar para quitar\)/ }).click()
   await page.getByRole('button', { name: 'Guardar y publicar asistencia' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
   await expect(page.getByText('Asistencia guardada y publicada. Los padres ya la ven en la App.')).toBeVisible()
   expect(api.calls.filter((c) => c.method === 'PUT' && c.path.endsWith('/attendance')).at(-1)?.body.records).toEqual([
     { player_id: 15, status: 'injured' }, { player_id: 18, status: null },

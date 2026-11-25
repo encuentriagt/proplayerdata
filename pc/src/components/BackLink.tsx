@@ -24,12 +24,15 @@ export function BackLink() {
     return <Link to={`/${slug}`} className={cls}><ArrowLeft className="size-5" aria-hidden /> Inicio</Link>
   }
 
-  const fallback = parts[0] === 'eventos' ? `/${slug}/calendario` : `/${slug}/${parts[0]}`
+  // Formulario de partido o entreno: vuelve a su lista; otro evento, al calendario.
+  const tipo = new URLSearchParams(location.search).get('tipo')
+  const eventList = tipo === 'match' ? 'partidos' : tipo === 'training' ? 'entrenos' : 'calendario'
+  const fallback = parts[0] === 'eventos' ? `/${slug}/${eventList}` : `/${slug}/${parts[0]}`
   // location.key === 'default' significa que es la primera pantalla de la pestaña (no hay a dónde volver).
   const canGoBack = location.key !== 'default'
   return (
     <button type="button" className={cls} onClick={() => (canGoBack ? navigate(-1) : navigate(fallback))}>
-      <ArrowLeft className="size-5" aria-hidden /> {canGoBack ? 'Volver' : SECTION[parts[0]] ?? 'Volver'}
+      <ArrowLeft className="size-5" aria-hidden /> {canGoBack ? 'Volver' : parts[0] === 'eventos' ? SECTION[eventList] : SECTION[parts[0]] ?? 'Volver'}
     </button>
   )
 }

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
 import { fmt } from '../lib/dates'
-import { EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY } from '../lib/labels'
+import { EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle } from '../lib/labels'
 import { useOrg } from '../lib/org'
 import type { PcEvent } from '../lib/types'
 
@@ -25,7 +25,7 @@ export function EventCard({ ev, showDate = true, showType = true }: { ev: PcEven
           )}
         </div>
         <p className={`mt-1 truncate font-semibold ${cancelled ? 'line-through text-black/50' : ''}`}>
-          {ev.display_title}
+          {eventTitle(ev)}
           {ev.home_away && ev.type === 'match' && <span className="font-normal text-black/60"> · {HOME_AWAY[ev.home_away]}</span>}
         </p>
         {ev.location && (

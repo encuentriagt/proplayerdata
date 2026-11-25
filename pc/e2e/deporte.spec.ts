@@ -23,14 +23,14 @@ test('selector de deporte: Inicio muestra el deporte y Partidos solo el elegido'
   await expect(switcher).toContainText('⚽')
 
   await page.goto('/colegio-demo/partidos')
-  await expect(page.getByText('vs. Rival Fútbol')).toBeVisible()
-  await expect(page.getByText('vs. Rival Básquet')).toHaveCount(0)
+  await expect(page.getByText('vs Rival Fútbol')).toBeVisible()
+  await expect(page.getByText('vs Rival Básquet')).toHaveCount(0)
 
   // Cambiar a Basketball
   await page.getByRole('button', { name: /Cambiar deporte/ }).click()
   await page.getByRole('option', { name: /Basketball/ }).click()
-  await expect(page.getByText('vs. Rival Básquet')).toBeVisible()
-  await expect(page.getByText('vs. Rival Fútbol')).toHaveCount(0)
+  await expect(page.getByText('vs Rival Básquet')).toBeVisible()
+  await expect(page.getByText('vs Rival Fútbol')).toHaveCount(0)
   await expect(page.getByLabel('Filtrar por equipo').locator('option')).toHaveText(['Todos los equipos', 'Básquet Juvenil'])
 
   // Se recuerda al volver a Inicio

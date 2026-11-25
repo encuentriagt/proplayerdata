@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.4 (2026-11-25)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.5 (2026-11-25)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -85,6 +85,7 @@ Permisos (v1.4, ver `docs/ARQUITECTURA.md` §2): **admin** todo · **director t�
   "manage_directors": false,                     // solo admin: alcance de directores
   "manage_seasons": false, "manage_plans": false, "manage_branding": false,
   "manage_sports": false,                        // solo admin: activar/desactivar deportes de la organización
+  "manage_positions": [1],                       // ids de deportes donde puede editar posiciones (admin: activados; director: su alcance; coach: deportes de sus equipos)
   "create_teams": [1, 5],                        // "all" (admin: todos los ACTIVADOS) | ids de deportes donde puede crear equipos | []
   "delete_players": false,
   "create_players_without_team": false,           // solo admin: registrar jugador sin equipo
@@ -97,12 +98,16 @@ Permisos (v1.4, ver `docs/ARQUITECTURA.md` §2): **admin** todo · **director t�
 
 ### Deportes de la organización
 El catálogo (deportes, posiciones, estadísticas) es del super admin. El admin del colegio solo **activa** los que usa.
+**Posiciones por organización:** al activar un deporte, la organización recibe una copia de las posiciones del catálogo y desde ahí las edita (todos sus coaches de ese deporte comparten la lista). `positions` en `GET sports`, `GET teams/{id}` y `GET events/{id}` son las de la organización (`{id, code, name, sort}`). Plantilla y ficha solo aceptan posiciones de la organización y del deporte del equipo.
 Códigos y nombres de deporte en inglés (`soccer`/Soccer, `futsal`/Futsal, `basketball`/Basketball, `volleyball`/Volleyball, `american_football`/American Football, `baseball`/Baseball); posiciones y estadísticas en español.
 
 | Método | Ruta | Quién | Notas |
 |---|---|---|---|
 | GET | `sports` | todos | Deportes activados que el miembro ve, con `positions` y `stat_types`: admin todos; director los de su alcance (sus deportes y los de sus equipos sueltos); coach los de sus equipos |
-| PUT | `sports` | admin (`manage_sports`) | `{sport_ids:[...]}` reemplaza la lista (repetirlo no cambia nada). Desactivar un deporte con equipos → 422 `sport_in_use` con `error.sport_ids`. Al desactivar se quita ese deporte del alcance de los directores. Responde la lista nueva |
+| PUT | `sports` | admin (`manage_sports`) | `{sport_ids:[...]}` reemplaza la lista (repetirlo no cambia nada). Desactivar un deporte con equipos → 422 `sport_in_use` con `error.sport_ids`. Al desactivar se quita ese deporte del alcance de los directores. Al activar se copian las posiciones del catálogo (solo la primera vez; reactivar conserva la lista editada). Responde la lista nueva |
+| POST ♻️ | `sports/{sportId}/positions` | `manage_positions` | `{name, code?, sort?}`. Sin `code` se genera (p. ej. "LIB", "LIB2"). Nombre repetido o código tomado → 422 |
+| PATCH | `positions/{id}` | `manage_positions` | `{name?, sort?}` |
+| DELETE | `positions/{id}` | `manage_positions` | 422 `position_in_use` (con `error.players`) si algún jugador la tiene en una plantilla activa. Las fichas pasadas no bloquean y conservan el nombre (`lineup[].position_name`) |
 
 ### Temporadas y equipos
 | Método | Ruta | Quién | Cuerpo |

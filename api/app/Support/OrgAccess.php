@@ -149,6 +149,12 @@ final class OrgAccess
             ->where('organization_id', $this->organization->id)->pluck('sport_id')->map(fn ($i) => (int) $i)->all();
     }
 
+    /** Admin: deportes activados; director: su alcance; coach: deportes de sus equipos. */
+    public function canManagePositions(int $sportId): bool
+    {
+        return in_array($sportId, $this->visibleSportIds(), true);
+    }
+
     public function isSportEnabled(int $sportId): bool
     {
         return in_array($sportId, $this->enabledSportIds(), true);
@@ -227,6 +233,7 @@ final class OrgAccess
             'manage_seasons' => $this->isAdmin(),
             'manage_plans' => $this->isAdmin(),
             'manage_sports' => $this->isAdmin(),
+            'manage_positions' => $this->visibleSportIds(),
             'manage_branding' => $this->isAdmin() && $this->organization->branding_editable_by_org,
             'create_teams' => $this->isAdmin() ? 'all' : $this->directorScope()['sport_ids'],
             'delete_players' => $this->isAdmin(),

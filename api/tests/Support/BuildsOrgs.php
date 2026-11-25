@@ -37,7 +37,7 @@ trait BuildsOrgs
     protected function team(Organization $org, string $name = 'Sub-12', string $sport = 'soccer'): Team
     {
         $sportId = Sport::where('code', $sport)->value('id');
-        $org->sports()->syncWithoutDetaching([$sportId]);
+        \App\Support\Positions::enableSports($org, [$sportId]);
 
         return $org->teams()->create(['name' => $name, 'sport_id' => $sportId]);
     }

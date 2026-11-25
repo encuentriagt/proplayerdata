@@ -16,7 +16,8 @@ class Sport extends Model
 
     public function positions(): HasMany
     {
-        return $this->hasMany(SportPosition::class)->orderBy('sort');
+        // Catálogo de ppd. Las de cada organización se leen con App\Support\Positions.
+        return $this->hasMany(SportPosition::class)->whereNull('organization_id')->orderBy('sort');
     }
 
     public function statTypes(): HasMany
@@ -32,7 +33,7 @@ class Sport extends Model
             'max_on_field' => $this->max_on_field, 'unlimited_substitutions' => $this->unlimited_substitutions,
         ];
         if ($withCatalog) {
-            $data['positions'] = $this->positions->map(fn ($p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name])->all();
+            $data['positions'] = $this->positions->map(fn ($p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name, 'sort' => $p->sort])->values()->all();
             $data['stat_types'] = $this->statTypes->map(fn ($s) => ['id' => $s->id, 'code' => $s->code, 'name' => $s->name, 'scores' => $s->scores])->all();
         }
 

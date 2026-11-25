@@ -105,7 +105,7 @@ class OrganizationAdminController extends Controller
         }
         // El super admin puede dar a un director deportes que la organización aún no activó: se activan.
         if ($data['role'] === 'director' && ! empty($data['sport_ids'])) {
-            $organization->sports()->syncWithoutDetaching(array_map('intval', $data['sport_ids']));
+            \App\Support\Positions::enableSports($organization, $data['sport_ids']);
         }
         [$inv, $token] = $this->invitations->create($organization, $data['email'], $data['role'], null, $data['team_ids'] ?? null, $request->user(),
             $data['role'] === 'director' ? ($data['sport_ids'] ?? null) : null);

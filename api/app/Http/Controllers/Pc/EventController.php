@@ -69,9 +69,10 @@ class EventController extends Controller
     public function show(Organization $organization, Event $event, OrgAccess $access): JsonResponse
     {
         $access->authorize($access->canViewTeam($event->team));
-        $event->load(['team.sport', 'callups.player', 'attendances.player', 'lineup.player', 'actions.statType', 'playerStats']);
+        $event->load(['team.sport', 'callups.player', 'attendances.player', 'lineup.player', 'lineup.position', 'actions.statType', 'playerStats']);
 
-        $event->team->sport->load(['positions', 'statTypes']);
+        $event->team->sport->load('statTypes');
+        \App\Support\Positions::apply($event->team->sport, $organization->id);
         $data = $event->payload();
         $data['sport'] = $event->team->sport->payload();
         $data['callups'] = $event->callups->map(fn ($c) => [
@@ -83,7 +84,7 @@ class EventController extends Controller
         ])->values();
         $data['lineup'] = $event->lineup->map(fn ($l) => [
             'player_id' => $l->player_id, 'player_name' => $l->player?->fullName(), 'is_starter' => $l->is_starter,
-            'sport_position_id' => $l->sport_position_id, 'jersey_number' => $l->jersey_number, 'minutes_played' => $l->minutes_played,
+            'sport_position_id' => $l->sport_position_id, 'position_name' => $l->position?->name, 'jersey_number' => $l->jersey_number, 'minutes_played' => $l->minutes_played,
         ])->values();
         $data['actions'] = $event->actions->map(fn ($a) => [
             'type' => $a->type, 'stat_code' => $a->statType?->code, 'player_id' => $a->player_id,

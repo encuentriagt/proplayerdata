@@ -82,6 +82,7 @@ Cada organización tiene: nombre, `slug`, logo (PNG/SVG), escudo opcional, color
 Catálogo administrado desde el Panel (no código):
 - `sports`: Soccer, Futsal, Basketball, Volleyball, American Football, Baseball, etc. **Código y nombre del deporte en inglés** (`soccer`, `futsal`, `basketball`, `volleyball`, `american_football`, `baseball`): es la única excepción a "textos en español".
 - `organization_sports`: qué deportes del catálogo activó cada organización (lo decide su admin).
+- **El catálogo de deportes y de estadísticas es de ppd. Las posiciones son de cada organización:** `sport_positions.organization_id` NULL = catálogo; con valor = lista del colegio, copiada del catálogo al activar el deporte y editable por admin, director (su alcance) y coach (deportes de sus equipos). Editarla no afecta a otras organizaciones. Borrar es lógico (`deleted_at`): no se borra si un jugador la usa en una plantilla activa; las fichas pasadas conservan el nombre.
 - `sport_positions`: posiciones por deporte (POR, DEF, MED, DEL / Base, Escolta, Alero… ).
 - `sport_stat_types`: estadísticas por deporte, con:
   - `code` (goal, assist, yellow_card, red_card, point_1, point_2, point_3, rebound, foul, …)

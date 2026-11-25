@@ -28,7 +28,8 @@ class TeamController extends Controller
     public function show(Organization $organization, Team $team, OrgAccess $access): JsonResponse
     {
         $access->authorize($access->canViewTeam($team));
-        $team->load(['sport.positions', 'sport.statTypes', 'season']);
+        $team->load(['sport.statTypes', 'season']);
+        \App\Support\Positions::apply($team->sport, $organization->id);
 
         $data = $team->payload();
         $data['sport'] = $team->sport->payload();

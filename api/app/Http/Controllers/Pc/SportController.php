@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Support\ApiError;
 use App\Support\Audit;
 use App\Support\OrgAccess;
+use App\Support\Positions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,7 @@ class SportController extends Controller
     /** GET: deportes activados visibles para el miembro (admin todos; director y coach, los de su alcance). */
     public function index(Organization $organization, OrgAccess $access): JsonResponse
     {
-        return response()->json(['data' => $this->payload($access->visibleSportIds())]);
+        return response()->json(['data' => $this->payload($access->visibleSportIds(), $organization->id)]);
     }
 
     /** PUT {sport_ids:[...]}: solo admin. Reemplaza la lista (idempotente por naturaleza). */
@@ -58,22 +59,19 @@ class SportController extends Controller
                     // Un director no puede quedar con un deporte desactivado en su alcance.
                     DirectorScope::where('organization_id', $organization->id)->whereIn('sport_id', $removed)->delete();
                 }
-                $now = now();
-                foreach ($added as $sid) {
-                    DB::table('organization_sports')->insertOrIgnore([
-                        'organization_id' => $organization->id, 'sport_id' => $sid, 'created_at' => $now, 'updated_at' => $now,
-                    ]);
-                }
+                Positions::enableSports($organization, $added);
             });
             Audit::log('organization.sports_changed', $organization, ['added' => $added, 'removed' => $removed], $organization->id);
         }
 
-        return response()->json(['data' => $this->payload($new)]);
+        return response()->json(['data' => $this->payload($new, $organization->id)]);
     }
 
-    private function payload(array $ids): array
+    private function payload(array $ids, int $orgId): array
     {
-        return Sport::with(['positions', 'statTypes'])->whereIn('id', $ids ?: [0])->orderBy('sort')->orderBy('name')->get()
-            ->map->payload()->values()->all();
+        $positions = Positions::forOrg($orgId, $ids);
+
+        return Sport::with('statTypes')->whereIn('id', $ids ?: [0])->orderBy('sort')->orderBy('name')->get()
+            ->map(fn (Sport $s) => $s->setRelation('positions', $positions->get($s->id, collect()))->payload())->values()->all();
     }
 }

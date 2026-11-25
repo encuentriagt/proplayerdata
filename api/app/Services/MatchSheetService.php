@@ -26,7 +26,8 @@ final class MatchSheetService
         $sportId = $event->team->sport_id;
         $rosterIds = TeamPlayer::where('team_id', $event->team_id)->pluck('player_id')->map(fn ($id) => (int) $id)->all();
         $statTypes = SportStatType::where('sport_id', $sportId)->get()->keyBy('code');
-        $positionIds = SportPosition::where('sport_id', $sportId)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        // Posiciones de la organización en ese deporte; las borradas siguen valiendo para no bloquear fichas pasadas.
+        $positionIds = SportPosition::withTrashed()->where('organization_id', $event->team->organization_id)->where('sport_id', $sportId)->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         $lineup = collect($data['lineup'] ?? []);
         $actions = collect($data['actions'] ?? []);
@@ -37,7 +38,7 @@ final class MatchSheetService
                 $errors["lineup.$i.player_id"] = 'El jugador no pertenece al equipo.';
             }
             if (! empty($row['sport_position_id']) && ! in_array((int) $row['sport_position_id'], $positionIds, true)) {
-                $errors["lineup.$i.sport_position_id"] = 'La posición no corresponde al deporte.';
+                $errors["lineup.$i.sport_position_id"] = 'La posición no es de su organización o no corresponde al deporte.';
             }
         }
         if ($lineup->pluck('player_id')->duplicates()->isNotEmpty()) {

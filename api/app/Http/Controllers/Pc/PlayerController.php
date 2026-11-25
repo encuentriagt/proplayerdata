@@ -150,8 +150,8 @@ class PlayerController extends Controller
 
     private function assertPosition(Team $team, ?int $positionId): void
     {
-        if ($positionId && ! \App\Models\SportPosition::where('id', $positionId)->where('sport_id', $team->sport_id)->exists()) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['sport_position_id' => 'La posición no corresponde al deporte del equipo.']);
+        if (! \App\Support\Positions::valid($positionId, $team->organization_id, $team->sport_id)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['sport_position_id' => 'La posición no es de su organización o no corresponde al deporte del equipo.']);
         }
     }
 }

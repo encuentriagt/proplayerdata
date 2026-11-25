@@ -51,7 +51,13 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
 
   return (
     <div className="space-y-3">
-      {ok && <Alert tone="success">Asistencia guardada.</Alert>}
+      {ok && (
+        <Alert tone="success">
+          {event.is_draft
+            ? 'Asistencia guardada. Los padres la verán en la App cuando publique el partido.'
+            : 'Asistencia guardada y publicada. Los padres ya la ven en la App.'}
+        </Alert>
+      )}
       <ErrorAlert error={save.error} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-black/70">
@@ -96,7 +102,7 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
 
       <div className="sticky bottom-0 -mx-4 bg-ppd-bg/95 px-4 py-3 backdrop-blur">
         <button className="btn-primary w-full sm:w-auto" disabled={!dirty || save.isPending || !hasChanges} onClick={() => save.mutate()}>
-          {save.isPending ? 'Guardando…' : 'Guarde la asistencia'}
+          {save.isPending ? 'Publicando…' : 'Guardar y publicar asistencia'}
         </button>
         {missing > 0 && <p className="mt-1 text-xs text-black/60">Faltan {missing} por marcar (se guardan solo los marcados).</p>}
       </div>

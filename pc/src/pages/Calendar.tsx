@@ -7,7 +7,7 @@ import {
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { capitalize, nowGt, toGt, ymd } from '../lib/dates'
-import { EVENT_TYPE, EVENT_TYPE_COLOR } from '../lib/labels'
+import { EVENT_TYPE, EVENT_TYPE_COLOR, eventTitle } from '../lib/labels'
 import { useOrg } from '../lib/org'
 import { useEvents } from '../lib/queries'
 import { useSport } from '../lib/sport'
@@ -136,9 +136,9 @@ function GridView({ events, from, to, anchor, compact }: { events: PcEvent[]; fr
               <ul className="space-y-1">
                 {list.map((e) => (
                   <li key={e.id}>
-                    <Link to={`/${slug}/eventos/${e.id}`} title={e.display_title}
+                    <Link to={`/${slug}/eventos/${e.id}`} title={eventTitle(e)}
                       className={`block truncate rounded-md px-1.5 py-0.5 text-xs font-semibold ${EVENT_TYPE_COLOR[e.type]} ${e.status === 'cancelled' ? 'line-through opacity-50' : ''}`}>
-                      {format(toGt(e.starts_at), 'HH:mm')} {e.display_title}
+                      {format(toGt(e.starts_at), 'HH:mm')} {eventTitle(e)}
                       {e.status === 'finished' && e.score_us !== null && ` · ${e.score_us}–${e.score_them}`}
                     </Link>
                   </li>

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CalendarX, MapPin, Pencil, Trash2 } from 'lucide-react'
 import { capitalize, fmt } from '../lib/dates'
-import { EVENT_STATUS, EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY } from '../lib/labels'
+import { EVENT_STATUS, EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle } from '../lib/labels'
 import { useOrg } from '../lib/org'
 import { useEvent, usePcMutation } from '../lib/queries'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { ErrorAlert, Spinner } from '../components/ui'
+import { Alert, ErrorAlert, Spinner } from '../components/ui'
 import { CallupsTab } from './event/CallupsTab'
 import { AttendanceTab } from './event/AttendanceTab'
 import { MatchSheetTab } from './event/MatchSheetTab'
@@ -21,6 +21,7 @@ export function EventDetailPage() {
   const [params, setParams] = useSearchParams()
   const ev = useEvent(eventId)
   const [confirm, setConfirm] = useState<null | 'cancel' | 'delete'>(null)
+  const justPublished = (useLocation().state as { published?: boolean; called?: number } | null) ?? null
 
   const cancel = usePcMutation({
     method: 'PATCH', path: `events/${eventId}`, body: () => ({ status: 'cancelled' }),
@@ -47,6 +48,14 @@ export function EventDetailPage() {
 
   return (
     <>
+      {justPublished?.published && (
+        <div className="mb-4">
+          <Alert tone="success">
+            Partido publicado.{' '}
+            {justPublished.called ? `Se avisó en la App a los padres de ${justPublished.called} convocado${justPublished.called === 1 ? '' : 's'}.` : 'Aún no tiene convocados: puede convocar desde la pestaña Convocatoria.'}
+          </Alert>
+        </div>
+      )}
       <div className="mb-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`chip ${EVENT_TYPE_COLOR[e.type]}`}>{EVENT_TYPE[e.type]}</span>
@@ -57,7 +66,7 @@ export function EventDetailPage() {
         </div>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className={`title text-3xl sm:text-4xl ${e.status === 'cancelled' ? 'line-through opacity-60' : ''}`}>{e.display_title}</h1>
+            <h1 className={`title text-3xl sm:text-4xl ${e.status === 'cancelled' ? 'line-through opacity-60' : ''}`}>{eventTitle(e)}</h1>
             <p className="mt-1 text-black/70">
               {capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM, HH:mm"))}
               {e.ends_at && ` – ${fmt(e.ends_at, 'HH:mm')}`}

@@ -28,12 +28,11 @@ test('login → equipo → crear partido → convocar → ficha → publicar', a
 
   // Crear partido
   await page.getByRole('link', { name: 'Nueva actividad' }).click()
-  await page.getByLabel('Inicio', { exact: true }).fill('2026-11-20T09:00')
+  await page.getByLabel('Fecha y hora').fill('2026-11-20T09:00')
   await page.getByLabel('Rival').fill('Liceo Norte')
-  await page.getByLabel('Condición').selectOption('home')
   await page.getByLabel('Lugar').fill('Cancha 1')
-  await page.getByRole('button', { name: 'Crear partido' }).click()
-  await expect(page.getByRole('heading', { name: 'vs. Liceo Norte' })).toBeVisible()
+  await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
+  await expect(page.getByRole('heading', { name: 'Sub-15 Masculino vs Liceo Norte' })).toBeVisible()
   const create = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
   expect(create.headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/)
   expect(create.body).toMatchObject({ team_id: 1, type: 'match', starts_at: '2026-11-20 09:00', opponent_name: 'Liceo Norte' })
@@ -145,16 +144,16 @@ test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo',
   await expect(page.getByText('Entrenamiento', { exact: true })).toHaveCount(0)
   const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
   await page.getByLabel('Equipo').selectOption('1')
-  await page.getByLabel('Inicio', { exact: true }).fill(`${manana}T10:00`)
+  await page.getByLabel('Fecha y hora').fill(`${manana}T10:00`)
   await page.getByLabel('Rival').fill('Colegio Sur')
-  await page.getByRole('button', { name: 'Crear partido' }).click()
-  await expect(page.getByRole('heading', { name: 'vs. Colegio Sur' })).toBeVisible()
+  await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
+  await expect(page.getByRole('heading', { name: 'Sub-15 Masculino vs Colegio Sur' })).toBeVisible()
   expect(api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))?.body.type).toBe('match')
 
   // Desde el detalle, "Volver" regresa a la lista de partidos (el formulario se reemplazó al crear)
   await page.getByRole('button', { name: 'Volver' }).click()
   await expect(page.getByRole('heading', { name: 'Partidos' })).toBeVisible()
-  await expect(page.getByText('vs. Colegio Sur')).toBeVisible()
+  await expect(page.getByText('vs Colegio Sur')).toBeVisible()
   // Y "Inicio" lleva al menú principal
   await page.getByRole('link', { name: 'Inicio', exact: true }).first().click()
   await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
@@ -169,7 +168,7 @@ test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo',
   // Entrenos: el partido no aparece; "Nuevo entreno" abre el formulario con el tipo entreno
   await page.goto('/colegio-demo/entrenos')
   await expect(page.getByRole('heading', { name: 'Entrenos' })).toBeVisible()
-  await expect(page.getByText('vs. Colegio Sur')).toHaveCount(0)
+  await expect(page.getByText('vs Colegio Sur')).toHaveCount(0)
   await page.getByRole('link', { name: 'Nuevo entreno' }).first().click()
   await expect(page.getByRole('heading', { name: 'Nuevo entreno' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Crear entreno' })).toBeVisible()
@@ -181,4 +180,42 @@ test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo',
   await page.goto('/colegio-demo/eventos/nuevo')
   await expect(page.getByRole('group', { name: 'Tipo' })).toBeVisible()
   await expect(page.getByText('Otro', { exact: true })).toBeVisible()
+})
+
+test('Nuevo partido: sin fin, condición ni título; convocar y "Crear partido y publicar"', async ({ page }) => {
+  const api = mockApi(page)
+  await page.goto('/colegio-demo/login')
+  await page.getByLabel('Correo electrónico').fill('coach@demo.gt')
+  await page.getByLabel('Contraseña', { exact: true }).fill('Secreta12345')
+  await page.getByRole('button', { name: 'Ingresar' }).click()
+  await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
+
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
+  await expect(page.getByRole('heading', { name: 'Nuevo partido' })).toBeVisible()
+  for (const campo of ['Fin (opcional)', 'Condición', 'Título (opcional)']) await expect(page.getByLabel(campo)).toHaveCount(0)
+
+  const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
+  await page.getByLabel('Fecha y hora').fill(`${manana}T10:00`)
+  // Sin rival no se puede publicar
+  await expect(page.getByRole('button', { name: 'Crear partido y publicar' })).toBeDisabled()
+  await page.getByLabel('Rival').fill('Colegio Sur')
+  await expect(page.getByText('Se verá como: Sub-15 Masculino vs Colegio Sur')).toBeVisible()
+
+  // Convocar: aparecen los jugadores del equipo elegido
+  await page.getByRole('button', { name: 'Convocar jugadores' }).click()
+  await expect(page.getByText('Luis Pérez')).toBeVisible()
+  await page.getByRole('checkbox', { name: /Ana López/ }).check()
+  await expect(page.getByText('Convocatoria · 1 de 2')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
+  await expect(page.getByRole('heading', { name: 'Sub-15 Masculino vs Colegio Sur' })).toBeVisible()
+  await expect(page.getByText('Partido publicado. Se avisó en la App a los padres de 1 convocado.')).toBeVisible()
+
+  const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
+  expect(post.body).not.toHaveProperty('title')
+  expect(post.body).not.toHaveProperty('home_away')
+  expect(post.body).not.toHaveProperty('ends_at')
+  const put = api.calls.find((c) => c.method === 'PUT' && c.path.endsWith('/callups'))!
+  expect(put.body).toEqual({ players: [{ player_id: 15, status: 'called' }] })
+  expect(put.headers['idempotency-key']).toBeTruthy()
 })

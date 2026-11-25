@@ -24,3 +24,9 @@ export const ATTENDANCE_ORDER: AttendanceStatus[] = ['present', 'late', 'absent'
 export const TEAM_GENDER = { male: 'Masculino', female: 'Femenino', mixed: 'Mixto' } as const
 export const PLAYER_GENDER = { male: 'Masculino', female: 'Femenino', other: 'Otro' } as const
 export const ROLE_LABEL = { org_admin: 'Administrador', director: 'Director técnico', coach: 'Coach', guardian: 'Padre o madre' } as const
+
+/** Título que se muestra: los partidos siempre son "Equipo vs Rival"; lo demás usa display_title de la API. */
+export function eventTitle(e: { type: string; team_name: string | null; opponent_name: string | null; display_title: string }): string {
+  if (e.type === 'match' && e.opponent_name) return `${e.team_name ?? 'Equipo'} vs ${e.opponent_name}`
+  return e.display_title
+}

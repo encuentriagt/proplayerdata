@@ -50,6 +50,7 @@ export function EventDetailPage() {
   // Publicar un borrador: fecha, rival (partido) y al menos un convocado. Se completa con "Editar".
   const publishMissing = [
     !e.starts_at && 'fecha y hora',
+    !!e.starts_at && e.time_pending && 'hora',
     e.type === 'match' && !e.opponent_name && 'rival',
     e.type === 'match' && !e.callups.some((c) => c.status === 'called') && 'al menos un convocado',
   ].filter(Boolean) as string[]
@@ -98,7 +99,11 @@ export function EventDetailPage() {
           <div>
             <h1 className={`title text-3xl sm:text-4xl ${e.status === 'cancelled' ? 'line-through opacity-60' : ''}`}>{eventTitle(e)}</h1>
             <p className="mt-1 text-black/70">
-              {e.starts_at ? capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM, HH:mm")) : 'Sin fecha todavía'}
+              {e.starts_at
+                ? e.time_pending
+                  ? `${capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM"))} · Hora por definir`
+                  : capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM, HH:mm"))
+                : 'Sin fecha todavía'}
               {e.ends_at && ` – ${fmt(e.ends_at, 'HH:mm')}`}
               {e.home_away && e.type === 'match' && ` · ${HOME_AWAY[e.home_away]}`}
             </p>

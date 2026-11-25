@@ -134,8 +134,9 @@ export interface PcEvent {
   type: EventType
   title: string | null
   display_title: string
-  /** null solo en borradores sin fecha (se agrega después). */
   starts_at: string | null
+  /** Borrador con fecha pero sin hora todavía (pedido al backend: guardar esta marca). */
+  time_pending?: boolean
   ends_at: string | null
   location: string | null
   opponent_name: string | null

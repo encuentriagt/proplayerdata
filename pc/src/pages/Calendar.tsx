@@ -139,7 +139,7 @@ function GridView({ events, from, to, anchor, compact }: { events: PcEvent[]; fr
                   <li key={e.id}>
                     <Link to={`/${slug}/eventos/${e.id}`} title={eventTitle(e)}
                       className={`block truncate rounded-md px-1.5 py-0.5 text-xs font-semibold ${EVENT_TYPE_COLOR[e.type]} ${e.status === 'cancelled' ? 'line-through opacity-50' : ''}`}>
-                      {e.starts_at && format(toGt(e.starts_at), 'HH:mm')} {eventTitle(e)}
+                      {e.starts_at && !e.time_pending && format(toGt(e.starts_at), 'HH:mm')} {eventTitle(e)}
                       {e.status === 'finished' && e.score_us !== null && ` · ${e.score_us}–${e.score_them}`}
                     </Link>
                   </li>

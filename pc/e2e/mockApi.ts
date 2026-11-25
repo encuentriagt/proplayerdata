@@ -126,8 +126,6 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
         const sportOf = (tid: number) => (tid === 2 ? 2 : 1)
         const base = (e: any) => (!q.get('type') || e.type === q.get('type')) && (!q.get('team_id') || String(e.team_id) === q.get('team_id'))
           && (!q.get('sport_id') || String(sportOf(e.team_id)) === q.get('sport_id'))
-        // Propuesta al backend: undated_drafts=1 devuelve los borradores sin fecha
-        if (q.get('undated_drafts') === '1') return ok(route, list.filter((e: any) => base(e) && e.is_draft && !e.starts_at))
         return ok(route, list.filter((e: any) => base(e) && !!e.starts_at && (!from || day(e.starts_at) >= from) && (!to || day(e.starts_at) <= to)))
       }
       if (q.get('pending_sheet') === '1') {
@@ -140,7 +138,8 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
       const e = {
         id, team_id: body.team_id, team_name: team.name, type: body.type, title: body.title,
         display_title: body.title ?? (body.type === 'match' ? (body.opponent_name ? `${[team, basket].find((t) => t.id === body.team_id)?.name} vs ${body.opponent_name}` : `${[team, basket].find((t) => t.id === body.team_id)?.name} · Partido`) : ({ training: 'Entrenamiento', other: 'Actividad' } as any)[body.type]),
-        starts_at: body.starts_at ? body.starts_at.replace(' ', 'T') + ':00-06:00' : null, ends_at: null, location: body.location, opponent_name: body.opponent_name,
+        starts_at: !body.starts_at ? null : body.starts_at.length === 10 ? `${body.starts_at}T00:00:00-06:00` : body.starts_at.replace(' ', 'T') + ':00-06:00',
+        time_pending: !!body.time_pending, ends_at: null, location: body.location, opponent_name: body.opponent_name,
         home_away: body.home_away, status: 'scheduled', score_us: null, score_them: null, result_published_at: null, notes: body.notes,
         is_draft: body.publish === false, published_at: body.publish === false ? null : new Date().toISOString(),
         sport, callups: (body.callups ?? []).map((c: any) => ({ player_id: c.player_id, player_name: null, status: c.status ?? 'called', guardian_response: 'pending', responded_at: null })),
@@ -157,7 +156,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
       if (!m[2] && method === 'DELETE') { delete events[e.id]; return ok(route, { ok: true }) }
       if (!m[2] && method === 'PATCH') {
         Object.assign(e, body)
-        if (body.starts_at) e.starts_at = body.starts_at.replace(' ', 'T') + ':00-06:00'
+        if (body.starts_at) e.starts_at = body.starts_at.length === 10 ? `${body.starts_at}T00:00:00-06:00` : body.starts_at.replace(' ', 'T') + ':00-06:00'
         if (body.opponent_name !== undefined && e.type === 'match') e.display_title = body.opponent_name ? `${[team, basket].find((t) => t.id === e.team_id)?.name} vs ${body.opponent_name}` : 'Partido'
         return ok(route, e)
       }

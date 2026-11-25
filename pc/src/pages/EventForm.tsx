@@ -63,7 +63,7 @@ export function EventFormPage() {
     const e = existing.data
     if (!e) return
     setF({
-      team_id: String(e.team_id), type: e.type, starts_at: toInputValue(e.starts_at), ends_at: toInputValue(e.ends_at),
+      team_id: String(e.team_id), type: e.type, starts_at: e.time_pending && e.starts_at ? `${toInputValue(e.starts_at).slice(0, 10)}T` : toInputValue(e.starts_at), ends_at: toInputValue(e.ends_at),
       title: e.title ?? '', location: e.location ?? '', opponent_name: e.opponent_name ?? '', home_away: e.home_away ?? '', notes: e.notes ?? '',
     })
   }, [existing.data])
@@ -76,16 +76,17 @@ export function EventFormPage() {
   const [startDate = '', startTime = ''] = f.starts_at.split('T')
   const endTime = f.ends_at.split('T')[1] ?? ''
   const startOk = !!startDate && !!startTime
-  // Borrador: solo el equipo (fecha, hora, rival y convocados se agregan después). Si pone fecha, también la hora y viceversa.
-  // Publicar: equipo, fecha, hora, rival y al menos un convocado (regla del dueño).
-  const missingDraft = [!f.team_id && 'equipo', startTime && !startDate && 'fecha', startDate && !startTime && 'hora'].filter(Boolean) as string[]
+  // Borrador: equipo y fecha. Hora, rival y convocados se agregan después.
+  // Publicar: además hora, rival y al menos un convocado (regla del dueño).
+  const missingDraft = [!f.team_id && 'equipo', !startDate && 'fecha'].filter(Boolean) as string[]
   // Partido: sin fin, condición ni título (el título es siempre "Equipo vs Rival"). No se envían esos campos,
   // así al editar no se borra lo que tuviera un partido anterior.
   const body = () => ({
     ...(editing ? {} : { team_id: Number(f.team_id) }),
     type: f.type,
-    // "yyyy-MM-ddTHH:mm" → "yyyy-MM-dd HH:mm" (hora de Guatemala); null en un borrador sin fecha.
-    starts_at: startOk ? fromInputValue(f.starts_at) : null,
+    // "yyyy-MM-ddTHH:mm" → "yyyy-MM-dd HH:mm" (hora de Guatemala). Borrador sin hora: solo la fecha + time_pending.
+    starts_at: startTime ? fromInputValue(f.starts_at) : startDate || null,
+    ...(startDate && !startTime ? { time_pending: true } : startTime ? { time_pending: false } : {}),
     location: f.location.trim() || null,
     notes: f.notes.trim() || null,
     ...(isMatch
@@ -287,7 +288,7 @@ export function EventFormPage() {
             <>
               <button type="button" className="btn-secondary" disabled={busy || missingDraft.length > 0}
                 onClick={() => (editing ? void saveDraft(false) : createDraft.mutate())}>
-                {createDraft.isPending || savingDraft === 'draft' ? 'Guardando…' : editing ? 'Guardar borrador' : 'Borrador'}
+                {createDraft.isPending || savingDraft === 'draft' ? 'Guardando…' : 'Guardar borrador'}
               </button>
               {/* Regla: para publicar un partido hace falta al menos un convocado. */}
               <button type="button" className="btn-primary" disabled={busy || missingPublish.length > 0}

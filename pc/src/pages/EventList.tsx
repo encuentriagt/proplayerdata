@@ -48,9 +48,7 @@ export function EventList({ type }: { type: Kind }) {
     : Array.from({ length: blocks }, (_, i) => [addDays(today, -WINDOW * (i + 1)), addDays(today, -WINDOW * i - 1)])
 
   const base = { type, team_id: teamId, sport_id: sport.selected?.id ?? -1 }
-  const queries: Record<string, string | number | undefined>[] = ranges.map(([from, to]) => ({ ...base, from: ymd(from), to: ymd(to) }))
-  // Borradores sin fecha (no entran en ningún rango): se piden aparte y van primero en Próximos.
-  if (tab === 'proximos') queries.unshift({ ...base, undated_drafts: 1 })
+  const queries = ranges.map(([from, to]) => ({ ...base, from: ymd(from), to: ymd(to) }))
   const results = useQueries({
     queries: queries.map((query) => ({
       queryKey: [slug, 'events', query],

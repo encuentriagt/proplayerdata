@@ -212,7 +212,7 @@ test('Nuevo partido: sin fin, condición ni título; convocar y "Crear partido y
   await expect(page.getByText('Se verá como: Sub-15 Masculino vs Colegio Sur')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Crear partido y publicar' })).toBeDisabled()
   await expect(page.getByText('Para publicar falta: al menos un convocado.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Borrador', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Guardar borrador', exact: true })).toBeEnabled()
 
   // Convocar: aparecen los jugadores del equipo elegido
   await page.getByRole('button', { name: 'Convocar jugadores' }).click()

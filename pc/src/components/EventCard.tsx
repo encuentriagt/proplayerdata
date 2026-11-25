@@ -16,7 +16,9 @@ export function EventCard({ ev, showDate = true, showType = true }: { ev: PcEven
         {ev.starts_at ? (
           <>
             {showDate && <p className="text-xs font-semibold uppercase text-black/60">{fmt(ev.starts_at, 'EEE d MMM')}</p>}
-            <p className="font-display text-xl font-extrabold italic">{fmt(ev.starts_at, 'HH:mm')}</p>
+            {ev.time_pending
+              ? <p className="text-xs font-semibold leading-tight text-black/60">Hora por definir</p>
+              : <p className="font-display text-xl font-extrabold italic">{fmt(ev.starts_at, 'HH:mm')}</p>}
           </>
         ) : <p className="text-xs font-semibold uppercase leading-tight text-black/60">Sin fecha</p>}
       </div>

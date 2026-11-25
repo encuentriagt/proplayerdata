@@ -129,7 +129,7 @@ test('Un partido guardado (publicado o borrador) aparece en Partidos, no solo en
   await expect(page.getByText('El rango máximo es de 120 días.')).toHaveCount(0)
 })
 
-test('Asistencia: botones A · NA · L · NJ y se guarda present / excused / injured / absent', async ({ page }) => {
+test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nombre y al tocarlo se quita', async ({ page }) => {
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
@@ -138,19 +138,34 @@ test('Asistencia: botones A · NA · L · NJ y se guarda present / excused / inj
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
   await page.getByRole('tab', { name: 'Asistencia' }).click()
 
-  const ana = page.getByRole('radiogroup', { name: 'Asistencia de Ana López' })
-  await expect(ana.getByRole('radio')).toHaveText(['A', 'NA', 'L', 'NJ'])
-  await expect(ana.getByRole('radio', { name: 'Lesión' })).toBeVisible()
-  await ana.getByRole('radio', { name: 'Lesión' }).click()
-  await page.getByRole('radiogroup', { name: 'Asistencia de Luis Pérez' }).getByRole('radio', { name: 'No justificado' }).click()
-  await expect(page.getByText('A = asiste · NA = no asiste (con aviso) · L = lesión · NJ = no justificado')).toBeVisible()
-  // Contador con mayúscula inicial
+  const ana = page.getByRole('group', { name: 'Asistencia de Ana López' })
+  await expect(ana.getByRole('button')).toHaveText(['A', 'NA', 'L', 'NJ'])
+
+  // Elegir Asiste: queda un solo botón "Asiste"
+  await ana.getByRole('button', { name: 'Asiste', exact: true }).click()
+  await expect(ana.getByRole('button')).toHaveText(['Asiste'])
+  await expect(page.getByText('1 Asiste')).toBeVisible()
+  // Tocarlo de nuevo: se quita y vuelven los 4
+  await ana.getByRole('button', { name: /Asiste \(tocar para quitar\)/ }).click()
+  await expect(ana.getByRole('button')).toHaveText(['A', 'NA', 'L', 'NJ'])
   await expect(page.getByText('0 Asiste')).toBeVisible()
+
+  await ana.getByRole('button', { name: 'Lesión' }).click()
+  await expect(ana.getByRole('button')).toHaveText(['Lesión'])
+  await page.getByRole('group', { name: 'Asistencia de Luis Pérez' }).getByRole('button', { name: 'No justificado' }).click()
   await expect(page.getByText('1 Lesión')).toBeVisible()
   await expect(page.getByText('1 No justificado')).toBeVisible()
   await page.getByRole('button', { name: 'Guarde la asistencia' }).click()
   await expect(page.getByText('Asistencia guardada.')).toBeVisible()
-  expect(api.calls.find((c) => c.method === 'PUT' && c.path.endsWith('/attendance'))?.body.records).toEqual([
+  expect(api.calls.filter((c) => c.method === 'PUT' && c.path.endsWith('/attendance')).at(-1)?.body.records).toEqual([
     { player_id: 15, status: 'injured' }, { player_id: 18, status: 'absent' },
+  ])
+
+  // Quitar una marca ya guardada: se envía status null para borrar ese registro
+  await page.getByRole('group', { name: 'Asistencia de Luis Pérez' }).getByRole('button', { name: /No justificado \(tocar para quitar\)/ }).click()
+  await page.getByRole('button', { name: 'Guarde la asistencia' }).click()
+  await expect(page.getByText('Asistencia guardada.')).toBeVisible()
+  expect(api.calls.filter((c) => c.method === 'PUT' && c.path.endsWith('/attendance')).at(-1)?.body.records).toEqual([
+    { player_id: 15, status: 'injured' }, { player_id: 18, status: null },
   ])
 })

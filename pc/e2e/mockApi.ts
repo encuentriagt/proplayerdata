@@ -161,9 +161,11 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
         return ok(route, { count: e.callups.length, newly_called: body.players.map((p: any) => p.player_id).filter((id: number) => !prev.has(id)) })
       }
       if (m[2] === 'attendance') {
-        const bad = body.records.find((r: any) => !['present', 'absent', 'late', 'excused', 'injured'].includes(r.status))
+        // status null = quitar el registro (pedido al backend)
+        const bad = body.records.find((r: any) => r.status !== null && !['present', 'absent', 'late', 'excused', 'injured'].includes(r.status))
         if (bad) return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'validation_failed', message: 'Estado no válido.' } }) })
-        e.attendance = body.records.map((r: any) => ({ ...r, player_name: null, note: r.note ?? null }))
+        const keep = e.attendance.filter((a: any) => !body.records.some((r: any) => r.player_id === a.player_id))
+        e.attendance = [...keep, ...body.records.filter((r: any) => r.status !== null).map((r: any) => ({ ...r, player_name: null, note: r.note ?? null }))]
         return ok(route, { count: body.records.length })
       }
       if (m[2] === 'match-sheet' && e.is_draft) return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'event_draft', message: 'Publique el partido primero.' } }) })

@@ -167,7 +167,7 @@ export function EventFormPage() {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (busy) return
-    if (!editing && isMatch) createPublished.mutate()
+    if (!editing && isMatch) { if (called.length) createPublished.mutate() }
     else if (editing && isDraft && isMatch) void saveDraft(false)
     else m.mutate()
   }
@@ -256,6 +256,9 @@ export function EventFormPage() {
           <p className="text-sm text-black/60">Si cambia la fecha o el lugar, se avisará a los padres de los convocados.</p>
         )}
 
+        {isMatch && (!editing || isDraft) && called.length === 0 && (
+          <p className="text-right text-sm text-amber-900">Para publicar, convoque al menos a un jugador. Puede guardarlo como borrador sin convocados.</p>
+        )}
         <div className="flex flex-wrap justify-end gap-2 pt-2">
           <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
           {isMatch && (!editing || isDraft) ? (
@@ -264,7 +267,9 @@ export function EventFormPage() {
                 onClick={() => (editing ? void saveDraft(false) : createDraft.mutate())}>
                 {createDraft.isPending || savingDraft === 'draft' ? 'Guardando…' : editing ? 'Guardar borrador' : 'Borrador'}
               </button>
-              <button type="button" className="btn-primary" disabled={busy || !f.team_id || !f.starts_at || !f.opponent_name.trim()}
+              {/* Regla: para publicar un partido hace falta al menos un convocado. */}
+              <button type="button" className="btn-primary" disabled={busy || !f.team_id || !f.starts_at || !f.opponent_name.trim() || called.length === 0}
+                title={called.length === 0 ? 'Para publicar, convoque al menos a un jugador' : undefined}
                 onClick={() => (editing ? void saveDraft(true) : createPublished.mutate())}>
                 {createPublished.isPending || savingDraft === 'publish' ? 'Publicando…' : editing ? 'Guardar y publicar' : 'Crear partido y publicar'}
               </button>

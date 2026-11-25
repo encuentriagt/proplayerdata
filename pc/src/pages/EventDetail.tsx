@@ -69,7 +69,14 @@ export function EventDetailPage() {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-stone-200 p-3">
           <span className="chip bg-stone-600 text-white">No publicado</span>
           <p className="flex-1 text-sm">Es un borrador: los padres no lo ven en la App y no se ha avisado a nadie.</p>
-          <button className="btn-primary" onClick={() => { publish.reset(); setConfirmPublish(true) }}>Publicar</button>
+          {e.callups.some((c) => c.status === 'called') ? (
+            <button className="btn-primary" onClick={() => { publish.reset(); setConfirmPublish(true) }}>Publicar</button>
+          ) : (
+            <span className="flex flex-col items-end gap-1">
+              <button className="btn-primary" disabled title="Para publicar, convoque al menos a un jugador">Publicar</button>
+              <span className="text-xs text-amber-900">Convoque al menos a un jugador para publicar.</span>
+            </span>
+          )}
         </div>
       )}
       <div className="mb-4">

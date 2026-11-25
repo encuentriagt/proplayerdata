@@ -1,5 +1,12 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { mockApi } from './mockApi'
+
+/** Para publicar hace falta al menos un convocado (regla del dueño). */
+async function convocar(page: Page, nombre = 'Ana López') {
+  const btn = page.getByRole('button', { name: 'Convocar jugadores' })
+  if (await btn.isVisible()) await btn.click()
+  await page.getByRole('checkbox', { name: new RegExp(nombre) }).check()
+}
 
 test('login → equipo → crear partido → convocar → ficha → publicar', async ({ page }) => {
   const api = mockApi(page)
@@ -31,6 +38,7 @@ test('login → equipo → crear partido → convocar → ficha → publicar', a
   await page.getByLabel('Fecha y hora').fill('2026-11-20T09:00')
   await page.getByLabel('Rival').fill('Liceo Norte')
   await page.getByLabel('Lugar').fill('Cancha 1')
+  await convocar(page, 'Luis Pérez')
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
   await expect(page.getByRole('heading', { name: 'Sub-15 Masculino vs Liceo Norte' })).toBeVisible()
   const create = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
@@ -42,7 +50,7 @@ test('login → equipo → crear partido → convocar → ficha → publicar', a
   await page.getByRole('group', { name: 'Convocatoria de Ana López' }).getByRole('button', { name: 'Convocado' }).click()
   await page.getByRole('group', { name: 'Convocatoria de Luis Pérez' }).getByRole('button', { name: 'Reserva' }).click()
   await page.getByRole('button', { name: 'Guarde la convocatoria' }).click()
-  await expect(page.getByText(/Se avisó a los padres de 2 jugadores/)).toBeVisible()
+  await expect(page.getByText(/Se avisó a los padres de 1 jugador\b/)).toBeVisible()
   const callups = api.calls.find((c) => c.path.endsWith('/callups'))!
   expect(callups.body.players).toEqual([{ player_id: 15, status: 'called' }, { player_id: 18, status: 'reserve' }])
 
@@ -146,6 +154,7 @@ test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo',
   await page.getByLabel('Equipo').selectOption('1')
   await page.getByLabel('Fecha y hora').fill(`${manana}T10:00`)
   await page.getByLabel('Rival').fill('Colegio Sur')
+  await convocar(page)
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
   await expect(page.getByRole('heading', { name: 'Sub-15 Masculino vs Colegio Sur' })).toBeVisible()
   expect(api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))?.body.type).toBe('match')
@@ -200,6 +209,9 @@ test('Nuevo partido: sin fin, condición ni título; convocar y "Crear partido y
   await expect(page.getByRole('button', { name: 'Crear partido y publicar' })).toBeDisabled()
   await page.getByLabel('Rival').fill('Colegio Sur')
   await expect(page.getByText('Se verá como: Sub-15 Masculino vs Colegio Sur')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Crear partido y publicar' })).toBeDisabled()
+  await expect(page.getByText('Para publicar, convoque al menos a un jugador.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Borrador', exact: true })).toBeEnabled()
 
   // Convocar: aparecen los jugadores del equipo elegido
   await page.getByRole('button', { name: 'Convocar jugadores' }).click()
@@ -207,6 +219,7 @@ test('Nuevo partido: sin fin, condición ni título; convocar y "Crear partido y
   await page.getByRole('checkbox', { name: /Ana López/ }).check()
   await expect(page.getByText('Convocatoria · 1 de 2')).toBeVisible()
 
+  await convocar(page)
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
   await expect(page.getByRole('heading', { name: 'Sub-15 Masculino vs Colegio Sur' })).toBeVisible()
   await expect(page.getByText('Partido publicado. Se avisó en la App a los padres de 1 convocado.')).toBeVisible()

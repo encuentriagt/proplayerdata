@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mockApi } from './mockApi'
 
+/** Para publicar hace falta al menos un convocado (regla del dueño). */
+async function convocar(page: Page, nombre = 'Ana López') {
+  const btn = page.getByRole('button', { name: 'Convocar jugadores' })
+  if (await btn.isVisible()) await btn.click()
+  await page.getByRole('checkbox', { name: new RegExp(nombre) }).check()
+}
+
 async function entrar(page: Page) {
   await page.goto('/colegio-demo/login')
   await page.getByLabel('Correo electrónico').fill('coach@demo.gt')
@@ -53,6 +60,13 @@ test('Publicar un borrador desde el detalle', async ({ page }) => {
   await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
   await page.getByLabel('Rival').fill('Liceo Norte')
   await page.getByRole('button', { name: 'Borrador', exact: true }).click()
+  // Sin convocados no se puede publicar
+  await expect(page.getByRole('button', { name: 'Publicar', exact: true })).toBeDisabled()
+  await expect(page.getByText('Convoque al menos a un jugador para publicar.')).toBeVisible()
+  await page.getByRole('tab', { name: 'Convocatoria' }).click()
+  await page.getByRole('group', { name: 'Convocatoria de Ana López' }).getByRole('button', { name: 'Convocado' }).click()
+  await page.getByRole('button', { name: 'Guarde la convocatoria' }).click()
+  await expect(page.getByText(/Convocatoria guardada/)).toBeVisible()
   await page.getByRole('button', { name: 'Publicar', exact: true }).click()
   await expect(page.getByText('¿Publicar este partido?')).toBeVisible()
   await page.getByRole('dialog').getByRole('button', { name: 'Publicar' }).click()
@@ -66,6 +80,7 @@ test('Tarjetas de Partidos sin menú ⋮; editar y borrar desde el detalle', asy
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
   await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
   await page.getByLabel('Rival').fill('Instituto Este')
+  await convocar(page)
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
   await page.goto('/colegio-demo/partidos')
   await expect(page.getByRole('button', { name: /Opciones de/ })).toHaveCount(0)
@@ -113,6 +128,7 @@ test('Un partido guardado (publicado o borrador) aparece en Partidos, no solo en
     await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
     await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
     await page.getByLabel('Rival').fill(rival)
+    if (boton === 'Crear partido y publicar') await convocar(page)
     await page.getByRole('button', { name: boton, exact: true }).click()
     await expect(page.getByRole('heading', { name: `Sub-15 Masculino vs ${rival}` })).toBeVisible()
   }
@@ -135,6 +151,8 @@ test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nomb
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
   await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
   await page.getByLabel('Rival').fill('Colegio Sur')
+  await convocar(page)
+  await convocar(page, 'Luis Pérez')
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
   await page.getByRole('tab', { name: 'Asistencia' }).click()
 

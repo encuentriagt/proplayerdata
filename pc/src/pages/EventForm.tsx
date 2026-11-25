@@ -10,7 +10,7 @@ import { pcPath, useOrg } from '../lib/org'
 import { useEvent, usePcMutation, useRoster, useTeams } from '../lib/queries'
 import { useSport } from '../lib/sport'
 import type { EventType, HomeAway, PcEvent } from '../lib/types'
-import { DatePicker, TimeSelect } from '../components/DateTimeFields'
+import { DatePicker, TimePicker } from '../components/DateTimeFields'
 import { Avatar, ErrorAlert, PageHeader, SelectField, Spinner, TextAreaField, TextField, fieldError } from '../components/ui'
 
 interface FormState {
@@ -214,8 +214,8 @@ export function EventFormPage() {
           <div className="sm:col-span-2">
             <DatePicker label="Fecha" value={startDate} onChange={setStartDate} error={err('starts_at')} />
           </div>
-          <TimeSelect label={isMatch ? 'Hora' : 'Hora de inicio'} value={startTime} onChange={setStartTime} />
-          {!isMatch && <TimeSelect label="Hora de fin (opcional)" optional value={endTime} onChange={(t) => set('ends_at', t ? `${startDate}T${t}` : '')} error={err('ends_at')} />}
+          <TimePicker label={isMatch ? 'Hora' : 'Hora de inicio'} value={startTime} onChange={setStartTime} />
+          {!isMatch && <TimePicker label="Hora de fin (opcional)" optional value={endTime} onChange={(t) => set('ends_at', t ? `${startDate}T${t}` : '')} error={err('ends_at')} />}
         </div>
 
         {isMatch && (

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mockApi } from './mockApi'
-import { fechaHora } from './helpers'
+import { elegirHora, fechaHora } from './helpers'
 
 /** Para publicar hace falta al menos un convocado (regla del dueño). */
 async function convocar(page: Page, nombre = 'Ana López') {
@@ -228,11 +228,29 @@ test('Fecha con calendario propio y hora por separado; en entreno se sugiere la 
   // Botón "Mañana" del calendario
   await page.getByLabel('Fecha', { exact: true }).click()
   await page.getByRole('dialog', { name: /Elegir fecha/ }).getByRole('button', { name: 'Mañana' }).click()
-  await page.getByLabel('Hora de inicio', { exact: true }).selectOption('15:30')
-  await expect(page.getByLabel('Hora de fin (opcional)')).toHaveValue('17:00')
-  await expect(page.getByLabel('Hora de inicio', { exact: true }).locator('option:checked')).toHaveText('3:30 p. m.')
+  await elegirHora(page, 'Hora de inicio', '15:30')
+  await expect(page.getByLabel('Hora de inicio', { exact: true })).toHaveText('3:30 p. m.')
+  // Fin sugerido 1 h 30 después; se puede quitar
+  await expect(page.getByLabel('Hora de fin (opcional)', { exact: true })).toHaveText('5:00 p. m.')
   await page.getByRole('button', { name: 'Crear entreno' }).click()
   const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
   expect(post.body.starts_at).toBe(`${manana()} 15:30`)
   expect(post.body.ends_at).toBe(`${manana()} 17:00`)
+})
+
+test('Reloj de hora: primero la hora, luego pasa solo a minutos; Cancelar no cambia nada', async ({ page }) => {
+  mockApi(page)
+  await entrar(page)
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
+  await page.getByLabel('Hora', { exact: true }).click()
+  const reloj = page.getByRole('dialog', { name: /Elegir hora/ })
+  await expect(reloj.getByText('Elija la hora')).toBeVisible()
+  await expect(reloj.getByRole('button', { name: 'Aceptar' })).toBeDisabled()
+  await reloj.getByRole('button', { name: '7 horas', exact: true }).click()
+  await expect(reloj.getByText('Elija los minutos')).toBeVisible()
+  await reloj.getByRole('button', { name: '45 minutos', exact: true }).click()
+  await reloj.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page.getByLabel('Hora', { exact: true })).toHaveText('Elija la hora')
+  await elegirHora(page, 'Hora', '07:45')
+  await expect(page.getByLabel('Hora', { exact: true })).toHaveText('7:45 a. m.')
 })

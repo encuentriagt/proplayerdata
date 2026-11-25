@@ -33,6 +33,7 @@ class EventController extends Controller
             'team_id' => ['nullable', 'integer'], 'type' => ['nullable', Rule::in(['match', 'training', 'other'])],
             'pending_sheet' => ['nullable', 'boolean'],
             'sport_id' => ['nullable', 'integer'],
+            'undated_drafts' => ['nullable', 'boolean'],
         ]);
         $pending = $request->boolean('pending_sheet');
         if ($pending) {
@@ -55,6 +56,13 @@ class EventController extends Controller
         }
         if (! empty($data['sport_id'])) {
             $teamIds = \App\Models\Team::whereIn('id', $teamIds ?: [0])->where('sport_id', (int) $data['sport_id'])->pluck('id')->all();
+        }
+
+        if ($request->boolean('undated_drafts')) {
+            $drafts = Event::with('team:id,name')->whereIn('team_id', $teamIds ?: [0])->whereNull('published_at')->whereNull('starts_at')
+                ->when($data['type'] ?? null, fn ($q, $t) => $q->where('type', $t))->orderByDesc('updated_at')->limit(200)->get();
+
+            return response()->json(['data' => $drafts->map->payload()->values()]);
         }
 
         $events = Event::with('team:id,name')
@@ -115,9 +123,12 @@ class EventController extends Controller
         if ($callups !== null && ($bad = $this->notOnRoster($team->id, $callups))) {
             return $bad;
         }
-        // Solo si se envía publish:true explícito: sin el campo se conserva el flujo anterior (crear y luego convocar).
-        if ($request->boolean('publish') && $data['type'] === 'match' && empty($callups)) {
-            return $this->callupsRequired();
+        if ($publish) {
+            // Sin publish explícito (flujo anterior: crear y luego convocar) solo se exige la fecha.
+            $explicit = $request->has('publish');
+            if ($bad = $this->publishProblems($data['type'], $data['starts_at'] ?? null, $explicit ? ($data['opponent_name'] ?? null) : 'x', $explicit ? count($callups ?? []) : 1)) {
+                return $bad;
+            }
         }
 
         $event = DB::transaction(function () use ($data, $organization, $access, $publish, $callups) {
@@ -149,8 +160,8 @@ class EventController extends Controller
         if ($event->status === 'cancelled') {
             return ApiError::response('event_closed', 'La actividad está cancelada.', 422);
         }
-        if ($event->isDraft() && $event->type === 'match' && ! EventCallup::where('event_id', $event->id)->exists()) {
-            return $this->callupsRequired();
+        if ($event->isDraft() && ($bad = $this->publishProblems($event->type, $event->starts_at, $event->opponent_name, EventCallup::where('event_id', $event->id)->count()))) {
+            return $bad;
         }
         $published = DB::transaction(function () use ($event) {
             $locked = Event::whereKey($event->id)->lockForUpdate()->first();
@@ -185,13 +196,19 @@ class EventController extends Controller
             'status' => ['sometimes', Rule::in(['scheduled', 'cancelled'])],
         ]));
         unset($data['team_id']); // no se mueve de equipo
+        if (array_key_exists('starts_at', $data) && $data['starts_at'] === null && ! $event->isDraft()) {
+            return ApiError::response('validation_failed', 'Una actividad publicada necesita fecha.', 422, ['fields' => ['starts_at' => ['La fecha es obligatoria.']]]);
+        }
+        if (array_key_exists('opponent_name', $data) && blank($data['opponent_name']) && $event->type === 'match' && ! $event->isDraft()) {
+            return ApiError::response('validation_failed', 'Un partido publicado necesita rival.', 422, ['fields' => ['opponent_name' => ['El rival es obligatorio.']]]);
+        }
 
         $before = [$event->starts_at?->format('YmdHi'), $event->location, $event->status];
         $event->update($data);
         $after = [$event->starts_at?->format('YmdHi'), $event->location, $event->status];
 
         $cancelled = $event->status === 'cancelled' && $before[2] !== 'cancelled';
-        $moved = ! $cancelled && $event->status === 'scheduled' && ($before[0] !== $after[0] || $before[1] !== $after[1]) && $event->starts_at->isFuture();
+        $moved = ! $cancelled && $event->status === 'scheduled' && ($before[0] !== $after[0] || $before[1] !== $after[1]) && $event->starts_at?->isFuture();
         if (($cancelled || $moved) && ! $event->isDraft()) {
             $this->notifier->changed($event, $cancelled);
         }
@@ -205,6 +222,10 @@ class EventController extends Controller
         $access->authorize($access->canWorkOnTeam($event->team));
         if ($event->result_published_at) {
             return ApiError::response('event_has_result', 'No se puede borrar un partido con resultado publicado.', 422);
+        }
+        // Lo publicado y programado ya lo vieron los padres: primero se cancela (y se les avisa).
+        if (! $event->isDraft() && $event->status === 'scheduled') {
+            return ApiError::response('event_must_cancel', 'Cancele la actividad antes de borrarla: los padres ya la ven en la App.', 422);
         }
         $event->delete();
         Audit::log('event.deleted', $event, [], $organization->id);
@@ -348,9 +369,24 @@ class EventController extends Controller
         return response()->json(['data' => array_merge($event->payload(), ['warnings' => $result['warnings']])]);
     }
 
-    private function callupsRequired(): JsonResponse
+    /** Para publicar: fecha siempre; en partidos además rival y al menos un convocado. */
+    private function publishProblems(string $type, $startsAt, ?string $opponent, int $callups): ?JsonResponse
     {
-        return ApiError::response('callups_required', 'Para publicar un partido convoque al menos a un jugador.', 422);
+        $fields = [];
+        if (! $startsAt) {
+            $fields['starts_at'] = ['La fecha es obligatoria para publicar.'];
+        }
+        if ($type === 'match' && blank($opponent)) {
+            $fields['opponent_name'] = ['El rival es obligatorio para publicar.'];
+        }
+        if ($fields) {
+            return ApiError::response('publish_incomplete', 'Para publicar complete: '.implode(' y ', array_map(fn ($f) => $f === 'starts_at' ? 'la fecha' : 'el rival', array_keys($fields))).'.', 422, ['fields' => $fields]);
+        }
+        if ($type === 'match' && $callups < 1) {
+            return ApiError::response('callups_required', 'Para publicar un partido convoque al menos a un jugador.', 422);
+        }
+
+        return null;
     }
 
     private function notOnRoster(int $teamId, array $players): ?JsonResponse
@@ -369,7 +405,7 @@ class EventController extends Controller
             'team_id' => [$req, 'integer', Rule::exists('teams', 'id')->where('organization_id', $organization->id)->whereNull('deleted_at')],
             'type' => [$req, Rule::in(['match', 'training', 'other'])],
             'title' => ['nullable', 'string', 'max:150'],
-            'starts_at' => [$req, 'date'],
+            'starts_at' => ['sometimes', 'nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:200'],
             'opponent_name' => ['nullable', 'string', 'max:120'],

@@ -225,6 +225,7 @@ test('Nuevo entreno: sin hora de fin; fecha con calendario propio y hora', async
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=training')
   await expect(page.getByLabel('Hora de fin (opcional)')).toHaveCount(0)
+  await expect(page.getByText('Las horas son de Guatemala.')).toHaveCount(0)
   await expect(page.getByLabel('Fecha', { exact: true })).toContainText('Elija la fecha')
   await page.getByLabel('Fecha', { exact: true }).click()
   await page.getByRole('dialog', { name: /Elegir fecha/ }).getByRole('button', { name: 'Mañana' }).click()

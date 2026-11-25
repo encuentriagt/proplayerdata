@@ -216,7 +216,7 @@ export function EventFormPage() {
 
   return (
     <>
-      <PageHeader title={editing ? (f.type === 'match' ? (isDraft ? 'Editar borrador' : 'Editar partido') : f.type === 'training' ? 'Editar entreno' : 'Editar actividad') : f.type === 'match' ? 'Nuevo partido' : f.type === 'training' ? 'Nuevo entreno' : 'Nueva actividad'} subtitle="Las horas son de Guatemala." />
+      <PageHeader title={editing ? (f.type === 'match' ? (isDraft ? 'Editar borrador' : 'Editar partido') : f.type === 'training' ? 'Editar entreno' : 'Editar actividad') : f.type === 'match' ? 'Nuevo partido' : f.type === 'training' ? 'Nuevo entreno' : 'Nueva actividad'} subtitle={f.type === 'training' ? undefined : 'Las horas son de Guatemala.'} />
       <form onSubmit={submit} className="card max-w-2xl space-y-4 p-4 sm:p-6" noValidate>
         <ErrorAlert error={formError} />
 

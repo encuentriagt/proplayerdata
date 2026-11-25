@@ -76,6 +76,9 @@ export function EventFormPage() {
   const [startDate = '', startTime = ''] = f.starts_at.split('T')
   const endTime = f.ends_at.split('T')[1] ?? ''
   const startOk = !!startDate && !!startTime
+  // Borrador: equipo, fecha y hora (la API exige la fecha). Rival y convocados se pueden agregar después.
+  // Publicar: además rival y al menos un convocado (regla del dueño).
+  const missingDraft = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora'].filter(Boolean) as string[]
   // Partido: sin fin, condición ni título (el título es siempre "Equipo vs Rival"). No se envían esos campos,
   // así al editar no se borra lo que tuviera un partido anterior.
   const body = () => ({
@@ -104,6 +107,7 @@ export function EventFormPage() {
       setCalled(existing.data.callups.filter((c) => c.status === 'called').map((c) => c.player_id))
     } else if (!editing) setCalled([])
   }, [f.team_id, editing, existing.data])
+  const missingPublish = [...missingDraft, !f.opponent_name.trim() && 'rival', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
   const callupsBody = () => called.map((player_id) => ({ player_id, status: 'called' as const }))
 
   const qc = useQueryClient()
@@ -219,7 +223,7 @@ export function EventFormPage() {
         </div>
 
         {isMatch && (
-          <TextField label="Rival" value={f.opponent_name} onChange={(e) => set('opponent_name', e.target.value)} maxLength={120} required error={err('opponent_name')}
+          <TextField label="Rival" value={f.opponent_name} onChange={(e) => set('opponent_name', e.target.value)} maxLength={120} error={err('opponent_name')}
             hint={f.opponent_name.trim() && f.team_id ? `Se verá como: ${teamOptions.find((t) => String(t.id) === f.team_id)?.name ?? 'Equipo'} vs ${f.opponent_name.trim()}` : undefined} />
         )}
 
@@ -270,20 +274,23 @@ export function EventFormPage() {
           <p className="text-sm text-black/60">Si cambia la fecha o el lugar, se avisará a los padres de los convocados.</p>
         )}
 
-        {isMatch && (!editing || isDraft) && called.length === 0 && (
-          <p className="text-right text-sm text-amber-900">Para publicar, convoque al menos a un jugador. Puede guardarlo como borrador sin convocados.</p>
+        {isMatch && (!editing || isDraft) && (missingDraft.length > 0 || missingPublish.length > 0) && (
+          <div className="text-right text-sm text-amber-900" aria-live="polite">
+            {missingDraft.length > 0 && <p>Para guardar el borrador falta: {listar(missingDraft)}.</p>}
+            {missingPublish.length > 0 && <p>Para publicar falta: {listar(missingPublish)}.</p>}
+          </div>
         )}
         <div className="flex flex-wrap justify-end gap-2 pt-2">
           <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
           {isMatch && (!editing || isDraft) ? (
             <>
-              <button type="button" className="btn-secondary" disabled={busy || !f.team_id || !startOk || !f.opponent_name.trim()}
+              <button type="button" className="btn-secondary" disabled={busy || missingDraft.length > 0}
                 onClick={() => (editing ? void saveDraft(false) : createDraft.mutate())}>
                 {createDraft.isPending || savingDraft === 'draft' ? 'Guardando…' : editing ? 'Guardar borrador' : 'Borrador'}
               </button>
               {/* Regla: para publicar un partido hace falta al menos un convocado. */}
-              <button type="button" className="btn-primary" disabled={busy || !f.team_id || !startOk || !f.opponent_name.trim() || called.length === 0}
-                title={called.length === 0 ? 'Para publicar, convoque al menos a un jugador' : undefined}
+              <button type="button" className="btn-primary" disabled={busy || missingPublish.length > 0}
+                title={missingPublish.length ? `Para publicar falta: ${listar(missingPublish)}` : undefined}
                 onClick={() => (editing ? void saveDraft(true) : createPublished.mutate())}>
                 {createPublished.isPending || savingDraft === 'publish' ? 'Publicando…' : editing ? 'Guardar y publicar' : 'Crear partido y publicar'}
               </button>
@@ -297,4 +304,9 @@ export function EventFormPage() {
       </form>
     </>
   )
+}
+
+/** ['fecha', 'hora', 'rival'] → "fecha, hora y rival" */
+function listar(xs: string[]): string {
+  return xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`
 }

@@ -254,3 +254,22 @@ test('Reloj de hora: primero la hora, luego pasa solo a minutos; Cancelar no cam
   await elegirHora(page, 'Hora', '07:45')
   await expect(page.getByLabel('Hora', { exact: true })).toHaveText('7:45 a. m.')
 })
+
+test('Borrador sin convocados ni rival: basta con fecha y hora; se indica qué falta', async ({ page }) => {
+  const api = mockApi(page)
+  await entrar(page)
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
+  const borrador = page.getByRole('button', { name: 'Borrador', exact: true })
+  await expect(borrador).toBeDisabled()
+  await expect(page.getByText('Para guardar el borrador falta: fecha y hora.')).toBeVisible()
+  await expect(page.getByText('Para publicar falta: fecha, hora, rival y al menos un convocado.')).toBeVisible()
+  await fechaHora(page, manana(), '16:00')
+  await expect(page.getByText('Para guardar el borrador falta')).toHaveCount(0)
+  await expect(borrador).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Crear partido y publicar' })).toBeDisabled()
+  await borrador.click()
+  await expect(page.getByText('Borrador guardado. No se avisó a nadie')).toBeVisible()
+  const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
+  expect(post.body.publish).toBe(false)
+  expect(post.body).not.toHaveProperty('callups')
+})

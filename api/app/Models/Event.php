@@ -12,14 +12,14 @@ class Event extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'organization_id', 'team_id', 'type', 'title', 'starts_at', 'ends_at', 'location',
+        'organization_id', 'team_id', 'series_id', 'type', 'title', 'starts_at', 'time_pending', 'ends_at', 'location',
         'opponent_name', 'home_away', 'status', 'score_us', 'score_them', 'result_published_at', 'published_at', 'notes', 'created_by',
     ];
 
     protected function casts(): array
     {
         return [
-            'starts_at' => 'datetime', 'ends_at' => 'datetime', 'result_published_at' => 'datetime', 'published_at' => 'datetime',
+            'starts_at' => 'datetime', 'ends_at' => 'datetime', 'result_published_at' => 'datetime', 'published_at' => 'datetime', 'time_pending' => 'boolean',
             'score_us' => 'integer', 'score_them' => 'integer',
         ];
     }
@@ -103,6 +103,8 @@ class Event extends Model
             'title' => $this->title,
             'display_title' => $this->displayTitle(),
             'starts_at' => $this->starts_at?->toIso8601String(),
+            'time_pending' => (bool) $this->time_pending,
+            'series_id' => $this->series_id,
             'ends_at' => $this->ends_at?->toIso8601String(),
             'location' => $this->location,
             'opponent_name' => $this->opponent_name,

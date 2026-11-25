@@ -114,19 +114,21 @@ class EventController extends Controller
             'callups' => ['sometimes', 'array', 'max:80'],
             'callups.*.player_id' => ['required', 'integer', 'distinct'],
             'callups.*.status' => ['sometimes', Rule::in(['called', 'reserve'])],
+            'notify' => ['sometimes', 'boolean'],
         ]));
         $team = Team::where('organization_id', $organization->id)->findOrFail($data['team_id']);
         $access->authorize($access->canWorkOnTeam($team));
         $publish = $data['publish'] ?? true;
         $callups = $data['callups'] ?? null;
-        unset($data['publish'], $data['callups']);
+        $trainingNotice = ($data['notify'] ?? false) && $data['type'] === 'training';
+        unset($data['publish'], $data['callups'], $data['notify']);
         if ($callups !== null && ($bad = $this->notOnRoster($team->id, $callups))) {
             return $bad;
         }
         if ($publish) {
             // Sin publish explícito (flujo anterior: crear y luego convocar) solo se exige la fecha.
             $explicit = $request->has('publish');
-            if ($bad = $this->publishProblems($data['type'], $data['starts_at'] ?? null, $explicit ? ($data['opponent_name'] ?? null) : 'x', $explicit ? count($callups ?? []) : 1)) {
+            if ($bad = $this->publishProblems($data['type'], $data['starts_at'] ?? null, $explicit ? ($data['opponent_name'] ?? null) : 'x', $explicit ? count($callups ?? []) : 1, (bool) ($data['time_pending'] ?? false))) {
                 return $bad;
             }
         }
@@ -143,11 +145,89 @@ class EventController extends Controller
             return $event;
         });
         if ($publish && $callups && $event->starts_at->isFuture()) {
-            $this->notifier->callups($event, array_map(fn ($p) => (int) $p['player_id'], $callups));
+            $ids = array_map(fn ($p) => (int) $p['player_id'], $callups);
+            // Entreno con notify: un solo aviso por padre, sin nombres. Si no, el aviso de convocatoria de siempre.
+            $trainingNotice ? $this->notifier->trainingsScheduled(collect([$event]), $ids, "event:{$event->id}") : $this->notifier->callups($event, $ids);
         }
         Audit::log('event.created', $event, ['type' => $event->type, 'team_id' => $team->id, 'draft' => ! $publish], $organization->id);
 
         return response()->json(['data' => $event->load('team:id,name')->payload()], 201);
+    }
+
+    /**
+     * Entrenos recurrentes: crea todos (publicados) en una transacción con un series_id común.
+     * Con notify, un solo aviso por padre de los convocados para toda la serie.
+     */
+    public function series(Request $request, Organization $organization, OrgAccess $access): JsonResponse
+    {
+        $data = $request->validate([
+            'team_id' => ['required', 'integer', Rule::exists('teams', 'id')->where('organization_id', $organization->id)->whereNull('deleted_at')],
+            'type' => ['required', Rule::in(['training'])],
+            'from' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
+            'until' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'weekdays' => ['required', 'array', 'min:1', 'max:7'],
+            'weekdays.*' => ['integer', 'distinct', 'between:1,7'],
+            'time' => ['required', 'date_format:H:i'],
+            'title' => ['nullable', 'string', 'max:150'],
+            'location' => ['nullable', 'string', 'max:200'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'callups' => ['required', 'array', 'min:1', 'max:80'],
+            'callups.*.player_id' => ['required', 'integer', 'distinct'],
+            'callups.*.status' => ['sometimes', Rule::in(['called', 'reserve'])],
+            'notify' => ['sometimes', 'boolean'],
+        ]);
+        $team = Team::where('organization_id', $organization->id)->findOrFail($data['team_id']);
+        $access->authorize($access->canWorkOnTeam($team));
+        if ($bad = $this->notOnRoster($team->id, $data['callups'])) {
+            return $bad;
+        }
+        $from = \Carbon\CarbonImmutable::parse($data['from']);
+        $until = \Carbon\CarbonImmutable::parse($data['until']);
+        if ($until->gt($from->addYear())) {
+            return ApiError::response('validation_failed', '"Hasta" debe estar dentro de un año.', 422, ['fields' => ['until' => ['Máximo un año.']]]);
+        }
+        [$h, $m] = array_map('intval', explode(':', $data['time']));
+        $dates = [];
+        for ($d = $from; $d->lte($until); $d = $d->addDay()) {
+            if (in_array($d->isoWeekday(), $data['weekdays'], true)) {
+                $at = $d->setTime($h, $m);
+                if ($at->isFuture()) {
+                    $dates[] = $at;
+                }
+            }
+            if (count($dates) > 200) {
+                return ApiError::response('series_too_large', 'Una serie puede tener como máximo 200 entrenos.', 422);
+            }
+        }
+        if (! $dates) {
+            return ApiError::response('series_empty', 'Con esos días y fechas no queda ningún entreno por crear.', 422);
+        }
+
+        $seriesId = (string) \Illuminate\Support\Str::uuid();
+        $events = DB::transaction(function () use ($dates, $data, $team, $organization, $access, $seriesId) {
+            $now = now();
+            $created = collect();
+            foreach ($dates as $at) {
+                $e = Event::create([
+                    'organization_id' => $organization->id, 'team_id' => $team->id, 'series_id' => $seriesId, 'type' => 'training',
+                    'title' => $data['title'] ?? null, 'location' => $data['location'] ?? null, 'notes' => $data['notes'] ?? null,
+                    'starts_at' => $at, 'status' => 'scheduled', 'created_by' => $access->user->id, 'published_at' => $now,
+                ]);
+                $rows = array_map(fn ($p) => ['event_id' => $e->id, 'player_id' => (int) $p['player_id'], 'status' => $p['status'] ?? 'called', 'created_at' => $now, 'updated_at' => $now], $data['callups']);
+                EventCallup::insert($rows);
+                $created->push($e);
+            }
+
+            return $created;
+        });
+
+        $notified = 0;
+        if ($data['notify'] ?? false) {
+            $notified = $this->notifier->trainingsScheduled($events, array_map(fn ($p) => (int) $p['player_id'], $data['callups']), "series:{$seriesId}");
+        }
+        Audit::log('event.series_created', $events->first(), ['series_id' => $seriesId, 'count' => $events->count(), 'team_id' => $team->id], $organization->id);
+
+        return response()->json(['data' => ['series_id' => $seriesId, 'count' => $events->count(), 'notified' => $notified]], 201);
     }
 
     /**
@@ -160,7 +240,7 @@ class EventController extends Controller
         if ($event->status === 'cancelled') {
             return ApiError::response('event_closed', 'La actividad está cancelada.', 422);
         }
-        if ($event->isDraft() && ($bad = $this->publishProblems($event->type, $event->starts_at, $event->opponent_name, EventCallup::where('event_id', $event->id)->count()))) {
+        if ($event->isDraft() && ($bad = $this->publishProblems($event->type, $event->starts_at, $event->opponent_name, EventCallup::where('event_id', $event->id)->count(), (bool) $event->time_pending))) {
             return $bad;
         }
         $published = DB::transaction(function () use ($event) {
@@ -198,6 +278,9 @@ class EventController extends Controller
         unset($data['team_id']); // no se mueve de equipo
         if (array_key_exists('starts_at', $data) && $data['starts_at'] === null && ! $event->isDraft()) {
             return ApiError::response('validation_failed', 'Una actividad publicada necesita fecha.', 422, ['fields' => ['starts_at' => ['La fecha es obligatoria.']]]);
+        }
+        if (! empty($data['time_pending']) && ! $event->isDraft()) {
+            return ApiError::response('validation_failed', 'Una actividad publicada necesita hora.', 422, ['fields' => ['starts_at' => ['La hora es obligatoria.']]]);
         }
         if (array_key_exists('opponent_name', $data) && blank($data['opponent_name']) && $event->type === 'match' && ! $event->isDraft()) {
             return ApiError::response('validation_failed', 'Un partido publicado necesita rival.', 422, ['fields' => ['opponent_name' => ['El rival es obligatorio.']]]);
@@ -369,21 +452,23 @@ class EventController extends Controller
         return response()->json(['data' => array_merge($event->payload(), ['warnings' => $result['warnings']])]);
     }
 
-    /** Para publicar: fecha siempre; en partidos además rival y al menos un convocado. */
-    private function publishProblems(string $type, $startsAt, ?string $opponent, int $callups): ?JsonResponse
+    /** Para publicar: fecha y hora siempre; en partidos además rival; en partidos y entrenos al menos un convocado. */
+    private function publishProblems(string $type, $startsAt, ?string $opponent, int $callups, bool $timePending = false): ?JsonResponse
     {
         $fields = [];
         if (! $startsAt) {
             $fields['starts_at'] = ['La fecha es obligatoria para publicar.'];
+        } elseif ($timePending) {
+            $fields['starts_at'] = ['La hora es obligatoria para publicar.'];
         }
         if ($type === 'match' && blank($opponent)) {
             $fields['opponent_name'] = ['El rival es obligatorio para publicar.'];
         }
         if ($fields) {
-            return ApiError::response('publish_incomplete', 'Para publicar complete: '.implode(' y ', array_map(fn ($f) => $f === 'starts_at' ? 'la fecha' : 'el rival', array_keys($fields))).'.', 422, ['fields' => $fields]);
+            return ApiError::response('publish_incomplete', 'Para publicar complete: '.implode(' y ', array_map(fn ($f) => $f === 'starts_at' ? ($timePending && $startsAt ? 'la hora' : 'la fecha') : 'el rival', array_keys($fields))).'.', 422, ['fields' => $fields]);
         }
-        if ($type === 'match' && $callups < 1) {
-            return ApiError::response('callups_required', 'Para publicar un partido convoque al menos a un jugador.', 422);
+        if (in_array($type, ['match', 'training'], true) && $callups < 1) {
+            return ApiError::response('callups_required', 'Para publicar convoque al menos a un jugador.', 422);
         }
 
         return null;
@@ -406,6 +491,7 @@ class EventController extends Controller
             'type' => [$req, Rule::in(['match', 'training', 'other'])],
             'title' => ['nullable', 'string', 'max:150'],
             'starts_at' => ['sometimes', 'nullable', 'date'],
+            'time_pending' => ['sometimes', 'boolean'],
             'ends_at' => ['nullable', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:200'],
             'opponent_name' => ['nullable', 'string', 'max:120'],

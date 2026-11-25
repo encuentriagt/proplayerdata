@@ -7,7 +7,8 @@ import { fromInputValue, toInputValue } from '../lib/dates'
 import { EVENT_TYPE } from '../lib/labels'
 import { pcPath, useOrg } from '../lib/org'
 import { useEvent, usePcMutation, useRoster, useTeams } from '../lib/queries'
-import { MAX_SERIES, seriesDates, untilDate } from '../lib/recurrence'
+import { MAX_SERIES, seriesDates, trainingNoticeText, untilDate } from '../lib/recurrence'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { RecurrenceFields, type Recurrence } from '../components/RecurrenceFields'
 import { useSport } from '../lib/sport'
 import type { EventType, HomeAway, PcEvent } from '../lib/types'
@@ -160,7 +161,7 @@ export function EventFormPage() {
   }
 
   const create = usePcMutation<void, PcEvent>({
-    method: 'POST', path: 'events', body: () => (isTraining ? createBody(true) : body()), idempotent: true, invalidate: [['events']],
+    method: 'POST', path: 'events', body: () => (isTraining ? { ...createBody(true), notify: true } : body()), idempotent: true, invalidate: [['events']],
     onSuccess: (ev) => navigate(`/${slug}/eventos/${ev.id}`, { replace: true }),
   })
   const update = usePcMutation<void, PcEvent>({
@@ -173,12 +174,19 @@ export function EventFormPage() {
   const seriesUntil = untilDate(startDate, rec.mode, rec.custom)
   const seriesCount = isSeries ? seriesDates(startDate, seriesUntil, rec.weekdays).length : 0
   const seriesOk = seriesCount > 0 && seriesCount <= MAX_SERIES
+  // Confirmación antes de crear entrenos: muestra el aviso que recibirán los padres (sin nombres de jugadores).
+  const [confirmTraining, setConfirmTraining] = useState(false)
+  const teamName = teamOptions.find((t) => String(t.id) === f.team_id)?.name ?? 'el equipo'
+  const noticeDates = isSeries ? seriesDates(startDate, seriesUntil, rec.weekdays) : startDate ? [startDate] : []
+  const notice = startTime && noticeDates.length ? trainingNoticeText({ team: teamName, dates: noticeDates, weekdays: rec.weekdays, time: startTime }) : ''
+
   const createSeries = usePcMutation<void, { count: number }>({
     method: 'POST', path: 'events/series', idempotent: true, invalidate: [['events']],
     body: () => ({
       team_id: Number(f.team_id), type: 'training', from: startDate, until: seriesUntil, weekdays: rec.weekdays, time: startTime,
       location: f.location.trim() || null, notes: f.notes.trim() || null, title: f.title.trim() || null,
       callups: callupsBody(), // los mismos convocados en todos los entrenos de la serie
+      notify: true, // aviso general a los padres (sin nombres); la API lo usará cuando lo tenga
     }),
     onSuccess: (r) => navigate(`/${slug}/entrenos`, { replace: true, state: { created: r.count ?? seriesCount } }),
   })
@@ -198,8 +206,7 @@ export function EventFormPage() {
     if (busy) return
     if (!editing && isMatch) { if (called.length) createPublished.mutate() }
     else if (editing && isDraft && isMatch) void saveDraft(false)
-    else if (isTraining && !editing && called.length === 0) return
-    else if (isSeries) { if (seriesOk && startOk) createSeries.mutate() }
+    else if (isTraining && !editing) { if (called.length && startOk && (!isSeries || seriesOk)) setConfirmTraining(true) }
     else m.mutate()
   }
 
@@ -327,6 +334,13 @@ export function EventFormPage() {
             </button>
           )}
         </div>
+      <ConfirmDialog open={confirmTraining} title={isSeries ? `¿Crear ${seriesCount} entrenos y avisar?` : '¿Crear el entreno y avisar?'}
+        confirmLabel={isSeries ? `Crear ${seriesCount} y avisar` : 'Crear y avisar'} busy={createSeries.isPending || create.isPending}
+        onConfirm={() => { if (isSeries) createSeries.mutate(); else create.mutate() }} onCancel={() => setConfirmTraining(false)}>
+        Se enviará este aviso a la App de los padres o encargados de los {called.length} convocado{called.length === 1 ? '' : 's'}:
+        <blockquote className="mt-2 rounded-xl bg-black/5 p-3 text-ink">«{notice}»</blockquote>
+        <ErrorAlert error={createSeries.error ?? create.error} />
+      </ConfirmDialog>
       </form>
     </>
   )

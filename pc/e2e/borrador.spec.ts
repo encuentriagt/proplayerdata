@@ -236,8 +236,16 @@ test('Nuevo entreno: sin hora de fin; fecha con calendario propio y hora', async
   await convocar(page)
   await expect(page.getByText('Para crear el entreno falta')).toHaveCount(0)
   await page.getByRole('button', { name: 'Crear entreno' }).click()
+  // Confirmación con el aviso que recibirán los padres (sin nombres de jugadores)
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.getByText('¿Crear el entreno y avisar?')).toBeVisible()
+  await expect(dlg.getByText(/Se programó un entreno de Sub-15 Masculino: .*, 3:30 p\. m\./)).toBeVisible()
+  await expect(dlg.getByText(/Ana López/)).toHaveCount(0)
+  await dlg.getByRole('button', { name: 'Crear y avisar' }).click()
+  await expect(page.getByRole('heading', { name: 'Entrenamiento' })).toBeVisible()
   const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
   expect(post.body.starts_at).toBe(`${manana()} 15:30`)
+  expect(post.body.notify).toBe(true)
   expect(post.body).not.toHaveProperty('ends_at')
   expect(post.body).toMatchObject({ type: 'training', publish: true, callups: [{ player_id: 15, status: 'called' }] })
 })
@@ -263,9 +271,17 @@ test('Entreno recurrente: lunes y miércoles por 1 mes, con vista previa', async
   await convocar(page, 'Luis Pérez')
   await expect(page.getByText('Los convocados aplican a todos los entrenos de la serie.')).toBeVisible()
   await page.getByRole('button', { name: 'Crear 9 entrenos' }).click()
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.getByText('Se enviará este aviso a la App de los padres o encargados de los 2 convocados')).toBeVisible()
+  await expect(dlg.getByText('«Se programaron 9 entrenos de Sub-15 Masculino: lunes y miércoles, 3:30 p. m., del 2 de diciembre al 30 de diciembre.»')).toBeVisible()
+  // Cancelar no crea nada
+  await dlg.getByRole('button', { name: 'Cancelar' }).click()
+  expect(api.calls.some((c) => c.method === 'POST' && c.path.endsWith('/events/series'))).toBe(false)
+  await page.getByRole('button', { name: 'Crear 9 entrenos' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Crear 9 y avisar' }).click()
   await expect(page.getByText('Se crearon 9 entrenos.')).toBeVisible()
   const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events/series'))!
-  expect(post.body).toMatchObject({ team_id: 1, type: 'training', from: '2026-12-02', until: '2027-01-02', weekdays: [1, 3], time: '15:30', location: 'Gimnasio',
+  expect(post.body).toMatchObject({ team_id: 1, type: 'training', from: '2026-12-02', until: '2027-01-02', weekdays: [1, 3], time: '15:30', location: 'Gimnasio', notify: true,
     callups: [{ player_id: 15, status: 'called' }, { player_id: 18, status: 'called' }] })
   expect(post.headers['idempotency-key']).toBeTruthy()
 })

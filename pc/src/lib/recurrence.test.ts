@@ -1,4 +1,4 @@
-import { seriesDates, untilDate, weekdaysText, MAX_SERIES } from './recurrence'
+import { seriesDates, trainingNoticeText, untilDate, weekdaysText, MAX_SERIES } from './recurrence'
 
 describe('entrenos recurrentes', () => {
   it('todos los miércoles de un mes', () => {
@@ -31,5 +31,17 @@ describe('entrenos recurrentes', () => {
     expect(weekdaysText([1, 3])).toBe('lunes y miércoles')
     expect(weekdaysText([1, 3, 5])).toBe('lunes, miércoles y viernes')
     expect(weekdaysText([3])).toBe('miércoles')
+  })
+})
+
+describe('aviso de entrenos programados', () => {
+  it('serie: sin nombres de jugadores', () => {
+    const dates = seriesDates('2026-12-02', '2026-12-30', [1, 3])
+    expect(trainingNoticeText({ team: 'Sub-15 Masculino', dates, weekdays: [1, 3], time: '15:30' }))
+      .toBe('Se programaron 9 entrenos de Sub-15 Masculino: lunes y miércoles, 3:30 p. m., del 2 de diciembre al 30 de diciembre.')
+  })
+  it('un solo entreno', () => {
+    expect(trainingNoticeText({ team: 'Sub-15 Masculino', dates: ['2026-12-02'], time: '07:00' }))
+      .toBe('Se programó un entreno de Sub-15 Masculino: miércoles 2 de diciembre, 7:00 a. m.')
   })
 })

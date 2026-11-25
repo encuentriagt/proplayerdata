@@ -1,4 +1,5 @@
 import { addDays, addMonths, format, getISODay, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 /** Días de la semana en formato ISO: 1 = lunes … 7 = domingo. */
 export const WEEKDAYS = [
@@ -41,4 +42,17 @@ export function seriesDates(from: string, until: string | null, weekdays: number
 export function weekdaysText(weekdays: number[]): string {
   const names = WEEKDAYS.filter((w) => weekdays.includes(w.iso)).map((w) => w.name)
   return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}`
+}
+
+/**
+ * Texto del aviso que recibirán los padres al programar entrenos (sin nombres de jugadores).
+ * La API arma el push real; la PC lo muestra en la confirmación para que el coach sepa qué se enviará.
+ */
+export function trainingNoticeText(opts: { team: string; dates: string[]; weekdays?: number[]; time: string }): string {
+  const { team, dates, weekdays, time } = opts
+  const [h, m] = time.split(':').map(Number)
+  const hora = `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a. m.' : 'p. m.'}`
+  const d = (iso: string) => format(parseISO(iso), "d 'de' MMMM", { locale: es })
+  if (dates.length <= 1) return `Se programó un entreno de ${team}: ${format(parseISO(dates[0]), "EEEE d 'de' MMMM", { locale: es })}, ${hora}`
+  return `Se programaron ${dates.length} entrenos de ${team}: ${weekdaysText(weekdays ?? [])}, ${hora}, del ${d(dates[0])} al ${d(dates[dates.length - 1])}.`
 }

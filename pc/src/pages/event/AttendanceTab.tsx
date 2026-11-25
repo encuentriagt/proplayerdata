@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ATTENDANCE, ATTENDANCE_ORDER } from '../../lib/labels'
+import { ATTENDANCE, ATTENDANCE_ORDER, normalizeAttendance } from '../../lib/labels'
 import { usePcMutation, useRoster } from '../../lib/queries'
 import type { AttendanceStatus, EventDetail } from '../../lib/types'
 import { Alert, Avatar, Empty, ErrorAlert, Spinner } from '../../components/ui'
 
 export function AttendanceTab({ event }: { event: EventDetail }) {
   const roster = useRoster(event.team_id)
-  const initial = useMemo(() => Object.fromEntries(event.attendance.map((a) => [a.player_id, a.status])) as Record<number, AttendanceStatus>, [event.attendance])
+  const initial = useMemo(() => Object.fromEntries(event.attendance.map((a) => [a.player_id, normalizeAttendance(a.status)])) as Record<number, AttendanceStatus>, [event.attendance])
   const [sel, setSel] = useState<Record<number, AttendanceStatus>>(initial)
   const [ok, setOk] = useState(false)
   useEffect(() => setSel(initial), [initial])
@@ -38,9 +38,9 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
       <ErrorAlert error={save.error} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-black/70">
-          {counts.map(([s, n]) => <span key={s} className="mr-3"><strong>{n}</strong> {ATTENDANCE[s].label.toLowerCase()}</span>)}
+          {counts.map(([s, n]) => <span key={s} className="mr-3"><strong>{n}</strong> {ATTENDANCE[s].label}</span>)}
         </p>
-        <button className="btn-secondary" onClick={allPresent}>Todos presentes</button>
+        <button className="btn-secondary" onClick={allPresent}>Todos asisten</button>
       </div>
 
       <ul className="card divide-y divide-black/5">
@@ -62,7 +62,7 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
           </li>
         ))}
       </ul>
-      <p className="text-xs text-black/60">P = presente · T = tarde · A = ausente · E = excusa</p>
+      <p className="text-xs text-black/60">A = asiste · NA = no asiste (con aviso) · L = lesión · NJ = no justificado</p>
 
       <div className="sticky bottom-0 -mx-4 bg-ppd-bg/95 px-4 py-3 backdrop-blur">
         <button className="btn-primary w-full sm:w-auto" disabled={!dirty || save.isPending || Object.keys(sel).length === 0} onClick={() => save.mutate()}>

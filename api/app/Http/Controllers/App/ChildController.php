@@ -75,7 +75,7 @@ class ChildController extends Controller
         }
 
         $teamIds = TeamPlayer::where('player_id', $player->id)->pluck('team_id');
-        $events = Event::with('team:id,name')->whereIn('team_id', $teamIds)
+        $events = Event::with('team:id,name')->published()->whereIn('team_id', $teamIds)
             ->whereBetween('starts_at', [$from, max($from, $to)])->orderBy('starts_at')->get();
         $callups = EventCallup::where('player_id', $player->id)->whereIn('event_id', $events->pluck('id'))->get()->keyBy('event_id');
 
@@ -189,7 +189,7 @@ class ChildController extends Controller
     {
         $teamIds = TeamPlayer::where('player_id', $player->id)->pluck('team_id');
 
-        return Event::with('team.sport')->whereIn('team_id', $teamIds)->findOrFail($eventId);
+        return Event::with('team.sport')->published()->whereIn('team_id', $teamIds)->findOrFail($eventId);
     }
 
     private function publicEvent(Event $e): array

@@ -13,13 +13,13 @@ class Event extends Model
 
     protected $fillable = [
         'organization_id', 'team_id', 'type', 'title', 'starts_at', 'ends_at', 'location',
-        'opponent_name', 'home_away', 'status', 'score_us', 'score_them', 'result_published_at', 'notes', 'created_by',
+        'opponent_name', 'home_away', 'status', 'score_us', 'score_them', 'result_published_at', 'published_at', 'notes', 'created_by',
     ];
 
     protected function casts(): array
     {
         return [
-            'starts_at' => 'datetime', 'ends_at' => 'datetime', 'result_published_at' => 'datetime',
+            'starts_at' => 'datetime', 'ends_at' => 'datetime', 'result_published_at' => 'datetime', 'published_at' => 'datetime',
             'score_us' => 'integer', 'score_them' => 'integer',
         ];
     }
@@ -54,14 +54,40 @@ class Event extends Model
         return $this->hasMany(PlayerEventStat::class);
     }
 
+    /** Si al crear no se indica published_at, la actividad nace publicada (borrador solo cuando se pide). */
+    protected static function booted(): void
+    {
+        static::creating(function (Event $e) {
+            if (! array_key_exists('published_at', $e->getAttributes())) {
+                $e->published_at = now();
+            }
+        });
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->published_at === null;
+    }
+
+    /** Solo actividades publicadas (lo que ve la App). */
+    public function scopePublished($query)
+    {
+        return $query->whereNotNull('published_at');
+    }
+
     public function displayTitle(): string
     {
         if ($this->title) {
             return $this->title;
         }
 
+        $team = $this->team?->name;
+
         return match ($this->type) {
-            'match' => 'Partido'.($this->opponent_name ? ' vs '.$this->opponent_name : ''),
+            // "{equipo} vs {rival}", igual en la PC, la App y los avisos.
+            'match' => $team
+                ? $team.($this->opponent_name ? ' vs '.$this->opponent_name : ' · Partido')
+                : 'Partido'.($this->opponent_name ? ' vs '.$this->opponent_name : ''),
             'training' => 'Entrenamiento',
             default => 'Actividad',
         };
@@ -82,6 +108,8 @@ class Event extends Model
             'opponent_name' => $this->opponent_name,
             'home_away' => $this->home_away,
             'status' => $this->status,
+            'is_draft' => $this->isDraft(),
+            'published_at' => $this->published_at?->toIso8601String(),
             'score_us' => $this->score_us,
             'score_them' => $this->score_them,
             'result_published_at' => $this->result_published_at?->toIso8601String(),

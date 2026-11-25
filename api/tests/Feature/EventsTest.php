@@ -35,7 +35,7 @@ class EventsTest extends TestCase
         return $this->as($coach)->postJson($this->base.'/events', [
             'team_id' => $team->id, 'type' => 'match', 'starts_at' => now()->addDays(3)->setTime(9, 0)->toDateTimeString(),
             'opponent_name' => 'Colegio Rival', 'home_away' => 'home', 'location' => 'Cancha 1',
-        ])->assertCreated()->assertJsonPath('data.display_title', 'Partido vs Colegio Rival')->json('data.id');
+        ])->assertCreated()->assertJsonPath('data.display_title', 'Sub-12 vs Colegio Rival')->json('data.id');
     }
 
     public function test_coach_crea_y_ve_solo_eventos_de_sus_equipos(): void
@@ -64,6 +64,59 @@ class EventsTest extends TestCase
 
         $ajeno = $this->player($this->makeOrg('otra'), null, 'Zoe');
         $this->as($coach)->putJson($this->base."/events/{$id}/callups", ['players' => [['player_id' => $ajeno->id]]])->assertStatus(422);
+    }
+
+    public function test_borrador_no_avisa_ni_aparece_en_la_app_hasta_publicar(): void
+    {
+        ['coach' => $coach, 'team' => $team, 'otro' => $otro, 'ana' => $ana, 'beto' => $beto, 'papa' => $papa] = $this->setupTeam();
+        $when = now()->addDays(3)->setTime(9, 0)->toDateTimeString();
+
+        // Crear y convocar en una sola llamada, como borrador.
+        $id = $this->as($coach)->postJson($this->base.'/events', [
+            'team_id' => $team->id, 'type' => 'match', 'starts_at' => $when, 'opponent_name' => 'Colegio Rival',
+            'publish' => false, 'callups' => [['player_id' => $ana->id], ['player_id' => $beto->id, 'status' => 'reserve']],
+        ])->assertCreated()->assertJsonPath('data.is_draft', true)->assertJsonPath('data.published_at', null)->json('data.id');
+        $this->assertSame(0, UserNotification::count());
+        $this->as($coach)->getJson($this->base."/events/{$id}")->assertJsonPath('data.is_draft', true)->assertJsonCount(2, 'data.callups');
+        $this->as($coach)->getJson($this->base.'/events?from='.now()->toDateString())->assertJsonPath('data.0.is_draft', true);
+
+        // Editar, cambiar la fecha o la convocatoria del borrador no avisa.
+        $this->as($coach)->patchJson($this->base."/events/{$id}", ['starts_at' => now()->addDays(4)->toDateTimeString()])->assertOk();
+        $this->as($coach)->putJson($this->base."/events/{$id}/callups", ['players' => [['player_id' => $ana->id]]])->assertOk();
+        $this->assertSame(0, UserNotification::count());
+
+        // La App no lo ve; la ficha tampoco se puede llenar.
+        $from = now()->toDateString();
+        $this->as($papa)->getJson("/api/app/children/{$ana->id}/events?from={$from}")->assertOk()->assertJsonCount(0, 'data');
+        $this->as($papa)->getJson("/api/app/children/{$ana->id}/events/{$id}")->assertNotFound();
+        $this->as($coach)->putJson($this->base."/events/{$id}/match-sheet", ['score_us' => 1, 'score_them' => 0, 'lineup' => [], 'actions' => []])
+            ->assertStatus(422)->assertJsonPath('error.code', 'event_draft');
+
+        // Otro coach no lo publica.
+        $otroCoach = $this->member($team->organization, 'c2@x.test', 'coach');
+        $this->assign($otro, $otroCoach);
+        $this->as($otroCoach)->postJson($this->base."/events/{$id}/publish")->assertForbidden();
+
+        // Publicar: aparece en la App y avisa a los padres de los convocados, una sola vez.
+        $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertOk()->assertJsonPath('data.is_draft', false);
+        $this->assertSame(1, UserNotification::where('user_id', $papa->id)->where('kind', 'callup')->count());
+        $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertOk()->assertJsonPath('data.is_draft', false);
+        $this->assertSame(1, UserNotification::count());
+        $this->as($papa)->getJson("/api/app/children/{$ana->id}/events?from={$from}")->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.display_title', 'Sub-12 vs Colegio Rival');
+    }
+
+    public function test_crear_publicado_con_convocatoria_avisa_y_valida_plantilla(): void
+    {
+        ['coach' => $coach, 'team' => $team, 'ana' => $ana, 'papa' => $papa] = $this->setupTeam();
+        $base = ['team_id' => $team->id, 'type' => 'match', 'starts_at' => now()->addDays(2)->toDateTimeString(), 'opponent_name' => 'X'];
+        $ajeno = $this->player($this->makeOrg('otra'), null, 'Zoe');
+        $this->as($coach)->postJson($this->base.'/events', $base + ['callups' => [['player_id' => $ajeno->id]]])->assertStatus(422);
+        $this->assertSame(0, \App\Models\Event::count());
+
+        $this->as($coach)->postJson($this->base.'/events', $base + ['callups' => [['player_id' => $ana->id]]])
+            ->assertCreated()->assertJsonPath('data.is_draft', false);
+        $this->assertSame(1, UserNotification::where('user_id', $papa->id)->where('kind', 'callup')->count());
     }
 
     public function test_cancelar_avisa_a_los_padres(): void

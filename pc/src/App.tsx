@@ -12,6 +12,7 @@ import { EventList } from './pages/EventList'
 import { EventFormPage } from './pages/EventForm'
 import { EventDetailPage } from './pages/EventDetail'
 import { Teams } from './pages/Teams'
+import { PositionsPage } from './pages/Positions'
 import { TeamDetailPage } from './pages/TeamDetail'
 import { Players } from './pages/Players'
 import { PlayerDetailPage } from './pages/PlayerDetail'
@@ -45,6 +46,7 @@ export function App() {
         <Route path="eventos/:id/editar" element={<EventFormPage />} />
         <Route path="equipos" element={<Teams />} />
         <Route path="equipos/:id" element={<TeamDetailPage />} />
+        <Route path="posiciones" element={<PositionsPage />} />
         <Route path="jugadores" element={<Players />} />
         <Route path="jugadores/:id" element={<PlayerDetailPage />} />
         <Route path="admin" element={<RequireAdminArea><AdminLayout /></RequireAdminArea>}>

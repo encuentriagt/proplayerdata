@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Users } from 'lucide-react'
-import { ApiError, newIdempotencyKey, requestIdempotent } from '../lib/api'
+import { ApiError, newIdempotencyKey, request, requestIdempotent } from '../lib/api'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { addHours, format, parseISO } from 'date-fns'
 import { fromInputValue, toInputValue } from '../lib/dates'
@@ -85,47 +85,64 @@ export function EventFormPage() {
       : { ends_at: fromInputValue(f.ends_at), title: f.title.trim() || null, opponent_name: null, home_away: null }),
   })
 
-  // Convocatoria al crear un partido: jugadores activos del equipo elegido.
-  const roster = useRoster(!editing && isMatch && f.team_id ? Number(f.team_id) : undefined)
+  // Convocatoria en el formulario: al crear un partido y al editar un borrador.
+  const isDraft = !!existing.data?.is_draft
+  const withCallups = isMatch && (!editing || isDraft)
+  const roster = useRoster(withCallups && f.team_id ? Number(f.team_id) : undefined)
   const activePlayers = (roster.data ?? []).filter((p) => p.active)
   const [showCallups, setShowCallups] = useState(false)
   const [called, setCalled] = useState<number[]>([])
-  useEffect(() => { setCalled([]) }, [f.team_id])
+  const loadedCallups = useRef(false)
+  useEffect(() => {
+    // Al editar un borrador se parte de su convocatoria; al cambiar de equipo (creando) se limpia.
+    if (editing && existing.data && !loadedCallups.current) {
+      loadedCallups.current = true
+      setCalled(existing.data.callups.filter((c) => c.status === 'called').map((c) => c.player_id))
+    } else if (!editing) setCalled([])
+  }, [f.team_id, editing, existing.data])
+  const callupsBody = () => called.map((player_id) => ({ player_id, status: 'called' as const }))
 
-  // "Crear partido y publicar": crea el partido y guarda la convocatoria (avisa a los padres de los convocados).
-  // Cada paso tiene su Idempotency-Key; si falla la red, el reintento usa la misma y no duplica.
   const qc = useQueryClient()
-  const steps = useRef<{ eventKey?: string; callupKey?: string; eventId?: number }>({})
-  const [publishing, setPublishing] = useState(false)
-  const [publishError, setPublishError] = useState<unknown>(null)
-  const createAndPublish = async () => {
-    setPublishing(true)
-    setPublishError(null)
+  const goToEvent = (ev: { id: number }, publish: boolean) =>
+    navigate(`/${slug}/eventos/${ev.id}`, { replace: true, state: { saved: publish ? 'published' : 'draft', called: called.length } })
+
+  // Crear: una sola llamada con los convocados. Borrador (publish:false) no sale en la App ni avisa;
+  // publicar avisa a los padres de los convocados. Cada botón tiene su propia Idempotency-Key.
+  const createBody = (publish: boolean) => ({ ...body(), publish, ...(isMatch && called.length ? { callups: callupsBody() } : {}) })
+  const createDraft = usePcMutation<void, PcEvent>({
+    method: 'POST', path: 'events', idempotent: true, body: () => createBody(false), invalidate: [['events']],
+    onSuccess: (ev) => goToEvent(ev, false),
+  })
+  const createPublished = usePcMutation<void, PcEvent>({
+    method: 'POST', path: 'events', idempotent: true, body: () => createBody(true), invalidate: [['events']],
+    onSuccess: (ev) => goToEvent(ev, true),
+  })
+
+  // Editar un borrador: guardar datos, convocatoria y, si se pide, publicar. PUT callups y publish son
+  // idempotentes (misma clave en reintentos); PATCH repetido con los mismos datos no cambia nada.
+  const draftKeys = useRef<{ callups?: string; publish?: string }>({})
+  const [savingDraft, setSavingDraft] = useState<null | 'draft' | 'publish'>(null)
+  const [draftError, setDraftError] = useState<unknown>(null)
+  const saveDraft = async (publish: boolean) => {
+    setSavingDraft(publish ? 'publish' : 'draft')
+    setDraftError(null)
     try {
-      if (!steps.current.eventId) {
-        steps.current.eventKey ??= newIdempotencyKey()
-        const ev = await requestIdempotent<PcEvent>(pcPath(slug, 'events'), { method: 'POST', body: body(), idempotencyKey: steps.current.eventKey })
-        steps.current.eventId = ev.data.id
+      await request<PcEvent>(pcPath(slug, `events/${id}`), { method: 'PATCH', body: body() })
+      draftKeys.current.callups ??= newIdempotencyKey()
+      await requestIdempotent(pcPath(slug, `events/${id}/callups`), { method: 'PUT', body: { players: callupsBody() }, idempotencyKey: draftKeys.current.callups })
+      if (publish) {
+        draftKeys.current.publish ??= newIdempotencyKey()
+        await requestIdempotent(pcPath(slug, `events/${id}/publish`), { method: 'POST', idempotencyKey: draftKeys.current.publish })
       }
-      const eventId = steps.current.eventId
-      if (called.length) {
-        steps.current.callupKey ??= newIdempotencyKey()
-        await requestIdempotent(pcPath(slug, `events/${eventId}/callups`), {
-          method: 'PUT', body: { players: called.map((player_id) => ({ player_id, status: 'called' })) }, idempotencyKey: steps.current.callupKey,
-        })
-      }
-      steps.current = {}
+      draftKeys.current = {}
       void qc.invalidateQueries({ queryKey: [slug, 'events'] })
-      navigate(`/${slug}/eventos/${eventId}`, { replace: true, state: { published: true, called: called.length } })
+      void qc.invalidateQueries({ queryKey: [slug, 'event', Number(id)] })
+      goToEvent({ id: Number(id) }, publish)
     } catch (e) {
-      // Error de validación o negocio: la próxima vez es otra acción (clave nueva) del paso que falló.
-      if (e instanceof ApiError && e.status > 0 && e.status < 500) {
-        if (steps.current.eventId) steps.current.callupKey = undefined
-        else steps.current.eventKey = undefined
-      }
-      setPublishError(e)
+      if (e instanceof ApiError && e.status > 0 && e.status < 500) draftKeys.current = {}
+      setDraftError(e)
     } finally {
-      setPublishing(false)
+      setSavingDraft(null)
     }
   }
 
@@ -138,8 +155,8 @@ export function EventFormPage() {
     onSuccess: (ev) => navigate(`/${slug}/eventos/${ev.id}`, { replace: true }),
   })
   const m = editing ? update : create
-  const busy = m.isPending || publishing
-  const formError = m.error ?? publishError
+  const busy = m.isPending || createDraft.isPending || createPublished.isPending || savingDraft !== null
+  const formError = (editing ? (isDraft ? draftError : update.error) : createPublished.error ?? createDraft.error ?? create.error)
 
   if (teams.isLoading || (editing && existing.isLoading)) return <Spinner />
   if (editing && existing.isError) return <ErrorAlert error={existing.error} />
@@ -150,7 +167,8 @@ export function EventFormPage() {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (busy) return
-    if (!editing && isMatch) void createAndPublish()
+    if (!editing && isMatch) createPublished.mutate()
+    else if (editing && isDraft && isMatch) void saveDraft(false)
     else m.mutate()
   }
 
@@ -160,12 +178,9 @@ export function EventFormPage() {
 
   return (
     <>
-      <PageHeader title={editing ? (f.type === 'match' ? 'Editar partido' : f.type === 'training' ? 'Editar entreno' : 'Editar actividad') : f.type === 'match' ? 'Nuevo partido' : f.type === 'training' ? 'Nuevo entreno' : 'Nueva actividad'} subtitle="Las horas son de Guatemala." />
+      <PageHeader title={editing ? (f.type === 'match' ? (isDraft ? 'Editar borrador' : 'Editar partido') : f.type === 'training' ? 'Editar entreno' : 'Editar actividad') : f.type === 'match' ? 'Nuevo partido' : f.type === 'training' ? 'Nuevo entreno' : 'Nueva actividad'} subtitle="Las horas son de Guatemala." />
       <form onSubmit={submit} className="card max-w-2xl space-y-4 p-4 sm:p-6" noValidate>
         <ErrorAlert error={formError} />
-        {publishError != null && steps.current.eventId && (
-          <p className="text-sm text-amber-900">El partido ya se creó; falta guardar la convocatoria. Presione de nuevo "Crear partido y publicar".</p>
-        )}
 
         <SelectField label="Equipo" value={f.team_id} onChange={(e) => set('team_id', e.target.value)} disabled={editing} required error={err('team_id')}>
           <option value="">Elija un equipo</option>
@@ -198,7 +213,7 @@ export function EventFormPage() {
         <TextField label="Lugar" value={f.location} onChange={(e) => set('location', e.target.value)} maxLength={200} error={err('location')} />
         <TextAreaField label="Notas (opcional)" value={f.notes} onChange={(e) => set('notes', e.target.value)} maxLength={2000} error={err('notes')} />
 
-        {!editing && isMatch && f.team_id && (
+        {withCallups && f.team_id && (
           <section aria-labelledby="convocar-h" className="rounded-2xl border border-black/10 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 id="convocar-h" className="font-bold">Convocatoria <span className="font-normal text-black/60">· {called.length} de {activePlayers.length}</span></h2>
@@ -233,7 +248,7 @@ export function EventFormPage() {
                 </>
               )
             )}
-            <p className="mt-2 text-xs text-black/60">Al publicar se avisa en la App a los padres de los convocados. Puede cambiar la convocatoria después.</p>
+            <p className="mt-2 text-xs text-black/60">Al publicar se avisa en la App a los padres de los convocados. En borrador no se avisa a nadie.</p>
           </section>
         )}
 
@@ -243,9 +258,22 @@ export function EventFormPage() {
 
         <div className="flex flex-wrap justify-end gap-2 pt-2">
           <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
-          <button className="btn-primary" disabled={busy || !f.team_id || !f.starts_at || (isMatch && !f.opponent_name.trim())}>
-            {busy ? 'Guardando…' : editing ? 'Guarde los cambios' : isMatch ? 'Crear partido y publicar' : f.type === 'training' ? 'Crear entreno' : 'Crear actividad'}
-          </button>
+          {isMatch && (!editing || isDraft) ? (
+            <>
+              <button type="button" className="btn-secondary" disabled={busy || !f.team_id || !f.starts_at || !f.opponent_name.trim()}
+                onClick={() => (editing ? void saveDraft(false) : createDraft.mutate())}>
+                {createDraft.isPending || savingDraft === 'draft' ? 'Guardando…' : editing ? 'Guardar borrador' : 'Borrador'}
+              </button>
+              <button type="button" className="btn-primary" disabled={busy || !f.team_id || !f.starts_at || !f.opponent_name.trim()}
+                onClick={() => (editing ? void saveDraft(true) : createPublished.mutate())}>
+                {createPublished.isPending || savingDraft === 'publish' ? 'Publicando…' : editing ? 'Guardar y publicar' : 'Crear partido y publicar'}
+              </button>
+            </>
+          ) : (
+            <button className="btn-primary" disabled={busy || !f.team_id || !f.starts_at}>
+              {busy ? 'Guardando…' : editing ? 'Guarde los cambios' : f.type === 'training' ? 'Crear entreno' : 'Crear actividad'}
+            </button>
+          )}
         </div>
       </form>
     </>

@@ -21,11 +21,16 @@ export function EventDetailPage() {
   const [params, setParams] = useSearchParams()
   const ev = useEvent(eventId)
   const [confirm, setConfirm] = useState<null | 'cancel' | 'delete'>(null)
-  const justPublished = (useLocation().state as { published?: boolean; called?: number } | null) ?? null
+  const saved = (useLocation().state as { saved?: 'published' | 'draft'; called?: number } | null) ?? null
+  const [confirmPublish, setConfirmPublish] = useState(false)
 
   const cancel = usePcMutation({
     method: 'PATCH', path: `events/${eventId}`, body: () => ({ status: 'cancelled' }),
     invalidate: [['events'], ['event', eventId]], onSuccess: () => setConfirm(null),
+  })
+  const publish = usePcMutation({
+    method: 'POST', path: `events/${eventId}/publish`, idempotent: true, body: () => ({}),
+    invalidate: [['events'], ['event', eventId]], onSuccess: () => setConfirmPublish(false),
   })
   const remove = usePcMutation({
     method: 'DELETE', path: `events/${eventId}`, invalidate: [['events']],
@@ -48,12 +53,23 @@ export function EventDetailPage() {
 
   return (
     <>
-      {justPublished?.published && (
+      {saved && !(saved.saved === 'draft' && !e.is_draft) && (
         <div className="mb-4">
-          <Alert tone="success">
-            Partido publicado.{' '}
-            {justPublished.called ? `Se avisó en la App a los padres de ${justPublished.called} convocado${justPublished.called === 1 ? '' : 's'}.` : 'Aún no tiene convocados: puede convocar desde la pestaña Convocatoria.'}
-          </Alert>
+          {saved.saved === 'published' ? (
+            <Alert tone="success">
+              Partido publicado.{' '}
+              {saved.called ? `Se avisó en la App a los padres de ${saved.called} convocado${saved.called === 1 ? '' : 's'}.` : 'Aún no tiene convocados: puede convocar desde la pestaña Convocatoria.'}
+            </Alert>
+          ) : (
+            <Alert tone="info">Borrador guardado. No se avisó a nadie y los padres no lo ven en la App.</Alert>
+          )}
+        </div>
+      )}
+      {e.is_draft && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-stone-200 p-3">
+          <span className="chip bg-stone-600 text-white">No publicado</span>
+          <p className="flex-1 text-sm">Es un borrador: los padres no lo ven en la App y no se ha avisado a nadie.</p>
+          <button className="btn-primary" onClick={() => { publish.reset(); setConfirmPublish(true) }}>Publicar</button>
         </div>
       )}
       <div className="mb-4">
@@ -105,14 +121,21 @@ export function EventDetailPage() {
           <div role="tabpanel" id={`panel-${tab}`}>
             {tab === 'convocatoria' && <CallupsTab event={e} />}
             {tab === 'asistencia' && <AttendanceTab event={e} />}
-            {tab === 'ficha' && <MatchSheetTab event={e} />}
+            {tab === 'ficha' && (e.is_draft
+              ? <Alert tone="info">Publique el partido para poder llenar la ficha.</Alert>
+              : <MatchSheetTab event={e} />)}
           </div>
         </>
       )}
 
+      <ConfirmDialog open={confirmPublish} title="¿Publicar este partido?" confirmLabel="Publicar" busy={publish.isPending}
+        onConfirm={() => publish.mutate()} onCancel={() => setConfirmPublish(false)}>
+        Aparecerá en la App y se avisará a los padres de los {e.callups.filter((c) => c.status === 'called').length} convocados.
+        <ErrorAlert error={publish.error} />
+      </ConfirmDialog>
       <ConfirmDialog open={confirm === 'cancel'} title="¿Cancelar esta actividad?" confirmLabel="Sí, cancelar" danger
         busy={cancel.isPending} onConfirm={() => cancel.mutate()} onCancel={() => setConfirm(null)}>
-        Se avisará a los padres de los jugadores convocados.
+        {e.is_draft ? 'Es un borrador: no se avisará a nadie.' : 'Se avisará a los padres de los jugadores convocados.'}
         <ErrorAlert error={cancel.error} />
       </ConfirmDialog>
       <ConfirmDialog open={confirm === 'delete'} title="¿Borrar esta actividad?" confirmLabel="Borrar" danger

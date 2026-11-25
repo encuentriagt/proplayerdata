@@ -215,7 +215,8 @@ test('Nuevo partido: sin fin, condición ni título; convocar y "Crear partido y
   expect(post.body).not.toHaveProperty('title')
   expect(post.body).not.toHaveProperty('home_away')
   expect(post.body).not.toHaveProperty('ends_at')
-  const put = api.calls.find((c) => c.method === 'PUT' && c.path.endsWith('/callups'))!
-  expect(put.body).toEqual({ players: [{ player_id: 15, status: 'called' }] })
-  expect(put.headers['idempotency-key']).toBeTruthy()
+  // Crea y convoca en una sola llamada, publicado
+  expect(post.body).toMatchObject({ publish: true, callups: [{ player_id: 15, status: 'called' }] })
+  expect(post.headers['idempotency-key']).toBeTruthy()
+  expect(api.calls.some((c) => c.method === 'PUT' && c.path.endsWith('/callups'))).toBe(false)
 })

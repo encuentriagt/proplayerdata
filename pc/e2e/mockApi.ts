@@ -144,7 +144,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
         events[id] = { id, team_id: body.team_id, team_name: team.name, type: 'training', title: body.title, display_title: body.title ?? 'Entrenamiento',
           starts_at: `${iso(d)}T${body.time}:00-06:00`, ends_at: null, location: body.location, opponent_name: null, home_away: null, status: 'scheduled',
           score_us: null, score_them: null, result_published_at: null, notes: body.notes, is_draft: false, published_at: new Date().toISOString(),
-          sport, callups: [], attendance: [], lineup: [], actions: [], player_stats: [] }
+          sport, callups: (body.callups ?? []).map((c: any) => ({ ...c, player_name: null, guardian_response: 'pending', responded_at: null })), attendance: [], lineup: [], actions: [], player_stats: [] }
         n++
       }
       return ok(route, { series_id: 1, count: n }, 201)

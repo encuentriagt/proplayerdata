@@ -230,10 +230,16 @@ test('Nuevo entreno: sin hora de fin; fecha con calendario propio y hora', async
   await page.getByRole('dialog', { name: /Elegir fecha/ }).getByRole('button', { name: 'Mañana' }).click()
   await elegirHora(page, 'Hora', '15:30')
   await expect(page.getByLabel('Hora', { exact: true })).toHaveText('3:30 p. m.')
+  // Hace falta al menos un convocado para crear el entreno
+  await expect(page.getByRole('button', { name: 'Crear entreno' })).toBeDisabled()
+  await expect(page.getByText('Para crear el entreno falta: al menos un convocado.')).toBeVisible()
+  await convocar(page)
+  await expect(page.getByText('Para crear el entreno falta')).toHaveCount(0)
   await page.getByRole('button', { name: 'Crear entreno' }).click()
   const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
   expect(post.body.starts_at).toBe(`${manana()} 15:30`)
   expect(post.body).not.toHaveProperty('ends_at')
+  expect(post.body).toMatchObject({ type: 'training', publish: true, callups: [{ player_id: 15, status: 'called' }] })
 })
 
 test('Entreno recurrente: lunes y miércoles por 1 mes, con vista previa', async ({ page }) => {
@@ -252,10 +258,15 @@ test('Entreno recurrente: lunes y miércoles por 1 mes, con vista previa', async
   await expect(page.getByText(/Se crearán 9 entrenos, cada lunes y miércoles, del Miércoles 2 de diciembre al Miércoles 30 de diciembre/)).toBeVisible()
   await page.getByRole('button', { name: 'Ver fechas' }).click()
   await expect(page.getByText(/mié 2 dic · lun 7 dic/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Crear 9 entrenos' })).toBeDisabled()
+  await convocar(page)
+  await convocar(page, 'Luis Pérez')
+  await expect(page.getByText('Los convocados aplican a todos los entrenos de la serie.')).toBeVisible()
   await page.getByRole('button', { name: 'Crear 9 entrenos' }).click()
   await expect(page.getByText('Se crearon 9 entrenos.')).toBeVisible()
   const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events/series'))!
-  expect(post.body).toMatchObject({ team_id: 1, type: 'training', from: '2026-12-02', until: '2027-01-02', weekdays: [1, 3], time: '15:30', location: 'Gimnasio' })
+  expect(post.body).toMatchObject({ team_id: 1, type: 'training', from: '2026-12-02', until: '2027-01-02', weekdays: [1, 3], time: '15:30', location: 'Gimnasio',
+    callups: [{ player_id: 15, status: 'called' }, { player_id: 18, status: 'called' }] })
   expect(post.headers['idempotency-key']).toBeTruthy()
 })
 

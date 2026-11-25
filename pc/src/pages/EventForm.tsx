@@ -96,7 +96,9 @@ export function EventFormPage() {
 
   // Convocatoria en el formulario: al crear un partido y al editar un borrador.
   const isDraft = !!existing.data?.is_draft
-  const withCallups = isMatch && (!editing || isDraft)
+  const isTraining = f.type === 'training'
+  // Convocar en el formulario: al crear partido o entreno, y al editar un borrador de partido.
+  const withCallups = (!editing && (isMatch || isTraining)) || (isMatch && isDraft)
   const roster = useRoster(withCallups && f.team_id ? Number(f.team_id) : undefined)
   const activePlayers = (roster.data ?? []).filter((p) => p.active)
   const [showCallups, setShowCallups] = useState(false)
@@ -110,6 +112,7 @@ export function EventFormPage() {
     } else if (!editing) setCalled([])
   }, [f.team_id, editing, existing.data])
   const missingPublish = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora', !f.opponent_name.trim() && 'rival', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
+  const missingTraining = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
   const callupsBody = () => called.map((player_id) => ({ player_id, status: 'called' as const }))
 
   const qc = useQueryClient()
@@ -118,7 +121,7 @@ export function EventFormPage() {
 
   // Crear: una sola llamada con los convocados. Borrador (publish:false) no sale en la App ni avisa;
   // publicar avisa a los padres de los convocados. Cada botón tiene su propia Idempotency-Key.
-  const createBody = (publish: boolean) => ({ ...body(), publish, ...(isMatch && called.length ? { callups: callupsBody() } : {}) })
+  const createBody = (publish: boolean) => ({ ...body(), publish, ...((isMatch || isTraining) && called.length ? { callups: callupsBody() } : {}) })
   const createDraft = usePcMutation<void, PcEvent>({
     method: 'POST', path: 'events', idempotent: true, body: () => createBody(false), invalidate: [['events']],
     onSuccess: (ev) => goToEvent(ev, false),
@@ -157,7 +160,7 @@ export function EventFormPage() {
   }
 
   const create = usePcMutation<void, PcEvent>({
-    method: 'POST', path: 'events', body, idempotent: true, invalidate: [['events']],
+    method: 'POST', path: 'events', body: () => (isTraining ? createBody(true) : body()), idempotent: true, invalidate: [['events']],
     onSuccess: (ev) => navigate(`/${slug}/eventos/${ev.id}`, { replace: true }),
   })
   const update = usePcMutation<void, PcEvent>({
@@ -175,6 +178,7 @@ export function EventFormPage() {
     body: () => ({
       team_id: Number(f.team_id), type: 'training', from: startDate, until: seriesUntil, weekdays: rec.weekdays, time: startTime,
       location: f.location.trim() || null, notes: f.notes.trim() || null, title: f.title.trim() || null,
+      callups: callupsBody(), // los mismos convocados en todos los entrenos de la serie
     }),
     onSuccess: (r) => navigate(`/${slug}/entrenos`, { replace: true, state: { created: r.count ?? seriesCount } }),
   })
@@ -194,6 +198,7 @@ export function EventFormPage() {
     if (busy) return
     if (!editing && isMatch) { if (called.length) createPublished.mutate() }
     else if (editing && isDraft && isMatch) void saveDraft(false)
+    else if (isTraining && !editing && called.length === 0) return
     else if (isSeries) { if (seriesOk && startOk) createSeries.mutate() }
     else m.mutate()
   }
@@ -280,7 +285,11 @@ export function EventFormPage() {
                 </>
               )
             )}
-            <p className="mt-2 text-xs text-black/60">Al publicar se avisa en la App a los padres de los convocados. En borrador no se avisa a nadie.</p>
+            <p className="mt-2 text-xs text-black/60">
+              {isTraining
+                ? `Se avisa en la App a los padres de los convocados.${isSeries ? ' Los convocados aplican a todos los entrenos de la serie.' : ''}`
+                : 'Al publicar se avisa en la App a los padres de los convocados. En borrador no se avisa a nadie.'}
+            </p>
           </section>
         )}
 
@@ -288,6 +297,9 @@ export function EventFormPage() {
           <p className="text-sm text-black/60">Si cambia la fecha o el lugar, se avisará a los padres de los convocados.</p>
         )}
 
+        {!editing && isTraining && (missingTraining.length > 0) && (
+          <p className="text-right text-sm text-amber-900" aria-live="polite">Para crear el entreno falta: {listar(missingTraining)}.</p>
+        )}
         {isMatch && (!editing || isDraft) && (missingDraft.length > 0 || missingPublish.length > 0) && (
           <div className="text-right text-sm text-amber-900" aria-live="polite">
             {missingDraft.length > 0 && <p>Para guardar el borrador falta: {listar(missingDraft)}.</p>}
@@ -310,7 +322,7 @@ export function EventFormPage() {
               </button>
             </>
           ) : (
-            <button className="btn-primary" disabled={busy || !f.team_id || !startOk || (isSeries && !seriesOk)}>
+            <button className="btn-primary" disabled={busy || !f.team_id || !startOk || (isSeries && !seriesOk) || (isTraining && called.length === 0)}>
               {busy ? 'Guardando…' : editing ? 'Guarde los cambios' : isSeries ? `Crear ${seriesCount || ''} entrenos`.replace('  ', ' ') : f.type === 'training' ? 'Crear entreno' : 'Crear actividad'}
             </button>
           )}

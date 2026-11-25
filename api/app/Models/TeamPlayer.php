@@ -26,6 +26,6 @@ class TeamPlayer extends Model
 
     public function position(): BelongsTo
     {
-        return $this->belongsTo(SportPosition::class, 'sport_position_id');
+        return $this->belongsTo(SportPosition::class, 'sport_position_id')->withTrashed();
     }
 }

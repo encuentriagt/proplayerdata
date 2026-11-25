@@ -75,7 +75,7 @@ class PcTeamsPlayersTest extends TestCase
         $coach = $this->member($org, 'c@x.test', 'coach');
         $admin = $this->member($org, 'a@x.test', 'org_admin');
         $futbol = Sport::where('code', 'soccer')->value('id');
-        $org->sports()->attach($futbol);
+        \App\Support\Positions::enableSports($org, (array) $futbol);
 
         $this->as($coach)->postJson($this->base.'/teams', ['name' => 'Equipo X', 'sport_id' => $futbol])->assertForbidden();
 
@@ -131,14 +131,19 @@ class PcTeamsPlayersTest extends TestCase
         $admin = $this->member($org, 'a@x.test', 'org_admin');
         $p = $this->player($org);
         $posBasket = \App\Models\SportPosition::whereHas('sport', fn ($q) => $q->where('code', 'basketball'))->value('id');
-        $posFutbol = \App\Models\SportPosition::whereHas('sport', fn ($q) => $q->where('code', 'soccer'))->where('code', 'POR')->value('id');
+        $posCatalogo = \App\Models\SportPosition::whereNull('organization_id')->whereHas('sport', fn ($q) => $q->where('code', 'soccer'))->where('code', 'POR')->value('id');
+        $posFutbol = \App\Models\SportPosition::where('organization_id', $org->id)->whereHas('sport', fn ($q) => $q->where('code', 'soccer'))->where('code', 'POR')->value('id');
+        $this->assertNotNull($posFutbol);
+
+        // La posición del catálogo general no sirve: se usan las de la organización.
+        $this->as($admin)->postJson($this->base."/teams/{$t1->id}/roster", ['player_id' => $p->id, 'sport_position_id' => $posCatalogo])->assertStatus(422);
 
         $this->as($admin)->postJson($this->base."/teams/{$t1->id}/roster", ['player_id' => $p->id, 'sport_position_id' => $posBasket])->assertStatus(422);
         $this->as($admin)->postJson($this->base."/teams/{$t1->id}/roster", ['player_id' => $p->id, 'sport_position_id' => $posFutbol, 'jersey_number' => 9])->assertCreated();
         $this->as($admin)->getJson($this->base."/teams/{$t1->id}/roster")->assertJsonPath('data.0.jersey_number', 9)->assertJsonPath('data.0.position.code', 'POR');
 
         // No se puede cambiar el deporte si ya hay jugadores.
-        $org->sports()->syncWithoutDetaching([Sport::where('code', 'basketball')->value('id')]);
+        \App\Support\Positions::enableSports($org, (array) [Sport::where('code', 'basketball')->value('id')]);
         $this->as($admin)->patchJson($this->base."/teams/{$t1->id}", ['sport_id' => Sport::where('code', 'basketball')->value('id')])
             ->assertStatus(422)->assertJsonPath('error.code', 'sport_locked');
     }

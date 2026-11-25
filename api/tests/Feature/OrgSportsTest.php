@@ -69,7 +69,7 @@ class OrgSportsTest extends TestCase
         $admin = $this->member($org, 'a@x.test', 'org_admin');
         $f12 = $this->team($org, 'Fútbol Sub-12', 'soccer');
         $this->team($org, 'Básquet Juvenil', 'basketball');
-        $org->sports()->attach($this->id('volleyball'));
+        \App\Support\Positions::enableSports($org, (array) $this->id('volleyball'));
 
         $dt = $this->member($org, 'dt@x.test', 'director');
         DirectorScope::create(['organization_id' => $org->id, 'user_id' => $dt->id, 'sport_id' => $this->id('volleyball')]);

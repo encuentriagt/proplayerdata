@@ -104,7 +104,7 @@ class PcRequestsTest extends TestCase
         Mail::fake();
         $org = $this->makeOrg();
         $admin = $this->member($org, 'a@x.test', 'org_admin');
-        $org->sports()->attach(\App\Models\Sport::where('code', 'soccer')->value('id'));
+        \App\Support\Positions::enableSports($org, (array) \App\Models\Sport::where('code', 'soccer')->value('id'));
         $r = $this->as($admin)->postJson($this->base.'/invitations', ['email' => 'd@x.test', 'role' => 'director', 'sport_ids' => [\App\Models\Sport::where('code', 'soccer')->value('id')]])->json('data');
         $old = $this->tokenFrom($r['invite_url']);
         $new = $this->tokenFrom($this->as($admin)->postJson($this->base."/invitations/{$r['id']}/resend")->assertOk()->json('data.invite_url'));

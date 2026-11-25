@@ -91,6 +91,9 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::get('access', \App\Http\Controllers\Pc\AccessController::class);
         Route::get('sports', [\App\Http\Controllers\Pc\SportController::class, 'index']);
         Route::put('sports', [\App\Http\Controllers\Pc\SportController::class, 'update']);
+        Route::post('sports/{sportId}/positions', [\App\Http\Controllers\Pc\PositionController::class, 'store'])->whereNumber('sportId')->middleware('idempotent');
+        Route::patch('positions/{positionId}', [\App\Http\Controllers\Pc\PositionController::class, 'update'])->whereNumber('positionId');
+        Route::delete('positions/{positionId}', [\App\Http\Controllers\Pc\PositionController::class, 'destroy'])->whereNumber('positionId');
         Route::get('seasons', [SeasonController::class, 'index']);
         Route::post('seasons', [SeasonController::class, 'store'])->middleware('idempotent');
         Route::patch('seasons/{season}', [SeasonController::class, 'update']);

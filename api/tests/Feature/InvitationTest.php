@@ -106,7 +106,7 @@ class InvitationTest extends TestCase
         Mail::fake();
         $org = $this->makeOrg();
         $admin = $this->member($org, 'a@x.test', 'org_admin');
-        $org->sports()->attach(\App\Models\Sport::where('code', 'soccer')->value('id'));
+        \App\Support\Positions::enableSports($org, (array) \App\Models\Sport::where('code', 'soccer')->value('id'));
         $t1 = $this->tokenFrom($this->as($admin)->postJson($this->base.'/invitations', ['email' => 'd@x.test', 'role' => 'director', 'sport_ids' => [\App\Models\Sport::where('code', 'soccer')->value('id')]])->json('data.invite_url'));
         $t2 = $this->tokenFrom($this->as($admin)->postJson($this->base.'/invitations', ['email' => 'd@x.test', 'role' => 'director', 'sport_ids' => [\App\Models\Sport::where('code', 'soccer')->value('id')]])->json('data.invite_url'));
         $this->app['auth']->forgetGuards();

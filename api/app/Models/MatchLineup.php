@@ -14,6 +14,12 @@ class MatchLineup extends Model
         return ['is_starter' => 'boolean', 'minutes_played' => 'integer', 'jersey_number' => 'integer'];
     }
 
+    /** Incluye posiciones borradas: las fichas pasadas conservan el nombre. */
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(SportPosition::class, 'sport_position_id')->withTrashed();
+    }
+
     public function player(): BelongsTo
     {
         return $this->belongsTo(Player::class);

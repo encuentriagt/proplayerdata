@@ -40,7 +40,7 @@ class SportAdminController extends Controller
     public function storePosition(Request $request, Sport $sport): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'regex:/^[A-Z0-9]{1,12}$/', Rule::unique('sport_positions', 'code')->where('sport_id', $sport->id)],
+            'code' => ['required', 'regex:/^[A-Z0-9]{1,12}$/', Rule::unique('sport_positions', 'code')->where('sport_id', $sport->id)->whereNull('organization_id')],
             'name' => ['required', 'string', 'max:60'], 'sort' => ['sometimes', 'integer', 'min:0', 'max:999'],
         ]);
         $p = $sport->positions()->create($data);
@@ -51,6 +51,7 @@ class SportAdminController extends Controller
 
     public function updatePosition(Request $request, SportPosition $position): JsonResponse
     {
+        abort_if($position->organization_id !== null, 404); // aquí solo el catálogo
         $position->update($request->validate(['name' => ['sometimes', 'string', 'max:60'], 'sort' => ['sometimes', 'integer', 'min:0', 'max:999']]));
 
         return response()->json(['data' => ['id' => $position->id, 'code' => $position->code, 'name' => $position->name]]);

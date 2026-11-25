@@ -158,6 +158,7 @@ class ChildController extends Controller
         }
 
         $att = Attendance::where('player_id', $player->id)
+            ->whereHas('event', fn ($e) => $e->whereNotNull('published_at'))
             ->when($limits['history_days'] !== null, fn ($w) => $w->whereHas('event', fn ($e) => $e->where('starts_at', '>=', now()->subDays($limits['history_days']))))
             ->select('status', DB::raw('count(*) as n'))->groupBy('status')->pluck('n', 'status');
 
@@ -166,7 +167,7 @@ class ChildController extends Controller
                 'sport_id' => $sid, 'matches' => $v['matches'], 'minutes' => $v['minutes'],
                 'stats' => $this->namedStats($sid, $v['stats']),
             ])->values(),
-            'attendance' => ['present' => (int) ($att['present'] ?? 0), 'late' => (int) ($att['late'] ?? 0), 'absent' => (int) ($att['absent'] ?? 0), 'excused' => (int) ($att['excused'] ?? 0)],
+            'attendance' => ['present' => (int) ($att['present'] ?? 0), 'excused' => (int) ($att['excused'] ?? 0), 'injured' => (int) ($att['injured'] ?? 0), 'absent' => (int) ($att['absent'] ?? 0)],
         ], 'meta' => ['plan_level' => $level, 'limited' => $limits['stats_last_matches'] !== null]]);
     }
 

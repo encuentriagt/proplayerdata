@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
 import { fmt } from '../lib/dates'
@@ -6,16 +5,13 @@ import { EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle } from '../lib/labe
 import { useOrg } from '../lib/org'
 import type { PcEvent } from '../lib/types'
 
-/**
- * `showType=false` en listas de un solo tipo (Partidos, Entrenos), donde la etiqueta sobra.
- * `menu`: acciones en la esquina (⋮); quedan fuera del enlace para no abrir el evento al tocarlas.
- */
-export function EventCard({ ev, showDate = true, showType = true, menu }: { ev: PcEvent; showDate?: boolean; showType?: boolean; menu?: ReactNode }) {
+/** `showType=false` en listas de un solo tipo (Partidos, Entrenos), donde la etiqueta sobra. Borrador: gris con "No publicado". */
+export function EventCard({ ev, showDate = true, showType = true }: { ev: PcEvent; showDate?: boolean; showType?: boolean }) {
   const { slug } = useOrg()
   const cancelled = ev.status === 'cancelled'
   return (
-    <div className={`card relative flex items-stretch transition hover:ring-2 hover:ring-org/40 ${ev.is_draft ? 'bg-stone-200! text-black/60 outline-2 outline-dashed outline-black/20' : ''}`}>
-    <Link to={`/${slug}/eventos/${ev.id}`} className="flex min-w-0 flex-1 items-stretch gap-3 rounded-2xl p-3">
+    <Link to={`/${slug}/eventos/${ev.id}`}
+      className={`card flex items-stretch gap-3 p-3 transition hover:ring-2 hover:ring-org/40 ${ev.is_draft ? 'bg-stone-200! text-black/60 outline-2 outline-dashed outline-black/20' : ''}`}>
       <div className="w-14 shrink-0 text-center">
         {showDate && <p className="text-xs font-semibold uppercase text-black/60">{fmt(ev.starts_at, 'EEE d MMM')}</p>}
         <p className="font-display text-xl font-extrabold italic">{fmt(ev.starts_at, 'HH:mm')}</p>
@@ -45,7 +41,5 @@ export function EventCard({ ev, showDate = true, showType = true, menu }: { ev: 
         </div>
       )}
     </Link>
-    {menu && <div className="shrink-0 self-start p-1">{menu}</div>}
-    </div>
   )
 }

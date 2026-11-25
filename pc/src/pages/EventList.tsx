@@ -11,7 +11,6 @@ import { useSport } from '../lib/sport'
 import { SportSwitcher } from '../components/SportSwitcher'
 import type { PcEvent } from '../lib/types'
 import { EventCard } from '../components/EventCard'
-import { EventActions } from '../components/EventActions'
 import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
 
 type Kind = 'match' | 'training'
@@ -105,7 +104,7 @@ export function EventList({ type }: { type: Kind }) {
           {[...groups.entries()].map(([month, items]) => (
             <section key={month} aria-label={capitalize(format(toGt(items[0].starts_at), 'MMMM yyyy', { locale: es }))}>
               <h2 className="mb-2 text-sm font-bold uppercase text-black/60">{capitalize(format(toGt(items[0].starts_at), 'MMMM yyyy', { locale: es }))}</h2>
-              <div className="space-y-2">{items.map((e) => <EventCard key={e.id} ev={e} showType={false} menu={<EventActions ev={e} />} />)}</div>
+              <div className="space-y-2">{items.map((e) => <EventCard key={e.id} ev={e} showType={false} />)}</div>
             </section>
           ))}
         </div>

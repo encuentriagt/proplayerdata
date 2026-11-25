@@ -31,8 +31,8 @@ test('Borrador: se guarda sin publicar, se ve gris con "No publicado", se edita 
   await expect(page.getByText('No publicado')).toBeVisible()
 
   // Editar el borrador: conserva la convocatoria; agrega a Luis y guarda + publica
-  await page.getByRole('button', { name: /Opciones de Sub-15 Masculino vs Colegio Sur/ }).click()
-  await page.getByRole('menuitem', { name: 'Editar' }).click()
+  await page.getByRole('link', { name: /Sub-15 Masculino vs Colegio Sur/ }).click()
+  await page.getByRole('link', { name: 'Editar' }).click()
   await expect(page.getByRole('heading', { name: 'Editar borrador' })).toBeVisible()
   await page.getByRole('button', { name: 'Convocar jugadores' }).click()
   await expect(page.getByRole('checkbox', { name: /Ana López/ })).toBeChecked()
@@ -60,7 +60,7 @@ test('Publicar un borrador desde el detalle', async ({ page }) => {
   expect(api.calls.some((c) => c.method === 'POST' && c.path.endsWith('/publish'))).toBe(true)
 })
 
-test('Menú ⋮ en las tarjetas de Partidos: Editar y Eliminar', async ({ page }) => {
+test('Tarjetas de Partidos sin menú ⋮; editar y borrar desde el detalle', async ({ page }) => {
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
@@ -68,18 +68,13 @@ test('Menú ⋮ en las tarjetas de Partidos: Editar y Eliminar', async ({ page }
   await page.getByLabel('Rival').fill('Instituto Este')
   await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
   await page.goto('/colegio-demo/partidos')
+  await expect(page.getByRole('button', { name: /Opciones de/ })).toHaveCount(0)
 
-  const menu = page.getByRole('button', { name: 'Opciones de Sub-15 Masculino vs Instituto Este' })
-  await menu.click()
-  await page.getByRole('menuitem', { name: 'Editar' }).click()
-  await expect(page.getByRole('heading', { name: 'Editar partido' })).toBeVisible()
-  await page.goto('/colegio-demo/partidos')
-
-  await menu.click()
-  await page.getByRole('menuitem', { name: 'Eliminar' }).click()
-  await expect(page.getByText('¿Eliminar este partido?')).toBeVisible()
-  await page.getByRole('dialog').getByRole('button', { name: 'Eliminar' }).click()
-  await expect(page.getByText('Sub-15 Masculino vs Instituto Este')).toHaveCount(0)
+  await page.getByRole('link', { name: /Sub-15 Masculino vs Instituto Este/ }).click()
+  await expect(page.getByRole('link', { name: 'Editar' })).toBeVisible()
+  await page.getByRole('button', { name: 'Borrar' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Borrar' }).click()
+  await expect(page.getByRole('heading', { name: 'Calendario' })).toBeVisible()
   expect(api.calls.some((c) => c.method === 'DELETE' && /\/events\/\d+$/.test(c.path))).toBe(true)
 })
 

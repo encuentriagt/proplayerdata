@@ -243,11 +243,11 @@ test('Entreno recurrente: lunes y miércoles por 1 mes, con vista previa', async
   await fechaHora(page, '2026-12-02', '15:30') // miércoles
   await page.getByLabel('Lugar').fill('Gimnasio')
   await page.getByRole('checkbox', { name: 'Se repite' }).check()
-  // Por defecto, el día de la fecha elegida (miércoles) y "Fin de temporada"
+  // Por defecto, el día de la fecha elegida (miércoles) y "1 mes"; no hay "Fin de temporada"
   await expect(page.getByRole('button', { name: 'miércoles' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('button', { name: 'Fin de temporada (2026-2027)' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: '1 mes' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: /Fin de temporada/ })).toHaveCount(0)
   await page.getByRole('button', { name: 'lunes' }).click()
-  await page.getByRole('button', { name: '1 mes' }).click()
   // 2 dic → 2 ene: mié 2, 9, 16, 23, 30 y lun 7, 14, 21, 28 = 9
   await expect(page.getByText(/Se crearán 9 entrenos, cada lunes y miércoles, del Miércoles 2 de diciembre al Miércoles 30 de diciembre/)).toBeVisible()
   await page.getByRole('button', { name: 'Ver fechas' }).click()

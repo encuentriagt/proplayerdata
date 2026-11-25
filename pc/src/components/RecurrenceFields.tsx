@@ -12,21 +12,18 @@ const long = (d: string) => capitalize(format(parseISO(d), "EEEE d 'de' MMMM", {
 const short = (d: string) => format(parseISO(d), "EEE d MMM", { locale: es })
 
 /** "Se repite": días de la semana y hasta cuándo, con vista previa de las fechas. */
-export function RecurrenceFields({ value, onChange, startDate, seasonEnd, seasonName }: {
-  value: Recurrence; onChange: (v: Recurrence) => void; startDate: string; seasonEnd?: string | null; seasonName?: string | null
-}) {
+export function RecurrenceFields({ value, onChange, startDate }: { value: Recurrence; onChange: (v: Recurrence) => void; startDate: string }) {
   const [showAll, setShowAll] = useState(false)
   const set = (patch: Partial<Recurrence>) => onChange({ ...value, ...patch })
-  const until = untilDate(startDate, value.mode, seasonEnd, value.custom)
+  const until = untilDate(startDate, value.mode, value.custom)
   const dates = value.repeat ? seriesDates(startDate, until, value.weekdays) : []
   const tooMany = dates.length > MAX_SERIES
 
-  const modes: { mode: UntilMode; label: string; show: boolean }[] = [
-    { mode: 'season', label: seasonEnd ? `Fin de temporada${seasonName ? ` (${seasonName})` : ''}` : 'Fin de temporada', show: !!seasonEnd },
-    { mode: '1m', label: '1 mes', show: true },
-    { mode: '3m', label: '3 meses', show: true },
-    { mode: '6m', label: '6 meses', show: true },
-    { mode: 'custom', label: 'Otra fecha', show: true },
+  const modes: { mode: UntilMode; label: string }[] = [
+    { mode: '1m', label: '1 mes' },
+    { mode: '3m', label: '3 meses' },
+    { mode: '6m', label: '6 meses' },
+    { mode: 'custom', label: 'Otra fecha' },
   ]
 
   return (
@@ -64,7 +61,7 @@ export function RecurrenceFields({ value, onChange, startDate, seasonEnd, season
           <fieldset>
             <legend className="label">Hasta</legend>
             <div className="flex flex-wrap gap-1.5">
-              {modes.filter((m) => m.show).map((m) => (
+              {modes.map((m) => (
                 <button key={m.mode} type="button" aria-pressed={value.mode === m.mode} onClick={() => set({ mode: m.mode })}
                   className={`min-h-10 rounded-full px-3 text-sm font-semibold ring-1 ${value.mode === m.mode ? 'bg-org text-on-org ring-org' : 'bg-white ring-black/15 hover:bg-black/5'}`}>
                   {m.label}

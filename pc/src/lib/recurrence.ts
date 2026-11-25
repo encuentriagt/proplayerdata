@@ -14,16 +14,15 @@ export const WEEKDAYS = [
 /** Máximo de entrenos por serie (la API debe validar lo mismo). */
 export const MAX_SERIES = 200
 
-export type UntilMode = 'season' | '1m' | '3m' | '6m' | 'custom'
+export type UntilMode = '1m' | '3m' | '6m' | 'custom'
 
 /** Fecha final de la serie según la opción elegida ("yyyy-MM-dd"). */
-export function untilDate(from: string, mode: UntilMode, seasonEnd?: string | null, custom?: string): string | null {
+export function untilDate(from: string, mode: UntilMode, custom?: string): string | null {
   if (!from) return null
   const f = parseISO(from)
   if (mode === '1m') return format(addMonths(f, 1), 'yyyy-MM-dd')
   if (mode === '3m') return format(addMonths(f, 3), 'yyyy-MM-dd')
   if (mode === '6m') return format(addMonths(f, 6), 'yyyy-MM-dd')
-  if (mode === 'season') return seasonEnd ?? null
   return custom || null
 }
 

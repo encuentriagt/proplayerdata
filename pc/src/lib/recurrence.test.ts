@@ -15,9 +15,9 @@ describe('entrenos recurrentes', () => {
     expect(n).toBeGreaterThanOrEqual(51)
     expect(n).toBeLessThanOrEqual(53)
   })
-  it('hasta fin de temporada usa la fecha de la temporada actual', () => {
-    expect(untilDate('2026-12-02', 'season', '2027-06-30')).toBe('2027-06-30')
-    expect(untilDate('2026-12-02', 'season', null)).toBeNull()
+  it('otra fecha usa la fecha elegida', () => {
+    expect(untilDate('2026-12-02', 'custom', '2027-03-15')).toBe('2027-03-15')
+    expect(untilDate('2026-12-02', 'custom', '')).toBeNull()
   })
   it('sin días, sin fin o fin antes del inicio: nada', () => {
     expect(seriesDates('2026-12-02', '2026-12-31', [])).toEqual([])

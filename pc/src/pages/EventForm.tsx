@@ -6,7 +6,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fromInputValue, toInputValue } from '../lib/dates'
 import { EVENT_TYPE } from '../lib/labels'
 import { pcPath, useOrg } from '../lib/org'
-import { useEvent, usePcMutation, useRoster, useSeasons, useTeams } from '../lib/queries'
+import { useEvent, usePcMutation, useRoster, useTeams } from '../lib/queries'
 import { MAX_SERIES, seriesDates, untilDate } from '../lib/recurrence'
 import { RecurrenceFields, type Recurrence } from '../components/RecurrenceFields'
 import { useSport } from '../lib/sport'
@@ -165,13 +165,9 @@ export function EventFormPage() {
     onSuccess: (ev) => navigate(`/${slug}/eventos/${ev.id}`, { replace: true }),
   })
   // Entreno recurrente (solo al crear): POST events/series crea toda la serie en un paso (pedido al backend).
-  const seasons = useSeasons()
-  const currentSeason = seasons.data?.find((x) => x.is_current)
-  const [rec, setRec] = useState<Recurrence>({ repeat: false, weekdays: [], mode: 'season', custom: '' })
+  const [rec, setRec] = useState<Recurrence>({ repeat: false, weekdays: [], mode: '1m', custom: '' })
   const isSeries = !editing && f.type === 'training' && rec.repeat
-  // Sin temporada actual con fecha de fin, "Fin de temporada" no aplica: se usa 6 meses (solo cuando ya cargaron).
-  useEffect(() => { if (seasons.isSuccess && !currentSeason?.ends_on && rec.mode === 'season') setRec((r) => ({ ...r, mode: '6m' })) }, [seasons.isSuccess, currentSeason, rec.mode])
-  const seriesUntil = untilDate(startDate, rec.mode, currentSeason?.ends_on, rec.custom)
+  const seriesUntil = untilDate(startDate, rec.mode, rec.custom)
   const seriesCount = isSeries ? seriesDates(startDate, seriesUntil, rec.weekdays).length : 0
   const seriesOk = seriesCount > 0 && seriesCount <= MAX_SERIES
   const createSeries = usePcMutation<void, { count: number }>({
@@ -237,7 +233,7 @@ export function EventFormPage() {
         </div>
 
         {!editing && f.type === 'training' && (
-          <RecurrenceFields value={rec} onChange={setRec} startDate={startDate} seasonEnd={currentSeason?.ends_on} seasonName={currentSeason?.name} />
+          <RecurrenceFields value={rec} onChange={setRec} startDate={startDate} />
         )}
 
         {isMatch && (

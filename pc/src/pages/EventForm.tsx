@@ -161,7 +161,7 @@ export function EventFormPage() {
   }
 
   const create = usePcMutation<void, PcEvent>({
-    method: 'POST', path: 'events', body: () => (isTraining ? { ...createBody(true), notify: true } : body()), idempotent: true, invalidate: [['events']],
+    method: 'POST', path: 'events', body: () => (isTraining ? { ...createBody(true), notify: true } : { ...body(), publish: true }), // la API pide enviar siempre publish idempotent: true, invalidate: [['events']],
     onSuccess: (ev) => navigate(`/${slug}/eventos/${ev.id}`, { replace: true }),
   })
   const update = usePcMutation<void, PcEvent>({

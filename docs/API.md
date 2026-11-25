@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.3 (2026-11-24)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.4 (2026-11-25)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -133,17 +133,20 @@ Códigos y nombres de deporte en inglés (`soccer`/Soccer, `futsal`/Futsal, `bas
 `photo_url` es una URL **firmada que vence en 15 minutos**: no guardarla; pedirla de nuevo con el jugador.
 
 ### Calendario, convocatorias, asistencia y ficha
+Cada evento trae `is_draft` y `published_at` (borrador = `published_at: null`). `display_title` de partidos: "{equipo} vs {rival}" (sin rival: "{equipo} · Partido"); si el evento tiene `title`, se usa ese. Mientras es borrador, cambiar fecha/lugar, convocar o cancelar no avisa a nadie.
+
 | Método | Ruta | Cuerpo / Notas |
 |---|---|---|
 | GET | `events?from=&to=&team_id=&type=&sport_id=` | Máx. 120 días. Sin rango: el mes actual + 6 semanas |
-| GET | `events?pending_sheet=1` | Partidos ya jugados (últimos 120 días), no cancelados y **sin resultado publicado** (ignora `from/to`) |
-| POST ♻️ | `events` | `{team_id, type(match\|training\|other), starts_at, ends_at?, title?, location?, opponent_name?, home_away?(home\|away\|neutral), notes?}` |
+| GET | `events?pending_sheet=1` | Partidos ya jugados (últimos 120 días), publicados (no borradores), no cancelados y **sin resultado publicado** (ignora `from/to`) |
+| POST ♻️ | `events` | `{team_id, type(match\|training\|other), starts_at, ends_at?, title?, location?, opponent_name?, home_away?(home\|away\|neutral), notes?, publish?(default true), callups?:[{player_id, status?}]}`. `publish:false` = **borrador**: no aparece en la App ni en `pending_sheet` y no avisa a nadie. `callups` crea y convoca en una sola llamada (jugadores activos del equipo; si no, 422 y no se crea nada); si se publica, avisa a los padres de los convocados |
+| POST ♻️ | `events/{id}/publish` | Publica un borrador: aparece en la App y avisa a los padres de los convocados. Si ya estaba publicado responde igual sin volver a avisar. Cancelado → 422 `event_closed` |
 | GET | `events/{id}` | Detalle con `sport{positions, stat_types}` del equipo, `callups`, `attendance`, `lineup`, `actions`, `player_stats` |
 | PATCH | `events/{id}` | Mismos campos + `status: scheduled\|cancelled`. Cambiar fecha/lugar o cancelar **avisa a los padres** |
 | DELETE | `events/{id}` | No si tiene resultado publicado (`event_has_result`) |
-| PUT ♻️ | `events/{id}/callups` | `{players:[{player_id, status?(called\|reserve)}], notify?}` Reemplaza la lista. Avisa a los padres de los **nuevos** convocados (una sola vez). Se ve la respuesta del padre en `guardian_response` |
+| PUT ♻️ | `events/{id}/callups` | `{players:[{player_id, status?(called\|reserve)}], notify?}` Reemplaza la lista. Avisa a los padres de los **nuevos** convocados (una sola vez); en borrador guarda **sin avisar** (el aviso sale al publicar). Se ve la respuesta del padre en `guardian_response` |
 | PUT ♻️ | `events/{id}/attendance` | `{records:[{player_id, status(present\|absent\|late\|excused), note?}]}` |
-| PUT ♻️ | `events/{id}/match-sheet` | **Ficha del partido al final** (no hay tiempo real). Ver abajo |
+| PUT ♻️ | `events/{id}/match-sheet` | **Ficha del partido al final** (no hay tiempo real). En borrador → 422 `event_draft`. Ver abajo |
 
 Ficha del partido:
 ```json
@@ -190,7 +193,7 @@ El padre solo ve **a sus hijos** y **solo los datos de su hijo** (no los de otro
 | Método | Ruta | Notas |
 |---|---|---|
 | GET | `children` | `id, first_name, last_name, photo_url, organization{marca}, teams[{id,name,category,sport{code,name},jersey_number}], plan_level` → pintar la App con la marca de la organización del hijo seleccionado |
-| GET | `children/{id}/events?from=&to=` | Eventos de los equipos del hijo con `callup{status,response}`. `meta.history_limited=true` si el plan recortó el pasado. Marcador `null` hasta que se publique |
+| GET | `children/{id}/events?from=&to=` | Eventos **publicados** de los equipos del hijo (los borradores no aparecen) con `callup{status,response}`. `meta.history_limited=true` si el plan recortó el pasado. Marcador `null` hasta que se publique |
 | GET | `children/{id}/events/{eventId}` | Detalle: `callup`, `attendance`, `child_played{is_starter,minutes_played}`, `child_stats[{code,name,value}]`. Fuera del límite del plan: 403 `plan_limit` |
 | POST ♻️ | `children/{id}/events/{eventId}/callup-response` | `{response: confirmed\|declined}` antes del partido (`not_called`, `event_closed`) |
 | GET | `children/{id}/stats?team_id=` | `by_sport[{sport_id, matches, minutes, stats[{code,name,value}]}]`, `attendance{present,late,absent,excused}`. `meta.limited` en Gratis |

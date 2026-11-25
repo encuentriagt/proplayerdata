@@ -60,7 +60,7 @@ class EventController extends Controller
             ->whereIn('team_id', $teamIds)
             ->whereBetween('starts_at', [$from, $to])
             ->when($data['type'] ?? null, fn ($q, $t) => $q->where('type', $t))
-            ->when($pending, fn ($q) => $q->where('type', 'match')->where('status', '!=', 'cancelled')->whereNull('result_published_at'))
+            ->when($pending, fn ($q) => $q->published()->where('type', 'match')->where('status', '!=', 'cancelled')->whereNull('result_published_at'))
             ->orderBy('starts_at')->get();
 
         return response()->json(['data' => $events->map->payload()->values()]);
@@ -99,16 +99,69 @@ class EventController extends Controller
 
     public function store(Request $request, Organization $organization, OrgAccess $access): JsonResponse
     {
-        $data = $request->validate($this->rules($organization));
+        $data = $request->validate(array_merge($this->rules($organization), [
+            'publish' => ['sometimes', 'boolean'],
+            'callups' => ['sometimes', 'array', 'max:80'],
+            'callups.*.player_id' => ['required', 'integer', 'distinct'],
+            'callups.*.status' => ['sometimes', Rule::in(['called', 'reserve'])],
+        ]));
         $team = Team::where('organization_id', $organization->id)->findOrFail($data['team_id']);
         $access->authorize($access->canWorkOnTeam($team));
+        $publish = $data['publish'] ?? true;
+        $callups = $data['callups'] ?? null;
+        unset($data['publish'], $data['callups']);
+        if ($callups !== null && ($bad = $this->notOnRoster($team->id, $callups))) {
+            return $bad;
+        }
 
-        $event = Event::create(array_merge($data, [
-            'organization_id' => $organization->id, 'status' => 'scheduled', 'created_by' => $access->user->id,
-        ]));
-        Audit::log('event.created', $event, ['type' => $event->type, 'team_id' => $team->id], $organization->id);
+        $event = DB::transaction(function () use ($data, $organization, $access, $publish, $callups) {
+            $event = Event::create(array_merge($data, [
+                'organization_id' => $organization->id, 'status' => 'scheduled', 'created_by' => $access->user->id,
+                'published_at' => $publish ? now() : null,
+            ]));
+            foreach ($callups ?? [] as $p) {
+                EventCallup::create(['event_id' => $event->id, 'player_id' => $p['player_id'], 'status' => $p['status'] ?? 'called']);
+            }
+
+            return $event;
+        });
+        if ($publish && $callups && $event->starts_at->isFuture()) {
+            $this->notifier->callups($event, array_map(fn ($p) => (int) $p['player_id'], $callups));
+        }
+        Audit::log('event.created', $event, ['type' => $event->type, 'team_id' => $team->id, 'draft' => ! $publish], $organization->id);
 
         return response()->json(['data' => $event->load('team:id,name')->payload()], 201);
+    }
+
+    /**
+     * Publica un borrador: aparece en la App y avisa a los padres de los convocados.
+     * Si ya estaba publicado responde igual sin volver a avisar (idempotente).
+     */
+    public function publish(Organization $organization, Event $event, OrgAccess $access): JsonResponse
+    {
+        $access->authorize($access->canWorkOnTeam($event->team));
+        if ($event->status === 'cancelled') {
+            return ApiError::response('event_closed', 'La actividad está cancelada.', 422);
+        }
+        $published = DB::transaction(function () use ($event) {
+            $locked = Event::whereKey($event->id)->lockForUpdate()->first();
+            if (! $locked->isDraft()) {
+                return false;
+            }
+            $locked->update(['published_at' => now()]);
+
+            return true;
+        });
+        $event->refresh();
+        if ($published) {
+            $called = EventCallup::where('event_id', $event->id)->pluck('player_id')->map(fn ($i) => (int) $i)->all();
+            if ($called && $event->starts_at->isFuture()) {
+                $this->notifier->callups($event, $called);
+            }
+            Audit::log('event.published', $event, ['callups' => count($called)], $organization->id);
+        }
+
+        return response()->json(['data' => $event->load('team:id,name')->payload()]);
     }
 
     public function update(Request $request, Organization $organization, Event $event, OrgAccess $access): JsonResponse
@@ -125,7 +178,7 @@ class EventController extends Controller
 
         $cancelled = $event->status === 'cancelled' && $before[2] !== 'cancelled';
         $moved = ! $cancelled && $event->status === 'scheduled' && ($before[0] !== $after[0] || $before[1] !== $after[1]) && $event->starts_at->isFuture();
-        if ($cancelled || $moved) {
+        if (($cancelled || $moved) && ! $event->isDraft()) {
             $this->notifier->changed($event, $cancelled);
         }
         Audit::log('event.updated', $event, ['fields' => array_keys($data)], $organization->id);
@@ -173,7 +226,8 @@ class EventController extends Controller
         });
 
         $new = array_values(array_diff($ids, $previous));
-        if ($new && ($data['notify'] ?? true) && $event->starts_at->isFuture()) {
+        // En borrador se guarda sin avisar: el aviso sale al publicar.
+        if ($new && ! $event->isDraft() && ($data['notify'] ?? true) && $event->starts_at->isFuture()) {
             $this->notifier->callups($event, $new);
         }
         Audit::log('event.callups_saved', $event, ['count' => count($ids)], $organization->id);
@@ -221,6 +275,9 @@ class EventController extends Controller
         if ($event->status === 'cancelled') {
             return ApiError::response('event_closed', 'El partido está cancelado.', 422);
         }
+        if ($event->isDraft()) {
+            return ApiError::response('event_draft', 'Publique el partido antes de llenar la ficha.', 422);
+        }
 
         $data = $request->validate([
             'score_us' => ['required', 'integer', 'min:0', 'max:999'],
@@ -254,6 +311,14 @@ class EventController extends Controller
         ], $organization->id);
 
         return response()->json(['data' => array_merge($event->payload(), ['warnings' => $result['warnings']])]);
+    }
+
+    private function notOnRoster(int $teamId, array $players): ?JsonResponse
+    {
+        $roster = TeamPlayer::where('team_id', $teamId)->where('active', true)->pluck('player_id')->map(fn ($i) => (int) $i)->all();
+        $ids = array_map(fn ($p) => (int) $p['player_id'], $players);
+
+        return array_diff($ids, $roster) ? ApiError::response('validation_failed', 'Hay jugadores que no están activos en el equipo.', 422) : null;
     }
 
     private function rules(Organization $organization, bool $partial = false): array

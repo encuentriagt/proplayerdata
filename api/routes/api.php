@@ -121,6 +121,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::get('events/{event}', [EventController::class, 'show']);
         Route::patch('events/{event}', [EventController::class, 'update']);
         Route::delete('events/{event}', [EventController::class, 'destroy']);
+        Route::post('events/{event}/publish', [EventController::class, 'publish'])->middleware('idempotent');
         Route::put('events/{event}/callups', [EventController::class, 'callups'])->middleware('idempotent');
         Route::put('events/{event}/attendance', [EventController::class, 'attendance'])->middleware('idempotent');
         Route::put('events/{event}/match-sheet', [EventController::class, 'matchSheet'])->middleware('idempotent');

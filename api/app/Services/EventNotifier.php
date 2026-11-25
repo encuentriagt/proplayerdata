@@ -32,6 +32,47 @@ final class EventNotifier
         }
     }
 
+    /**
+     * Entrenos programados (uno o una serie): UN aviso por padre de los convocados, sin nombres de jugadores.
+     * "Se programaron 8 entrenos de Sub-12: lunes y miércoles, 5:30 p. m., del 2 de diciembre al 23 de diciembre."
+     */
+    public function trainingsScheduled(\Illuminate\Support\Collection $events, array $playerIds, string $refKey): int
+    {
+        $events = $events->sortBy('starts_at')->values();
+        $first = $events->first();
+        if (! $first || ! $playerIds) {
+            return 0;
+        }
+        $first->loadMissing('team');
+        $hora = $this->clock($first->starts_at);
+        if ($events->count() === 1) {
+            $body = "Se programó un entreno de {$first->team->name}: ".$first->starts_at->locale('es')->translatedFormat('l j \d\e F').", {$hora}"; // la hora ya termina en "a. m." / "p. m."
+        } else {
+            $names = [1 => 'lunes', 2 => 'martes', 3 => 'miércoles', 4 => 'jueves', 5 => 'viernes', 6 => 'sábado', 7 => 'domingo'];
+            $days = $events->map(fn ($e) => $e->starts_at->isoWeekday())->unique()->sort()->map(fn ($d) => $names[$d])->values()->all();
+            $dias = count($days) < 2 ? implode('', $days) : implode(', ', array_slice($days, 0, -1)).' y '.end($days);
+            $d = fn ($e) => $e->starts_at->locale('es')->translatedFormat('j \d\e F');
+            $body = "Se programaron {$events->count()} entrenos de {$first->team->name}: {$dias}, {$hora}, del {$d($first)} al {$d($events->last())}.";
+        }
+
+        return $this->notifications->notify(
+            $this->guardiansOf($playerIds),
+            'trainings',
+            $refKey,
+            'Entrenos: '.$first->team->name,
+            $body,
+            ['team_id' => $first->team_id, 'event_id' => $first->id, 'series_id' => $first->series_id, 'count' => $events->count()],
+            $first->organization_id,
+        );
+    }
+
+    private function clock(\DateTimeInterface $t): string
+    {
+        $c = \Illuminate\Support\Carbon::instance($t);
+
+        return $c->format('g:i').($c->hour < 12 ? ' a. m.' : ' p. m.');
+    }
+
     /** Cambio de fecha/lugar o cancelación: a los padres de toda la plantilla activa. */
     public function changed(Event $event, bool $cancelled): void
     {

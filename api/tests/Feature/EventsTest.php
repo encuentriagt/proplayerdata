@@ -112,8 +112,9 @@ class EventsTest extends TestCase
         $base = ['team_id' => $team->id, 'type' => 'match', 'starts_at' => now()->addDays(2)->toDateTimeString(), 'opponent_name' => 'X'];
         $this->as($coach)->postJson($this->base.'/events', $base + ['publish' => true])->assertStatus(422)->assertJsonPath('error.code', 'callups_required');
         $this->as($coach)->postJson($this->base.'/events', $base + ['publish' => true, 'callups' => []])->assertStatus(422);
-        // Entreno publicado sin convocados sí.
-        $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'training', 'starts_at' => now()->addDay()->toDateTimeString(), 'publish' => true])->assertCreated();
+        // Entreno publicado también exige convocados; tipo "otro" no.
+        $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'training', 'starts_at' => now()->addDay()->toDateTimeString(), 'publish' => true])->assertStatus(422)->assertJsonPath('error.code', 'callups_required');
+        $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'other', 'starts_at' => now()->addDay()->toDateTimeString(), 'publish' => true])->assertCreated();
         $id = $this->as($coach)->postJson($this->base.'/events', $base + ['publish' => false])->assertCreated()->json('data.id');
         $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertStatus(422)->assertJsonPath('error.code', 'callups_required');
         $this->as($coach)->putJson($this->base."/events/{$id}/callups", ['players' => [['player_id' => $ana->id]]])->assertOk();
@@ -188,8 +189,8 @@ class EventsTest extends TestCase
 
     public function test_borrar_publicado_exige_cancelar(): void
     {
-        ['coach' => $coach, 'team' => $team] = $this->setupTeam();
-        $mk = fn (bool $pub) => $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'training', 'starts_at' => now()->addDay()->toDateTimeString(), 'publish' => $pub])->json('data.id');
+        ['coach' => $coach, 'team' => $team, 'ana' => $ana] = $this->setupTeam();
+        $mk = fn (bool $pub) => $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'training', 'starts_at' => now()->addDay()->toDateTimeString(), 'publish' => $pub, 'callups' => [['player_id' => $ana->id]]])->json('data.id');
         $pub = $mk(true);
         $this->as($coach)->deleteJson($this->base."/events/{$pub}")->assertStatus(422)->assertJsonPath('error.code', 'event_must_cancel');
         $this->as($coach)->patchJson($this->base."/events/{$pub}", ['status' => 'cancelled'])->assertOk();
@@ -203,6 +204,70 @@ class EventsTest extends TestCase
         $r = $this->as($coach)->postJson($this->base.'/events', ['type' => 'xx'])->assertStatus(422);
         $this->assertSame('El equipo es obligatorio.', $r->json('error.fields.team_id.0'));
         $this->assertStringNotContainsString('validation.', json_encode($r->json(), JSON_UNESCAPED_UNICODE));
+    }
+
+    public function test_hora_por_definir_en_borrador(): void
+    {
+        ['coach' => $coach, 'team' => $team, 'ana' => $ana] = $this->setupTeam();
+        $day = now()->addDays(5)->toDateString();
+        $id = $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'match', 'starts_at' => $day, 'time_pending' => true,
+            'opponent_name' => 'R', 'publish' => false, 'callups' => [['player_id' => $ana->id]]])
+            ->assertCreated()->assertJsonPath('data.time_pending', true)->json('data.id');
+        $this->as($coach)->getJson($this->base."/events/{$id}")->assertJsonPath('data.time_pending', true);
+        $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertStatus(422)->assertJsonPath('error.code', 'publish_incomplete')
+            ->assertJsonPath('error.fields.starts_at.0', 'La hora es obligatoria para publicar.');
+        $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'match', 'starts_at' => $day, 'time_pending' => true,
+            'opponent_name' => 'R', 'publish' => true, 'callups' => [['player_id' => $ana->id]]])->assertStatus(422);
+        $this->as($coach)->patchJson($this->base."/events/{$id}", ['starts_at' => $day.' 16:30', 'time_pending' => false])->assertOk();
+        $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertOk()->assertJsonPath('data.time_pending', false);
+        $this->as($coach)->patchJson($this->base."/events/{$id}", ['time_pending' => true])->assertStatus(422);
+    }
+
+    public function test_entrenos_recurrentes_con_un_aviso_por_padre(): void
+    {
+        ['coach' => $coach, 'team' => $team, 'ana' => $ana, 'beto' => $beto, 'papa' => $papa] = $this->setupTeam();
+        // El papá tiene a los dos hijos convocados: recibe un solo aviso.
+        \App\Models\GuardianPlayer::firstOrCreate(['user_id' => $papa->id, 'player_id' => $beto->id]);
+        $from = now()->addDay()->startOfWeek()->addWeek(); // un lunes futuro
+        $body = ['team_id' => $team->id, 'type' => 'training', 'from' => $from->toDateString(), 'until' => $from->copy()->addDays(20)->toDateString(),
+            'weekdays' => [1, 3], 'time' => '17:30', 'location' => 'Cancha', 'callups' => [['player_id' => $ana->id], ['player_id' => $beto->id]], 'notify' => true];
+
+        $r = $this->as($coach)->postJson($this->base.'/events/series', $body)->assertCreated()->assertJsonPath('data.count', 6);
+        $sid = $r->json('data.series_id');
+        $events = \App\Models\Event::where('series_id', $sid)->orderBy('starts_at')->get();
+        $this->assertCount(6, $events);
+        $this->assertSame('17:30', $events->first()->starts_at->format('H:i'));
+        $this->assertSame(12, \App\Models\EventCallup::whereIn('event_id', $events->pluck('id'))->count());
+        $this->assertFalse($events->contains(fn ($e) => $e->isDraft()));
+        $n = UserNotification::where('user_id', $papa->id)->get();
+        $this->assertCount(1, $n);
+        $this->assertSame('trainings', $n[0]->kind);
+        $this->assertStringStartsWith('Se programaron 6 entrenos de Sub-12: lunes y miércoles, 5:30 p. m., del ', $n[0]->body);
+        $this->assertStringNotContainsString('Ana', $n[0]->body);
+
+        // Repetir con la misma Idempotency-Key no duplica.
+        $k = ['Idempotency-Key' => 'serie-1'];
+        $a = $this->as($coach)->withHeaders($k)->postJson($this->base.'/events/series', ['weekdays' => [5]] + $body)->json('data.series_id');
+        $b = $this->as($coach)->withHeaders($k)->postJson($this->base.'/events/series', ['weekdays' => [5]] + $body)->json('data.series_id');
+        $this->assertSame($a, $b);
+        $this->flushHeaders();
+
+        // Límites.
+        $this->as($coach)->postJson($this->base.'/events/series', ['callups' => []] + $body)->assertStatus(422);
+        $this->as($coach)->postJson($this->base.'/events/series', ['until' => $from->copy()->addYears(2)->toDateString()] + $body)->assertStatus(422);
+        $this->as($coach)->postJson($this->base.'/events/series', ['weekdays' => [1, 2, 3, 4, 5, 6, 7], 'until' => $from->copy()->addDays(300)->toDateString()] + $body)
+            ->assertStatus(422)->assertJsonPath('error.code', 'series_too_large');
+    }
+
+    public function test_entreno_unico_con_notify_avisa_sin_nombres(): void
+    {
+        ['coach' => $coach, 'team' => $team, 'ana' => $ana, 'papa' => $papa] = $this->setupTeam();
+        $at = now()->addDays(2)->setTime(7, 5);
+        $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'training', 'starts_at' => $at->toDateTimeString(),
+            'publish' => true, 'notify' => true, 'callups' => [['player_id' => $ana->id]]])->assertCreated();
+        $n = UserNotification::where('user_id', $papa->id)->sole();
+        $this->assertSame('trainings', $n->kind);
+        $this->assertSame('Se programó un entreno de Sub-12: '.$at->locale('es')->translatedFormat('l j \d\e F').', 7:05 a. m.', $n->body);
     }
 
     public function test_rango_de_120_dias(): void

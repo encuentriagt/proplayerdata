@@ -105,3 +105,26 @@ test('Posiciones: el coach agrega, renombra, ordena y no puede borrar una en uso
   await expect(page.getByText(/La usan 1 jugador/)).toBeVisible()
   await expect(page.getByText('Delantero').first()).toBeVisible()
 })
+
+test('Un partido guardado (publicado o borrador) aparece en Partidos, no solo en Inicio', async ({ page }) => {
+  mockApi(page)
+  await entrar(page)
+  for (const [rival, boton] of [['Colegio Sur', 'Crear partido y publicar'], ['Liceo Norte', 'Borrador']] as const) {
+    await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
+    await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
+    await page.getByLabel('Rival').fill(rival)
+    await page.getByRole('button', { name: boton, exact: true }).click()
+    await expect(page.getByRole('heading', { name: `Sub-15 Masculino vs ${rival}` })).toBeVisible()
+  }
+  await page.goto('/colegio-demo')
+  await expect(page.getByText('Sub-15 Masculino vs Colegio Sur')).toBeVisible()
+  await page.goto('/colegio-demo/partidos')
+  // La API rechaza rangos de más de 120 días: la lista debe pedir un rango válido y mostrar ambos
+  await expect(page.getByText('El rango máximo es de 120 días.')).toHaveCount(0)
+  await expect(page.getByText('Sub-15 Masculino vs Colegio Sur')).toBeVisible()
+  await expect(page.getByText('Sub-15 Masculino vs Liceo Norte')).toBeVisible()
+  // Anteriores también con rangos válidos, incluso al cargar más
+  await page.getByRole('tab', { name: 'Anteriores' }).click()
+  await page.getByRole('button', { name: 'Ver más antiguos' }).click()
+  await expect(page.getByText('El rango máximo es de 120 días.')).toHaveCount(0)
+})

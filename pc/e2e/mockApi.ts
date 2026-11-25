@@ -119,6 +119,9 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
       if (q.get('pending_sheet') !== '1') {
         // Igual que la API: filtra por tipo, equipo y rango de fechas (hora de Guatemala).
         const from = q.get('from'), to = q.get('to')
+        if (from && to && (Date.parse(`${to}T23:59:59Z`) - Date.parse(`${from}T00:00:00Z`)) / 864e5 > 120) {
+          return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'range_too_large', message: 'El rango máximo es de 120 días.' } }) })
+        }
         const day = (iso: string) => iso.slice(0, 10)
         const sportOf = (tid: number) => (tid === 2 ? 2 : 1)
         return ok(route, list.filter((e: any) => (!q.get('type') || e.type === q.get('type')) && (!q.get('team_id') || String(e.team_id) === q.get('team_id'))

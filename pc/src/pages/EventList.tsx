@@ -21,8 +21,9 @@ const TEXT: Record<Kind, { title: string; nuevo: string; ninguno: string; ningun
   training: { title: 'Entrenos', nuevo: 'Nuevo entreno', ninguno: 'No hay entrenos programados.', ningunoAntes: 'No hay entrenos anteriores en este periodo.' },
 }
 
-// La API permite consultar hasta 120 días por llamada: los anteriores se cargan por bloques de 120 días.
-const WINDOW = 120
+// La API acepta hasta 120 días por llamada, contando el último día completo (hasta las 23:59):
+// "hoy + 120" ya se pasa. Se piden bloques de 119 días para quedar dentro del límite.
+const WINDOW = 119
 
 /** Lista de partidos o de entrenos (próximos y anteriores) con botón para agregar uno nuevo. */
 export function EventList({ type }: { type: Kind }) {

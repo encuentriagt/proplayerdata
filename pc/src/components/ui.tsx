@@ -40,7 +40,40 @@ export function ErrorAlert({ error }: { error: unknown }) {
 }
 
 export function fieldError(error: unknown, field: string): string | undefined {
-  return error instanceof ApiError ? error.fields[field]?.[0] : undefined
+  const msg = error instanceof ApiError ? error.fields[field]?.[0] : undefined
+  return msg ? humanizeValidation(msg) : undefined
+}
+
+// Si la API devuelve la clave sin traducir ("validation.required"), se muestra un texto en español.
+const VALIDATION_ES: Record<string, string> = {
+  required: 'Este campo es obligatorio.',
+  required_if: 'Este campo es obligatorio.',
+  required_without: 'Este campo es obligatorio.',
+  date: 'La fecha no es válida.',
+  after: 'La hora de fin debe ser después del inicio.',
+  after_or_equal: 'La fecha no es válida.',
+  before: 'La fecha no es válida.',
+  email: 'El correo no es válido.',
+  integer: 'Debe ser un número.',
+  numeric: 'Debe ser un número.',
+  min: 'Es demasiado corto o pequeño.',
+  max: 'Es demasiado largo o grande.',
+  in: 'El valor no es válido.',
+  exists: 'No se encontró. Revise el dato.',
+  unique: 'Ya existe.',
+  confirmed: 'Las contraseñas no coinciden.',
+  distinct: 'Hay valores repetidos.',
+  regex: 'El formato no es válido.',
+  boolean: 'El valor no es válido.',
+  array: 'El valor no es válido.',
+  string: 'El valor no es válido.',
+  present: 'Este campo es obligatorio.',
+}
+
+export function humanizeValidation(msg: string): string {
+  const m = /^validation\.([a-z_]+)/.exec(msg.trim())
+  if (!m) return msg
+  return VALIDATION_ES[m[1]] ?? 'Revise este dato.'
 }
 
 interface FieldProps {

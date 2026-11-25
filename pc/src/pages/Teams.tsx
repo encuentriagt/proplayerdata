@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, Plus } from 'lucide-react'
+import { ChevronRight, ListOrdered, Plus } from 'lucide-react'
 import { TEAM_GENDER } from '../lib/labels'
 import { canCreateTeams } from '../lib/auth'
 import { useOrg } from '../lib/org'
@@ -18,6 +18,7 @@ export function Teams() {
     <>
       <PageHeader title="Equipos" actions={<>
         <SportSwitcher />
+        {sport.selected && <Link to={`/${slug}/posiciones`} className="btn-secondary"><ListOrdered className="size-5" aria-hidden /> Posiciones</Link>}
         {canCreate && <Link to={`/${slug}/admin/equipos`} className="btn-primary"><Plus className="size-5" aria-hidden /> Crear o administrar equipos</Link>}
       </>} />
       {teams.isLoading ? <Spinner /> : teams.isError ? <ErrorAlert error={teams.error} /> : !sport.teams.length ? (

@@ -20,6 +20,10 @@ export function BackLink() {
 
   const cls = 'mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-xl pr-3 font-semibold text-org-accent hover:underline'
   const isSection = parts.length === 1 || parts[0] === 'admin'
+  // Posiciones se abre desde Equipos: vuelve allí.
+  if (parts[0] === 'posiciones') {
+    return <Link to={`/${slug}/equipos`} className={cls}><ArrowLeft className="size-5" aria-hidden /> Equipos</Link>
+  }
   if (isSection) {
     return <Link to={`/${slug}`} className={cls}><ArrowLeft className="size-5" aria-hidden /> Inicio</Link>
   }

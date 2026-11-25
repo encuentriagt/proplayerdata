@@ -99,6 +99,7 @@ function ListView({ events }: { events: PcEvent[] }) {
   if (!events.length) return <Empty>No hay actividades en este periodo.</Empty>
   const groups = new Map<string, PcEvent[]>()
   events.forEach((e) => {
+    if (!e.starts_at) return
     const k = ymd(toGt(e.starts_at))
     groups.set(k, [...(groups.get(k) ?? []), e])
   })
@@ -118,7 +119,7 @@ function GridView({ events, from, to, anchor, compact }: { events: PcEvent[]; fr
   const { slug } = useOrg()
   const days = eachDayOfInterval({ start: from, end: to })
   const today = nowGt()
-  const byDay = (d: Date) => events.filter((e) => isSameDay(toGt(e.starts_at), d))
+  const byDay = (d: Date) => events.filter((e) => e.starts_at && isSameDay(toGt(e.starts_at), d))
   const headers = eachDayOfInterval({ start: from, end: addDays(from, 6) })
 
   return (
@@ -138,7 +139,7 @@ function GridView({ events, from, to, anchor, compact }: { events: PcEvent[]; fr
                   <li key={e.id}>
                     <Link to={`/${slug}/eventos/${e.id}`} title={eventTitle(e)}
                       className={`block truncate rounded-md px-1.5 py-0.5 text-xs font-semibold ${EVENT_TYPE_COLOR[e.type]} ${e.status === 'cancelled' ? 'line-through opacity-50' : ''}`}>
-                      {format(toGt(e.starts_at), 'HH:mm')} {eventTitle(e)}
+                      {e.starts_at && !e.time_pending && format(toGt(e.starts_at), 'HH:mm')} {eventTitle(e)}
                       {e.status === 'finished' && e.score_us !== null && ` · ${e.score_us}–${e.score_them}`}
                     </Link>
                   </li>

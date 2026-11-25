@@ -31,6 +31,8 @@ export interface OrgPermissions {
   manage_branding: boolean
   /** Solo admin: activar/desactivar deportes de la organización. */
   manage_sports: boolean
+  /** Ids de deportes donde puede editar la lista de posiciones del colegio. */
+  manage_positions: number[]
   /** "all" (admin: todos los activados) | ids de deportes donde puede crear equipos | [] */
   create_teams: 'all' | number[]
   delete_players: boolean
@@ -61,7 +63,7 @@ export interface LoginResult extends Session {
   admin_totp: null | 'setup' | 'verify'
 }
 
-export interface Position { id: number; code: string; name: string }
+export interface Position { id: number; code: string; name: string; sort?: number }
 export interface StatType { id: number; code: string; name: string; scores: number }
 
 export interface Sport {
@@ -132,7 +134,9 @@ export interface PcEvent {
   type: EventType
   title: string | null
   display_title: string
-  starts_at: string
+  starts_at: string | null
+  /** Borrador con fecha pero sin hora todavía (pedido al backend: guardar esta marca). */
+  time_pending?: boolean
   ends_at: string | null
   location: string | null
   opponent_name: string | null
@@ -142,11 +146,15 @@ export interface PcEvent {
   score_them: number | null
   result_published_at: string | null
   notes: string | null
+  /** Borrador: no sale en la App ni avisa a nadie hasta publicarlo (published_at: null). */
+  is_draft?: boolean
+  published_at?: string | null
 }
 
 export type CallupStatus = 'called' | 'reserve'
 export type GuardianResponse = 'pending' | 'confirmed' | 'declined'
-export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused'
+/** 'injured' (Lesión) es nuevo; 'late' queda solo para registros anteriores (se muestra como Asiste). */
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused' | 'injured'
 
 export interface MatchAction {
   type?: 'stat' | 'sub_in' | 'sub_out' | 'note'

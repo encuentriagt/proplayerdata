@@ -21,11 +21,16 @@ export function EventDetailPage() {
   const [params, setParams] = useSearchParams()
   const ev = useEvent(eventId)
   const [confirm, setConfirm] = useState<null | 'cancel' | 'delete'>(null)
-  const justPublished = (useLocation().state as { published?: boolean; called?: number } | null) ?? null
+  const saved = (useLocation().state as { saved?: 'published' | 'draft'; called?: number } | null) ?? null
+  const [confirmPublish, setConfirmPublish] = useState(false)
 
   const cancel = usePcMutation({
     method: 'PATCH', path: `events/${eventId}`, body: () => ({ status: 'cancelled' }),
     invalidate: [['events'], ['event', eventId]], onSuccess: () => setConfirm(null),
+  })
+  const publish = usePcMutation({
+    method: 'POST', path: `events/${eventId}/publish`, idempotent: true, body: () => ({}),
+    invalidate: [['events'], ['event', eventId]], onSuccess: () => setConfirmPublish(false),
   })
   const remove = usePcMutation({
     method: 'DELETE', path: `events/${eventId}`, invalidate: [['events']],
@@ -41,19 +46,45 @@ export function EventDetailPage() {
     { key: 'asistencia', label: 'Asistencia' },
     ...(e.type === 'match' ? [{ key: 'ficha' as Tab, label: 'Ficha' }] : []),
   ]
-  const isPast = new Date(e.starts_at) < new Date()
+  const isPast = !!e.starts_at && new Date(e.starts_at) < new Date()
+  // Publicar un borrador: fecha, rival (partido) y al menos un convocado. Se completa con "Editar".
+  const publishMissing = [
+    !e.starts_at && 'fecha y hora',
+    !!e.starts_at && e.time_pending && 'hora',
+    e.type === 'match' && !e.opponent_name && 'rival',
+    e.type === 'match' && !e.callups.some((c) => c.status === 'called') && 'al menos un convocado',
+  ].filter(Boolean) as string[]
+  const canPublish = publishMissing.length === 0
   const defaultTab: Tab = e.type === 'match' && isPast ? 'ficha' : isPast ? 'asistencia' : 'convocatoria'
   const requested = params.get('tab') as Tab | null
   const tab: Tab = requested && tabs.some((t) => t.key === requested) ? requested : defaultTab
 
   return (
     <>
-      {justPublished?.published && (
+      {saved && !(saved.saved === 'draft' && !e.is_draft) && (
         <div className="mb-4">
-          <Alert tone="success">
-            Partido publicado.{' '}
-            {justPublished.called ? `Se avisó en la App a los padres de ${justPublished.called} convocado${justPublished.called === 1 ? '' : 's'}.` : 'Aún no tiene convocados: puede convocar desde la pestaña Convocatoria.'}
-          </Alert>
+          {saved.saved === 'published' ? (
+            <Alert tone="success">
+              Partido publicado.{' '}
+              {saved.called ? `Se avisó en la App a los padres de ${saved.called} convocado${saved.called === 1 ? '' : 's'}.` : 'Aún no tiene convocados: puede convocar desde la pestaña Convocatoria.'}
+            </Alert>
+          ) : (
+            <Alert tone="info">Borrador guardado. No se avisó a nadie y los padres no lo ven en la App.</Alert>
+          )}
+        </div>
+      )}
+      {e.is_draft && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-stone-200 p-3">
+          <span className="chip bg-stone-600 text-white">No publicado</span>
+          <p className="flex-1 text-sm">Es un borrador: los padres no lo ven en la App y no se ha avisado a nadie.</p>
+          {canPublish ? (
+            <button className="btn-primary" onClick={() => { publish.reset(); setConfirmPublish(true) }}>Publicar</button>
+          ) : (
+            <span className="flex flex-col items-end gap-1">
+              <button className="btn-primary" disabled title="Para publicar, convoque al menos a un jugador">Publicar</button>
+              <span className="text-xs text-amber-900">Para publicar falta: {publishMissing.join(', ')}.</span>
+            </span>
+          )}
         </div>
       )}
       <div className="mb-4">
@@ -68,7 +99,11 @@ export function EventDetailPage() {
           <div>
             <h1 className={`title text-3xl sm:text-4xl ${e.status === 'cancelled' ? 'line-through opacity-60' : ''}`}>{eventTitle(e)}</h1>
             <p className="mt-1 text-black/70">
-              {capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM, HH:mm"))}
+              {e.starts_at
+                ? e.time_pending
+                  ? `${capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM"))} · Hora por definir`
+                  : capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM, HH:mm"))
+                : 'Sin fecha todavía'}
               {e.ends_at && ` – ${fmt(e.ends_at, 'HH:mm')}`}
               {e.home_away && e.type === 'match' && ` · ${HOME_AWAY[e.home_away]}`}
             </p>
@@ -80,12 +115,21 @@ export function EventDetailPage() {
         </div>
         {e.notes && <p className="mt-2 whitespace-pre-line text-sm text-black/70">{e.notes}</p>}
 
-        {e.status === 'scheduled' && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link to={`/${slug}/eventos/${e.id}/editar`} className="btn-secondary"><Pencil className="size-4" aria-hidden /> Editar</Link>
-            <button className="btn-secondary" onClick={() => setConfirm('cancel')}><CalendarX className="size-4" aria-hidden /> Cancelar actividad</button>
-            {!e.result_published_at && (
+        {/* Borrar: un borrador se borra directo; uno publicado primero se cancela (avisa a los padres) y luego se borra.
+            Con resultado publicado no se borra (event_has_result). */}
+        {(e.status === 'scheduled' || (e.status === 'cancelled' && !e.result_published_at)) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {e.status === 'scheduled' && (
+              <>
+                <Link to={`/${slug}/eventos/${e.id}/editar`} className="btn-secondary"><Pencil className="size-4" aria-hidden /> Editar</Link>
+                <button className="btn-secondary" onClick={() => setConfirm('cancel')}><CalendarX className="size-4" aria-hidden /> Cancelar actividad</button>
+              </>
+            )}
+            {!e.result_published_at && (e.is_draft || e.status === 'cancelled') && (
               <button className="btn-ghost text-red-700" onClick={() => setConfirm('delete')}><Trash2 className="size-4" aria-hidden /> Borrar</button>
+            )}
+            {!e.result_published_at && !e.is_draft && e.status === 'scheduled' && (
+              <p className="w-full text-sm text-black/60">Para borrarlo, primero cancele la actividad (se avisará a los padres).</p>
             )}
           </div>
         )}
@@ -105,19 +149,26 @@ export function EventDetailPage() {
           <div role="tabpanel" id={`panel-${tab}`}>
             {tab === 'convocatoria' && <CallupsTab event={e} />}
             {tab === 'asistencia' && <AttendanceTab event={e} />}
-            {tab === 'ficha' && <MatchSheetTab event={e} />}
+            {tab === 'ficha' && (e.is_draft
+              ? <Alert tone="info">Publique el partido para poder llenar la ficha.</Alert>
+              : <MatchSheetTab event={e} />)}
           </div>
         </>
       )}
 
+      <ConfirmDialog open={confirmPublish} title="¿Publicar este partido?" confirmLabel="Publicar" busy={publish.isPending}
+        onConfirm={() => publish.mutate()} onCancel={() => setConfirmPublish(false)}>
+        Aparecerá en la App y se avisará a los padres de los {e.callups.filter((c) => c.status === 'called').length} convocados.
+        <ErrorAlert error={publish.error} />
+      </ConfirmDialog>
       <ConfirmDialog open={confirm === 'cancel'} title="¿Cancelar esta actividad?" confirmLabel="Sí, cancelar" danger
         busy={cancel.isPending} onConfirm={() => cancel.mutate()} onCancel={() => setConfirm(null)}>
-        Se avisará a los padres de los jugadores convocados.
+        {e.is_draft ? 'Es un borrador: no se avisará a nadie.' : 'Se avisará a los padres de los jugadores convocados.'}
         <ErrorAlert error={cancel.error} />
       </ConfirmDialog>
       <ConfirmDialog open={confirm === 'delete'} title="¿Borrar esta actividad?" confirmLabel="Borrar" danger
         busy={remove.isPending} onConfirm={() => remove.mutate()} onCancel={() => setConfirm(null)}>
-        Esta acción no se puede deshacer.
+        {e.status === 'cancelled' ? 'Ya se avisó a los padres que se canceló. ' : ''}Esta acción no se puede deshacer.
         <ErrorAlert error={remove.error} />
       </ConfirmDialog>
     </>

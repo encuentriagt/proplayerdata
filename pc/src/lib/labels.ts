@@ -14,19 +14,25 @@ export const GUARDIAN_RESPONSE: Record<GuardianResponse, { label: string; cls: s
   confirmed: { label: 'Confirmado', cls: 'bg-emerald-100 text-emerald-800' },
   declined: { label: 'No asistirá', cls: 'bg-red-100 text-red-800' },
 }
+// Asistencia: Asiste (A), No asiste con aviso (NA), Lesión (L), No justificado (NJ).
+// En la API: present, excused, injured, absent. "late" ya no se ofrece; los registros viejos se muestran como Asiste.
 export const ATTENDANCE: Record<AttendanceStatus, { label: string; short: string; cls: string }> = {
-  present: { label: 'Presente', short: 'P', cls: 'bg-emerald-600 text-white' },
-  late: { label: 'Tarde', short: 'T', cls: 'bg-amber-500 text-ink' },
-  absent: { label: 'Ausente', short: 'A', cls: 'bg-red-700 text-white' },
-  excused: { label: 'Excusa', short: 'E', cls: 'bg-sky-700 text-white' },
+  present: { label: 'Asiste', short: 'A', cls: 'bg-emerald-600 text-white' },
+  excused: { label: 'No asiste', short: 'NA', cls: 'bg-sky-700 text-white' },
+  injured: { label: 'Lesión', short: 'L', cls: 'bg-amber-500 text-ink' },
+  absent: { label: 'No justificado', short: 'NJ', cls: 'bg-red-700 text-white' },
+  late: { label: 'Asiste', short: 'A', cls: 'bg-emerald-600 text-white' },
 }
-export const ATTENDANCE_ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'excused']
+export const ATTENDANCE_ORDER: AttendanceStatus[] = ['present', 'excused', 'injured', 'absent']
+/** Registros anteriores con "late" se tratan como "present" (el jugador llegó). */
+export function normalizeAttendance(s: AttendanceStatus): AttendanceStatus {
+  return s === 'late' ? 'present' : s
+}
 export const TEAM_GENDER = { male: 'Masculino', female: 'Femenino', mixed: 'Mixto' } as const
 export const PLAYER_GENDER = { male: 'Masculino', female: 'Femenino', other: 'Otro' } as const
 export const ROLE_LABEL = { org_admin: 'Administrador', director: 'Director técnico', coach: 'Coach', guardian: 'Padre o madre' } as const
 
-/** Título que se muestra: los partidos siempre son "Equipo vs Rival"; lo demás usa display_title de la API. */
-export function eventTitle(e: { type: string; team_name: string | null; opponent_name: string | null; display_title: string }): string {
-  if (e.type === 'match' && e.opponent_name) return `${e.team_name ?? 'Equipo'} vs ${e.opponent_name}`
+/** Título que se muestra. La API ya arma el de partidos como "{equipo} vs {rival}" (display_title). */
+export function eventTitle(e: { display_title: string }): string {
   return e.display_title
 }

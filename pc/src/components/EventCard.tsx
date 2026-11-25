@@ -5,22 +5,31 @@ import { EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle } from '../lib/labe
 import { useOrg } from '../lib/org'
 import type { PcEvent } from '../lib/types'
 
-/** `showType=false` en listas de un solo tipo (Partidos, Entrenos), donde la etiqueta sobra. */
+/** `showType=false` en listas de un solo tipo (Partidos, Entrenos), donde la etiqueta sobra. Borrador: gris con "No publicado". */
 export function EventCard({ ev, showDate = true, showType = true }: { ev: PcEvent; showDate?: boolean; showType?: boolean }) {
   const { slug } = useOrg()
   const cancelled = ev.status === 'cancelled'
   return (
-    <Link to={`/${slug}/eventos/${ev.id}`} className="card flex items-stretch gap-3 p-3 transition hover:ring-2 hover:ring-org/40">
+    <Link to={`/${slug}/eventos/${ev.id}`}
+      className={`card flex items-stretch gap-3 p-3 transition hover:ring-2 hover:ring-org/40 ${ev.is_draft ? 'bg-stone-200! text-black/60 outline-2 outline-dashed outline-black/20' : ''}`}>
       <div className="w-14 shrink-0 text-center">
-        {showDate && <p className="text-xs font-semibold uppercase text-black/60">{fmt(ev.starts_at, 'EEE d MMM')}</p>}
-        <p className="font-display text-xl font-extrabold italic">{fmt(ev.starts_at, 'HH:mm')}</p>
+        {ev.starts_at ? (
+          <>
+            {showDate && <p className="text-xs font-semibold uppercase text-black/60">{fmt(ev.starts_at, 'EEE d MMM')}</p>}
+            {ev.time_pending
+              ? <p className="text-xs font-semibold leading-tight text-black/60">Hora por definir</p>
+              : <p className="font-display text-xl font-extrabold italic">{fmt(ev.starts_at, 'HH:mm')}</p>}
+          </>
+        ) : <p className="text-xs font-semibold uppercase leading-tight text-black/60">Sin fecha</p>}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           {showType && <span className={`chip ${EVENT_TYPE_COLOR[ev.type]}`}>{EVENT_TYPE[ev.type]}</span>}
-          {ev.team_name && <span className="chip bg-black/5 text-ink">{ev.team_name}</span>}
+          {/* En partidos el título ya dice el equipo ("Equipo vs Rival") */}
+          {ev.team_name && ev.type !== 'match' && <span className="chip bg-black/5 text-ink">{ev.team_name}</span>}
+          {ev.is_draft && <span className="chip bg-stone-600 text-white">No publicado</span>}
           {cancelled && <span className="chip bg-red-100 text-red-800">Cancelado</span>}
-          {ev.type === 'match' && ev.status === 'scheduled' && !ev.result_published_at && new Date(ev.starts_at) < new Date() && (
+          {ev.type === 'match' && !ev.is_draft && ev.status === 'scheduled' && !ev.result_published_at && !!ev.starts_at && new Date(ev.starts_at) < new Date() && (
             <span className="chip bg-amber-100 text-amber-900">Ficha pendiente</span>
           )}
         </div>

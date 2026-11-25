@@ -42,7 +42,8 @@ class EventController extends Controller
         } else {
             $from = CarbonImmutable::parse($data['from'] ?? now()->startOfMonth())->startOfDay();
             $to = CarbonImmutable::parse($data['to'] ?? $from->addDays(41))->endOfDay();
-            if ($from->diffInDays($to) > 120) {
+            // Hasta 120 días entre from y to (to completo): p. ej. 2026-01-01 a 2026-05-01.
+            if ($from->diffInDays($to->startOfDay()) > 120) {
                 return ApiError::response('range_too_large', 'El rango máximo es de 120 días.', 422);
             }
         }
@@ -114,6 +115,10 @@ class EventController extends Controller
         if ($callups !== null && ($bad = $this->notOnRoster($team->id, $callups))) {
             return $bad;
         }
+        // Solo si se envía publish:true explícito: sin el campo se conserva el flujo anterior (crear y luego convocar).
+        if ($request->boolean('publish') && $data['type'] === 'match' && empty($callups)) {
+            return $this->callupsRequired();
+        }
 
         $event = DB::transaction(function () use ($data, $organization, $access, $publish, $callups) {
             $event = Event::create(array_merge($data, [
@@ -144,6 +149,9 @@ class EventController extends Controller
         if ($event->status === 'cancelled') {
             return ApiError::response('event_closed', 'La actividad está cancelada.', 422);
         }
+        if ($event->isDraft() && $event->type === 'match' && ! EventCallup::where('event_id', $event->id)->exists()) {
+            return $this->callupsRequired();
+        }
         $published = DB::transaction(function () use ($event) {
             $locked = Event::whereKey($event->id)->lockForUpdate()->first();
             if (! $locked->isDraft()) {
@@ -158,6 +166,11 @@ class EventController extends Controller
             $called = EventCallup::where('event_id', $event->id)->pluck('player_id')->map(fn ($i) => (int) $i)->all();
             if ($called && $event->starts_at->isFuture()) {
                 $this->notifier->callups($event, $called);
+            }
+            // Si ya había asistencia guardada en el borrador, se avisa ahora.
+            $withAttendance = Attendance::where('event_id', $event->id)->pluck('player_id')->map(fn ($i) => (int) $i)->all();
+            if ($withAttendance && $event->type === 'match') {
+                $this->notifier->attendance($event, $withAttendance);
             }
             Audit::log('event.published', $event, ['callups' => count($called)], $organization->id);
         }
@@ -236,14 +249,17 @@ class EventController extends Controller
         return response()->json(['data' => ['count' => count($ids), 'newly_called' => $new]]);
     }
 
-    /** Guarda asistencia (reemplaza los registros enviados). */
+    /**
+     * Guarda asistencia de los jugadores enviados (status null = quitar la marca).
+     * En un partido publicado avisa a los padres de cada jugador cuyo estado cambió.
+     */
     public function attendance(Request $request, Organization $organization, Event $event, OrgAccess $access): JsonResponse
     {
         $access->authorize($access->canWorkOnTeam($event->team));
         $data = $request->validate([
             'records' => ['required', 'array', 'max:80'],
             'records.*.player_id' => ['required', 'integer', 'distinct'],
-            'records.*.status' => ['required', Rule::in(['present', 'absent', 'late', 'excused'])],
+            'records.*.status' => ['present', 'nullable', Rule::in(Attendance::STATUSES)],
             'records.*.note' => ['nullable', 'string', 'max:200'],
         ]);
         $roster = TeamPlayer::where('team_id', $event->team_id)->pluck('player_id')->map(fn ($i) => (int) $i)->all();
@@ -253,17 +269,35 @@ class EventController extends Controller
             }
         }
 
-        DB::transaction(function () use ($event, $data, $access) {
+        $changed = DB::transaction(function () use ($event, $data, $access) {
+            $before = Attendance::where('event_id', $event->id)->lockForUpdate()->pluck('status', 'player_id');
+            $changed = [];
             foreach ($data['records'] as $r) {
+                $pid = (int) $r['player_id'];
+                if ($r['status'] === null) {
+                    Attendance::where('event_id', $event->id)->where('player_id', $pid)->delete();
+
+                    continue;
+                }
                 Attendance::updateOrCreate(
-                    ['event_id' => $event->id, 'player_id' => $r['player_id']],
+                    ['event_id' => $event->id, 'player_id' => $pid],
                     ['status' => $r['status'], 'note' => $r['note'] ?? null, 'recorded_by' => $access->user->id],
                 );
+                if (($before[$pid] ?? null) !== $r['status']) {
+                    $changed[] = $pid;
+                }
             }
-        });
-        Audit::log('event.attendance_saved', $event, ['count' => count($data['records'])], $organization->id);
 
-        return response()->json(['data' => ['count' => count($data['records'])]]);
+            return $changed;
+        });
+
+        $notified = 0;
+        if ($changed && $event->type === 'match' && ! $event->isDraft()) {
+            $notified = $this->notifier->attendance($event, $changed);
+        }
+        Audit::log('event.attendance_saved', $event, ['count' => count($data['records']), 'changed' => count($changed)], $organization->id);
+
+        return response()->json(['data' => ['count' => count($data['records']), 'changed' => count($changed), 'notified' => $notified]]);
     }
 
     /** Ficha del partido al final. publish=true marca el partido como finalizado y avisa a los padres. */
@@ -312,6 +346,11 @@ class EventController extends Controller
         ], $organization->id);
 
         return response()->json(['data' => array_merge($event->payload(), ['warnings' => $result['warnings']])]);
+    }
+
+    private function callupsRequired(): JsonResponse
+    {
+        return ApiError::response('callups_required', 'Para publicar un partido convoque al menos a un jugador.', 422);
     }
 
     private function notOnRoster(int $teamId, array $players): ?JsonResponse

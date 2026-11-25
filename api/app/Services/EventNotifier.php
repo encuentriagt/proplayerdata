@@ -87,6 +87,39 @@ final class EventNotifier
         }
     }
 
+    /**
+     * Asistencia de un partido publicado: un aviso por jugador a sus padres ("Ana: Asiste").
+     * Si se corrige, solo avisa a quienes les cambió el estado; volver a un estado anterior también avisa.
+     */
+    public function attendance(Event $event, array $playerIds): int
+    {
+        $event->loadMissing('team');
+        $labels = ['present' => 'Asiste', 'excused' => 'No asiste (con aviso)', 'injured' => 'Lesión', 'absent' => 'No asiste (sin justificar)'];
+        $rows = \App\Models\Attendance::with('player')->where('event_id', $event->id)->whereIn('player_id', $playerIds)->get();
+        $sent = 0;
+        foreach ($rows as $a) {
+            if (! $a->player || ! isset($labels[$a->status])) {
+                continue;
+            }
+            $prefix = "event:{$event->id}:att:{$a->player_id}:";
+            // Borra el registro de avisos de otros estados para que, si vuelve a cambiar, se avise de nuevo.
+            \Illuminate\Support\Facades\DB::table('notification_logs')->where('kind', 'attendance')
+                ->where('ref_key', 'like', $prefix.'%')->where('ref_key', '!=', $prefix.$a->status)->delete();
+            $sent += $this->notifications->notify(
+                $this->guardiansOf([$a->player_id]),
+                'attendance',
+                $prefix.$a->status,
+                'Asistencia: '.$event->displayTitle(),
+                "{$a->player->first_name}: {$labels[$a->status]}.",
+                ['event_id' => $event->id, 'player_id' => $a->player_id, 'team_id' => $event->team_id, 'status' => $a->status],
+                $event->organization_id,
+                $a->player_id,
+            );
+        }
+
+        return $sent;
+    }
+
     private function activeRoster(Event $event): array
     {
         return TeamPlayer::where('team_id', $event->team_id)->where('active', true)->pluck('player_id')->all();

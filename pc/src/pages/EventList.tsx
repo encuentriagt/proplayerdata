@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
 import { addDays, format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -11,7 +11,7 @@ import { useSport } from '../lib/sport'
 import { SportSwitcher } from '../components/SportSwitcher'
 import type { PcEvent } from '../lib/types'
 import { EventCard } from '../components/EventCard'
-import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
+import { Alert, Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
 
 type Kind = 'match' | 'training'
 type Tab = 'proximos' | 'anteriores'
@@ -32,6 +32,7 @@ export function EventList({ type }: { type: Kind }) {
   const tab: Tab = params.get('ver') === 'anteriores' ? 'anteriores' : 'proximos'
   const teamId = Number(params.get('equipo')) || undefined
   const [blocks, setBlocks] = useState(1)
+  const created = (useLocation().state as { created?: number } | null)?.created
   const sport = useSport()
   const t = TEXT[type]
 
@@ -85,6 +86,7 @@ export function EventList({ type }: { type: Kind }) {
         </>
       } />
 
+      {created ? <div className="mb-4"><Alert tone="success">Se crearon {created} entrenos.</Alert></div> : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div role="tablist" aria-label="Periodo" className="flex rounded-xl bg-black/5 p-1">
           {([['proximos', 'Próximos'], ['anteriores', 'Anteriores']] as const).map(([k, label]) => (

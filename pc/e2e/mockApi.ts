@@ -111,7 +111,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
     }
     if (pc === 'teams/1') return ok(route, { ...team, sport, staff: [{ user_id: 1, name: 'Carlos Coach', role: 'head_coach' }], can_manage: role !== 'coach' })
     if (pc === 'teams/1/roster') return ok(route, roster)
-    if (pc === 'seasons') return ok(route, [])
+    if (pc === 'seasons') return ok(route, [{ id: 1, name: '2026-2027', starts_on: '2026-07-01', ends_on: '2027-06-30', is_current: true }])
     if (pc === 'invitations' && method === 'GET') return ok(route, [])
     if (pc === 'events' && method === 'GET') {
       const list = Object.values(events).map(({ sport: _s, callups, attendance, lineup, actions, player_stats, ...e }) => e)
@@ -132,6 +132,22 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
         return ok(route, list.filter((e: any) => e.type === 'match' && e.status !== 'cancelled' && !e.result_published_at && !!e.starts_at && new Date(e.starts_at) < new Date()))
       }
       return ok(route, list)
+    }
+    if (pc === 'events/series' && method === 'POST') {
+      // Propuesta al backend: crea toda la serie de una vez
+      const iso = (d: Date) => d.toISOString().slice(0, 10)
+      let n = 0
+      for (let d = new Date(`${body.from}T12:00:00Z`); iso(d) <= body.until; d = new Date(d.getTime() + 864e5)) {
+        const wd = ((d.getUTCDay() + 6) % 7) + 1
+        if (!body.weekdays.includes(wd)) continue
+        const id = nextId++
+        events[id] = { id, team_id: body.team_id, team_name: team.name, type: 'training', title: body.title, display_title: body.title ?? 'Entrenamiento',
+          starts_at: `${iso(d)}T${body.time}:00-06:00`, ends_at: null, location: body.location, opponent_name: null, home_away: null, status: 'scheduled',
+          score_us: null, score_them: null, result_published_at: null, notes: body.notes, is_draft: false, published_at: new Date().toISOString(),
+          sport, callups: [], attendance: [], lineup: [], actions: [], player_stats: [] }
+        n++
+      }
+      return ok(route, { series_id: 1, count: n }, 201)
     }
     if (pc === 'events' && method === 'POST') {
       const id = nextId++

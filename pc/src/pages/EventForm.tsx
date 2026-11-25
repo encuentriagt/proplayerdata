@@ -3,11 +3,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Users } from 'lucide-react'
 import { ApiError, newIdempotencyKey, request, requestIdempotent } from '../lib/api'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { addHours, format, parseISO } from 'date-fns'
 import { fromInputValue, toInputValue } from '../lib/dates'
 import { EVENT_TYPE } from '../lib/labels'
 import { pcPath, useOrg } from '../lib/org'
-import { useEvent, usePcMutation, useRoster, useTeams } from '../lib/queries'
+import { useEvent, usePcMutation, useRoster, useSeasons, useTeams } from '../lib/queries'
+import { MAX_SERIES, seriesDates, untilDate } from '../lib/recurrence'
+import { RecurrenceFields, type Recurrence } from '../components/RecurrenceFields'
 import { useSport } from '../lib/sport'
 import type { EventType, HomeAway, PcEvent } from '../lib/types'
 import { DatePicker, TimePicker } from '../components/DateTimeFields'
@@ -74,7 +75,6 @@ export function EventFormPage() {
 
   const isMatch = f.type === 'match'
   const [startDate = '', startTime = ''] = f.starts_at.split('T')
-  const endTime = f.ends_at.split('T')[1] ?? ''
   const startOk = !!startDate && !!startTime
   // Borrador: equipo y fecha. Hora, rival y convocados se agregan después.
   // Publicar: además hora, rival y al menos un convocado (regla del dueño).
@@ -91,7 +91,7 @@ export function EventFormPage() {
     notes: f.notes.trim() || null,
     ...(isMatch
       ? { opponent_name: f.opponent_name.trim() || null }
-      : { ends_at: endTime && startDate ? `${startDate} ${endTime}` : null, title: f.title.trim() || null, opponent_name: null, home_away: null }),
+      : { title: f.title.trim() || null, opponent_name: null, home_away: null }),
   })
 
   // Convocatoria en el formulario: al crear un partido y al editar un borrador.
@@ -164,9 +164,28 @@ export function EventFormPage() {
     method: 'PATCH', path: `events/${id}`, body, invalidate: [['events'], ['event', Number(id)]],
     onSuccess: (ev) => navigate(`/${slug}/eventos/${ev.id}`, { replace: true }),
   })
+  // Entreno recurrente (solo al crear): POST events/series crea toda la serie en un paso (pedido al backend).
+  const seasons = useSeasons()
+  const currentSeason = seasons.data?.find((x) => x.is_current)
+  const [rec, setRec] = useState<Recurrence>({ repeat: false, weekdays: [], mode: 'season', custom: '' })
+  const isSeries = !editing && f.type === 'training' && rec.repeat
+  // Sin temporada actual con fecha de fin, "Fin de temporada" no aplica: se usa 6 meses (solo cuando ya cargaron).
+  useEffect(() => { if (seasons.isSuccess && !currentSeason?.ends_on && rec.mode === 'season') setRec((r) => ({ ...r, mode: '6m' })) }, [seasons.isSuccess, currentSeason, rec.mode])
+  const seriesUntil = untilDate(startDate, rec.mode, currentSeason?.ends_on, rec.custom)
+  const seriesCount = isSeries ? seriesDates(startDate, seriesUntil, rec.weekdays).length : 0
+  const seriesOk = seriesCount > 0 && seriesCount <= MAX_SERIES
+  const createSeries = usePcMutation<void, { count: number }>({
+    method: 'POST', path: 'events/series', idempotent: true, invalidate: [['events']],
+    body: () => ({
+      team_id: Number(f.team_id), type: 'training', from: startDate, until: seriesUntil, weekdays: rec.weekdays, time: startTime,
+      location: f.location.trim() || null, notes: f.notes.trim() || null, title: f.title.trim() || null,
+    }),
+    onSuccess: (r) => navigate(`/${slug}/entrenos`, { replace: true, state: { created: r.count ?? seriesCount } }),
+  })
+
   const m = editing ? update : create
-  const busy = m.isPending || createDraft.isPending || createPublished.isPending || savingDraft !== null
-  const formError = (editing ? (isDraft ? draftError : update.error) : createPublished.error ?? createDraft.error ?? create.error)
+  const busy = m.isPending || createSeries.isPending || createDraft.isPending || createPublished.isPending || savingDraft !== null
+  const formError = (editing ? (isDraft ? draftError : update.error) : createSeries.error ?? createPublished.error ?? createDraft.error ?? create.error)
 
   if (teams.isLoading || (editing && existing.isLoading)) return <Spinner />
   if (editing && existing.isError) return <ErrorAlert error={existing.error} />
@@ -179,19 +198,13 @@ export function EventFormPage() {
     if (busy) return
     if (!editing && isMatch) { if (called.length) createPublished.mutate() }
     else if (editing && isDraft && isMatch) void saveDraft(false)
+    else if (isSeries) { if (seriesOk && startOk) createSeries.mutate() }
     else m.mutate()
   }
 
   // Fecha y hora por separado (calendario propio + selector de hora). El fin es solo hora, el mismo día.
   const setStartDate = (d: string) => set('starts_at', `${d}T${startTime}`)
-  const setStartTime = (t: string) => {
-    set('starts_at', `${startDate}T${t}`)
-    // Entreno: sugerir fin 1 h 30 después si no tiene (sin pasar de medianoche).
-    if (!isMatch && t && !endTime) {
-      const end = format(addHours(parseISO(`2000-01-01T${t}`), 1.5), 'HH:mm')
-      if (end > t) set('ends_at', `${startDate}T${end}`)
-    }
-  }
+  const setStartTime = (t: string) => set('starts_at', `${startDate}T${t}`)
 
   return (
     <>
@@ -220,9 +233,12 @@ export function EventFormPage() {
           <div className="sm:col-span-2">
             <DatePicker label="Fecha" value={startDate} onChange={setStartDate} error={err('starts_at')} />
           </div>
-          <TimePicker label={isMatch ? 'Hora' : 'Hora de inicio'} value={startTime} onChange={setStartTime} />
-          {!isMatch && <TimePicker label="Hora de fin (opcional)" optional value={endTime} onChange={(t) => set('ends_at', t ? `${startDate}T${t}` : '')} error={err('ends_at')} />}
+          <TimePicker label="Hora" value={startTime} onChange={setStartTime} />
         </div>
+
+        {!editing && f.type === 'training' && (
+          <RecurrenceFields value={rec} onChange={setRec} startDate={startDate} seasonEnd={currentSeason?.ends_on} seasonName={currentSeason?.name} />
+        )}
 
         {isMatch && (
           <TextField label="Rival" value={f.opponent_name} onChange={(e) => set('opponent_name', e.target.value)} maxLength={120} error={err('opponent_name')}
@@ -298,8 +314,8 @@ export function EventFormPage() {
               </button>
             </>
           ) : (
-            <button className="btn-primary" disabled={busy || !f.team_id || !startOk}>
-              {busy ? 'Guardando…' : editing ? 'Guarde los cambios' : f.type === 'training' ? 'Crear entreno' : 'Crear actividad'}
+            <button className="btn-primary" disabled={busy || !f.team_id || !startOk || (isSeries && !seriesOk)}>
+              {busy ? 'Guardando…' : editing ? 'Guarde los cambios' : isSeries ? `Crear ${seriesCount || ''} entrenos`.replace('  ', ' ') : f.type === 'training' ? 'Crear entreno' : 'Crear actividad'}
             </button>
           )}
         </div>

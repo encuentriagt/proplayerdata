@@ -1,0 +1,45 @@
+import { addDays, addMonths, format, getISODay, parseISO } from 'date-fns'
+
+/** Días de la semana en formato ISO: 1 = lunes … 7 = domingo. */
+export const WEEKDAYS = [
+  { iso: 1, short: 'L', name: 'lunes' },
+  { iso: 2, short: 'M', name: 'martes' },
+  { iso: 3, short: 'M', name: 'miércoles' },
+  { iso: 4, short: 'J', name: 'jueves' },
+  { iso: 5, short: 'V', name: 'viernes' },
+  { iso: 6, short: 'S', name: 'sábado' },
+  { iso: 7, short: 'D', name: 'domingo' },
+] as const
+
+/** Máximo de entrenos por serie (la API debe validar lo mismo). */
+export const MAX_SERIES = 200
+
+export type UntilMode = 'season' | '1m' | '3m' | '6m' | 'custom'
+
+/** Fecha final de la serie según la opción elegida ("yyyy-MM-dd"). */
+export function untilDate(from: string, mode: UntilMode, seasonEnd?: string | null, custom?: string): string | null {
+  if (!from) return null
+  const f = parseISO(from)
+  if (mode === '1m') return format(addMonths(f, 1), 'yyyy-MM-dd')
+  if (mode === '3m') return format(addMonths(f, 3), 'yyyy-MM-dd')
+  if (mode === '6m') return format(addMonths(f, 6), 'yyyy-MM-dd')
+  if (mode === 'season') return seasonEnd ?? null
+  return custom || null
+}
+
+/** Todas las fechas entre `from` y `until` (inclusive) que caen en los días elegidos. */
+export function seriesDates(from: string, until: string | null, weekdays: number[]): string[] {
+  if (!from || !until || !weekdays.length || until < from) return []
+  const out: string[] = []
+  for (let d = parseISO(from); format(d, 'yyyy-MM-dd') <= until; d = addDays(d, 1)) {
+    if (weekdays.includes(getISODay(d))) out.push(format(d, 'yyyy-MM-dd'))
+    if (out.length > MAX_SERIES) break
+  }
+  return out
+}
+
+/** [1, 3] → "lunes y miércoles" */
+export function weekdaysText(weekdays: number[]): string {
+  const names = WEEKDAYS.filter((w) => weekdays.includes(w.iso)).map((w) => w.name)
+  return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}`
+}

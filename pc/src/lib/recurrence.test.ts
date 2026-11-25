@@ -1,0 +1,35 @@
+import { seriesDates, untilDate, weekdaysText, MAX_SERIES } from './recurrence'
+
+describe('entrenos recurrentes', () => {
+  it('todos los miércoles de un mes', () => {
+    // 2 dic 2026 es miércoles
+    expect(seriesDates('2026-12-02', '2026-12-31', [3])).toEqual(['2026-12-02', '2026-12-09', '2026-12-16', '2026-12-23', '2026-12-30'])
+  })
+  it('lunes y miércoles, empezando en un día que no es de la serie', () => {
+    expect(seriesDates('2026-12-01', '2026-12-09', [1, 3])).toEqual(['2026-12-02', '2026-12-07', '2026-12-09'])
+  })
+  it('6 meses de lunes y miércoles ≈ 52 entrenos', () => {
+    const fin = untilDate('2026-12-02', '6m')!
+    expect(fin).toBe('2027-06-02')
+    const n = seriesDates('2026-12-02', fin, [1, 3]).length
+    expect(n).toBeGreaterThanOrEqual(51)
+    expect(n).toBeLessThanOrEqual(53)
+  })
+  it('hasta fin de temporada usa la fecha de la temporada actual', () => {
+    expect(untilDate('2026-12-02', 'season', '2027-06-30')).toBe('2027-06-30')
+    expect(untilDate('2026-12-02', 'season', null)).toBeNull()
+  })
+  it('sin días, sin fin o fin antes del inicio: nada', () => {
+    expect(seriesDates('2026-12-02', '2026-12-31', [])).toEqual([])
+    expect(seriesDates('2026-12-02', null, [3])).toEqual([])
+    expect(seriesDates('2026-12-02', '2026-11-01', [3])).toEqual([])
+  })
+  it('se corta al pasar el máximo', () => {
+    expect(seriesDates('2026-01-01', '2030-01-01', [1, 2, 3, 4, 5, 6, 7]).length).toBe(MAX_SERIES + 1)
+  })
+  it('texto de los días', () => {
+    expect(weekdaysText([1, 3])).toBe('lunes y miércoles')
+    expect(weekdaysText([1, 3, 5])).toBe('lunes, miércoles y viernes')
+    expect(weekdaysText([3])).toBe('miércoles')
+  })
+})

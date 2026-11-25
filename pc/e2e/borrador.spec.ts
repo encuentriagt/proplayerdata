@@ -220,24 +220,55 @@ test('Un borrador se borra directo (nadie lo ha visto)', async ({ page }) => {
   expect(api.calls.some((c) => c.method === 'DELETE' && /\/events\/\d+$/.test(c.path))).toBe(true)
 })
 
-test('Fecha con calendario propio y hora por separado; en entreno se sugiere la hora de fin', async ({ page }) => {
+test('Nuevo entreno: sin hora de fin; fecha con calendario propio y hora', async ({ page }) => {
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=training')
+  await expect(page.getByLabel('Hora de fin (opcional)')).toHaveCount(0)
   await expect(page.getByLabel('Fecha', { exact: true })).toContainText('Elija la fecha')
-  // Botón "Mañana" del calendario
   await page.getByLabel('Fecha', { exact: true }).click()
   await page.getByRole('dialog', { name: /Elegir fecha/ }).getByRole('button', { name: 'Mañana' }).click()
-  await elegirHora(page, 'Hora de inicio', '15:30')
-  await expect(page.getByLabel('Hora de inicio', { exact: true })).toHaveText('3:30 p. m.')
-  // Fin sugerido 1 h 30 después; se puede quitar
-  await expect(page.getByLabel('Hora de fin (opcional)', { exact: true })).toHaveText('5:00 p. m.')
+  await elegirHora(page, 'Hora', '15:30')
+  await expect(page.getByLabel('Hora', { exact: true })).toHaveText('3:30 p. m.')
   await page.getByRole('button', { name: 'Crear entreno' }).click()
   const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events'))!
   expect(post.body.starts_at).toBe(`${manana()} 15:30`)
-  expect(post.body.ends_at).toBe(`${manana()} 17:00`)
+  expect(post.body).not.toHaveProperty('ends_at')
 })
 
+test('Entreno recurrente: lunes y miércoles por 1 mes, con vista previa', async ({ page }) => {
+  const api = mockApi(page)
+  await entrar(page)
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=training')
+  await fechaHora(page, '2026-12-02', '15:30') // miércoles
+  await page.getByLabel('Lugar').fill('Gimnasio')
+  await page.getByRole('checkbox', { name: 'Se repite' }).check()
+  // Por defecto, el día de la fecha elegida (miércoles) y "Fin de temporada"
+  await expect(page.getByRole('button', { name: 'miércoles' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'Fin de temporada (2026-2027)' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'lunes' }).click()
+  await page.getByRole('button', { name: '1 mes' }).click()
+  // 2 dic → 2 ene: mié 2, 9, 16, 23, 30 y lun 7, 14, 21, 28 = 9
+  await expect(page.getByText(/Se crearán 9 entrenos, cada lunes y miércoles, del Miércoles 2 de diciembre al Miércoles 30 de diciembre/)).toBeVisible()
+  await page.getByRole('button', { name: 'Ver fechas' }).click()
+  await expect(page.getByText(/mié 2 dic · lun 7 dic/)).toBeVisible()
+  await page.getByRole('button', { name: 'Crear 9 entrenos' }).click()
+  await expect(page.getByText('Se crearon 9 entrenos.')).toBeVisible()
+  const post = api.calls.find((c) => c.method === 'POST' && c.path.endsWith('/events/series'))!
+  expect(post.body).toMatchObject({ team_id: 1, type: 'training', from: '2026-12-02', until: '2027-01-02', weekdays: [1, 3], time: '15:30', location: 'Gimnasio' })
+  expect(post.headers['idempotency-key']).toBeTruthy()
+})
+
+test('Entreno recurrente: sin días no se puede crear', async ({ page }) => {
+  mockApi(page)
+  await entrar(page)
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=training')
+  await fechaHora(page, '2026-12-02', '15:30')
+  await page.getByRole('checkbox', { name: 'Se repite' }).check()
+  await page.getByRole('button', { name: 'miércoles' }).click()
+  await expect(page.getByText('Elija al menos un día.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Crear .*entrenos$/ })).toBeDisabled()
+})
 test('Reloj de hora: primero la hora, luego pasa solo a minutos; Cancelar no cambia nada', async ({ page }) => {
   mockApi(page)
   await entrar(page)

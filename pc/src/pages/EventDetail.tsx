@@ -103,12 +103,21 @@ export function EventDetailPage() {
         </div>
         {e.notes && <p className="mt-2 whitespace-pre-line text-sm text-black/70">{e.notes}</p>}
 
-        {e.status === 'scheduled' && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link to={`/${slug}/eventos/${e.id}/editar`} className="btn-secondary"><Pencil className="size-4" aria-hidden /> Editar</Link>
-            <button className="btn-secondary" onClick={() => setConfirm('cancel')}><CalendarX className="size-4" aria-hidden /> Cancelar actividad</button>
-            {!e.result_published_at && (
+        {/* Borrar: un borrador se borra directo; uno publicado primero se cancela (avisa a los padres) y luego se borra.
+            Con resultado publicado no se borra (event_has_result). */}
+        {(e.status === 'scheduled' || (e.status === 'cancelled' && !e.result_published_at)) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {e.status === 'scheduled' && (
+              <>
+                <Link to={`/${slug}/eventos/${e.id}/editar`} className="btn-secondary"><Pencil className="size-4" aria-hidden /> Editar</Link>
+                <button className="btn-secondary" onClick={() => setConfirm('cancel')}><CalendarX className="size-4" aria-hidden /> Cancelar actividad</button>
+              </>
+            )}
+            {!e.result_published_at && (e.is_draft || e.status === 'cancelled') && (
               <button className="btn-ghost text-red-700" onClick={() => setConfirm('delete')}><Trash2 className="size-4" aria-hidden /> Borrar</button>
+            )}
+            {!e.result_published_at && !e.is_draft && e.status === 'scheduled' && (
+              <p className="w-full text-sm text-black/60">Para borrarlo, primero cancele la actividad (se avisará a los padres).</p>
             )}
           </div>
         )}
@@ -147,7 +156,7 @@ export function EventDetailPage() {
       </ConfirmDialog>
       <ConfirmDialog open={confirm === 'delete'} title="¿Borrar esta actividad?" confirmLabel="Borrar" danger
         busy={remove.isPending} onConfirm={() => remove.mutate()} onCancel={() => setConfirm(null)}>
-        Esta acción no se puede deshacer.
+        {e.status === 'cancelled' ? 'Ya se avisó a los padres que se canceló. ' : ''}Esta acción no se puede deshacer.
         <ErrorAlert error={remove.error} />
       </ConfirmDialog>
     </>

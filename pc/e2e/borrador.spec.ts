@@ -74,7 +74,7 @@ test('Publicar un borrador desde el detalle', async ({ page }) => {
   expect(api.calls.some((c) => c.method === 'POST' && c.path.endsWith('/publish'))).toBe(true)
 })
 
-test('Tarjetas de Partidos sin menú ⋮; editar y borrar desde el detalle', async ({ page }) => {
+test('Tarjetas sin menú ⋮; un partido publicado se cancela antes de borrarlo', async ({ page }) => {
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
@@ -87,7 +87,15 @@ test('Tarjetas de Partidos sin menú ⋮; editar y borrar desde el detalle', asy
 
   await page.getByRole('link', { name: /Sub-15 Masculino vs Instituto Este/ }).click()
   await expect(page.getByRole('link', { name: 'Editar' })).toBeVisible()
+  // Publicado: no se borra directo; primero se cancela (avisa a los padres)
+  await expect(page.getByRole('button', { name: 'Borrar' })).toHaveCount(0)
+  await expect(page.getByText('Para borrarlo, primero cancele la actividad (se avisará a los padres).')).toBeVisible()
+  await page.getByRole('button', { name: 'Cancelar actividad' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Sí, cancelar' }).click()
+  expect(api.calls.find((c) => c.method === 'PATCH' && /\/events\/\d+$/.test(c.path))?.body).toEqual({ status: 'cancelled' })
+  // Cancelado: ya se puede borrar
   await page.getByRole('button', { name: 'Borrar' }).click()
+  await expect(page.getByText('Ya se avisó a los padres que se canceló.')).toBeVisible()
   await page.getByRole('dialog').getByRole('button', { name: 'Borrar' }).click()
   await expect(page.getByRole('heading', { name: 'Calendario' })).toBeVisible()
   expect(api.calls.some((c) => c.method === 'DELETE' && /\/events\/\d+$/.test(c.path))).toBe(true)
@@ -194,4 +202,19 @@ test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nomb
   expect(api.calls.filter((c) => c.method === 'PUT' && c.path.endsWith('/attendance')).at(-1)?.body.records).toEqual([
     { player_id: 15, status: 'injured' }, { player_id: 18, status: null },
   ])
+})
+
+test('Un borrador se borra directo (nadie lo ha visto)', async ({ page }) => {
+  const api = mockApi(page)
+  await entrar(page)
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
+  await page.getByLabel('Fecha y hora').fill(`${manana()}T10:00`)
+  await page.getByLabel('Rival').fill('Colegio Sur')
+  await page.getByRole('button', { name: 'Borrador', exact: true }).click()
+  await expect(page.getByText('Para borrarlo, primero cancele')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Borrar' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Borrar' }).click()
+  await expect(page.getByRole('heading', { name: 'Calendario' })).toBeVisible()
+  expect(api.calls.some((c) => c.method === 'PATCH')).toBe(false)
+  expect(api.calls.some((c) => c.method === 'DELETE' && /\/events\/\d+$/.test(c.path))).toBe(true)
 })

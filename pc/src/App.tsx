@@ -1,4 +1,6 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
+import { Spinner } from './components/ui'
 import { OrgLayout, RequireAdminArea } from './components/OrgLayout'
 import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
@@ -16,16 +18,19 @@ import { PositionsPage } from './pages/Positions'
 import { TeamDetailPage } from './pages/TeamDetail'
 import { Players } from './pages/Players'
 import { PlayerDetailPage } from './pages/PlayerDetail'
-import { AdminIndex, AdminLayout, RequirePermission } from './pages/admin/AdminLayout'
+import { AdminIndex, RequirePermission } from './pages/admin/AdminLayout'
 import { useOrg } from './lib/org'
-import { AdminMembers } from './pages/admin/Members'
-import { AdminTeams } from './pages/admin/Teams'
-import { AdminSeasons } from './pages/admin/Seasons'
-import { AdminPlans } from './pages/admin/Plans'
-import { AdminBranding } from './pages/admin/Branding'
-import { AdminInvitations } from './pages/admin/Invitations'
-import { AdminSports } from './pages/admin/Sports'
 import { NotFound } from './pages/NotFound'
+
+// Administración se descarga solo cuando alguien la abre (los coaches casi nunca la usan).
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })))
+const AdminMembers = lazy(() => import('./pages/admin/Members').then((m) => ({ default: m.AdminMembers })))
+const AdminTeams = lazy(() => import('./pages/admin/Teams').then((m) => ({ default: m.AdminTeams })))
+const AdminSeasons = lazy(() => import('./pages/admin/Seasons').then((m) => ({ default: m.AdminSeasons })))
+const AdminPlans = lazy(() => import('./pages/admin/Plans').then((m) => ({ default: m.AdminPlans })))
+const AdminBranding = lazy(() => import('./pages/admin/Branding').then((m) => ({ default: m.AdminBranding })))
+const AdminInvitations = lazy(() => import('./pages/admin/Invitations').then((m) => ({ default: m.AdminInvitations })))
+const AdminSports = lazy(() => import('./pages/admin/Sports').then((m) => ({ default: m.AdminSports })))
 
 export function App() {
   return (
@@ -49,7 +54,7 @@ export function App() {
         <Route path="posiciones" element={<PositionsPage />} />
         <Route path="jugadores" element={<Players />} />
         <Route path="jugadores/:id" element={<PlayerDetailPage />} />
-        <Route path="admin" element={<RequireAdminArea><AdminLayout /></RequireAdminArea>}>
+        <Route path="admin" element={<RequireAdminArea><Suspense fallback={<Spinner />}><AdminLayout /></Suspense></RequireAdminArea>}>
           <Route index element={<AdminIndex />} />
           <Route path="miembros" element={<Guard k="manage_members"><AdminMembers /></Guard>} />
           <Route path="deportes" element={<Guard k="manage_sports"><AdminSports /></Guard>} />

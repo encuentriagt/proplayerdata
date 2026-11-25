@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.6 (2026-11-25)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.7 (2026-11-26)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -10,7 +10,7 @@ Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **c�
 | Tema | Regla |
 |---|---|
 | Formato | Siempre JSON. Respuestas exitosas: `{ "data": ..., "meta": ... }` |
-| Errores | `{ "error": { "code": "codigo_estable", "message": "Texto en español (usted)", ...extra } }`. El cliente decide por `code`; `message` se puede mostrar tal cual. Validación: `code = validation_failed` y `error.fields = { campo: [mensajes] }` |
+| Errores | `{ "error": { "code": "codigo_estable", "message": "Texto en español (usted)", ...extra } }`. El cliente decide por `code`; `message` se puede mostrar tal cual. Validación: `code = validation_failed` y `error.fields = { campo: [mensajes] }`; los mensajes vienen en español (`api/lang/es/validation.php`), p. ej. "El equipo es obligatorio." |
 | Autenticación | `Authorization: Bearer <token>` (token de `/auth/login`) |
 | Plataforma | `X-App-Platform: web \| android \| ios` **obligatorio en el login**. Una sesión por plataforma: iniciar sesión otra vez en la misma plataforma cierra la anterior |
 | Idempotencia | En las rutas marcadas ♻️ enviar `Idempotency-Key: <uuid>` (8–128 caracteres `A-Z a-z 0-9 _ -`). Reintentar con la **misma** clave y el **mismo** cuerpo devuelve la respuesta original (encabezado `Idempotency-Replayed: true`) sin repetir el efecto. Generar una clave nueva por cada acción del usuario, no por cada reintento |
@@ -142,13 +142,14 @@ Cada evento trae `is_draft` y `published_at` (borrador = `published_at: null`). 
 
 | Método | Ruta | Cuerpo / Notas |
 |---|---|---|
+| GET | `events?undated_drafts=1&team_id=&type=&sport_id=` | Borradores **sin fecha** que el miembro ve (más recientes primero, máx. 200). Ignora `from/to` |
 | GET | `events?from=&to=&team_id=&type=&sport_id=` | Hasta 120 días entre `from` y `to` (ambos incluidos; p. ej. 2026-01-01 a 2026-05-01). Más → 422 `range_too_large`. Sin rango: el mes actual + 6 semanas |
 | GET | `events?pending_sheet=1` | Partidos ya jugados (últimos 120 días), publicados (no borradores), no cancelados y **sin resultado publicado** (ignora `from/to`) |
-| POST ♻️ | `events` | `{team_id, type(match\|training\|other), starts_at, ends_at?, title?, location?, opponent_name?, home_away?(home\|away\|neutral), notes?, publish?(default true), callups?:[{player_id, status?}]}`. `publish:false` = **borrador**: no aparece en la App ni en `pending_sheet` y no avisa a nadie. `callups` crea y convoca en una sola llamada (jugadores activos del equipo; si no, 422 y no se crea nada); si se publica, avisa a los padres de los convocados. Partido con `publish:true` explícito y sin `callups` → 422 `callups_required` (los borradores se guardan sin convocados). **Envíe siempre `publish`**: si se omite se publica sin exigir convocados (compatibilidad). |
-| POST ♻️ | `events/{id}/publish` | Publica un borrador: aparece en la App, avisa a los padres de los convocados y, si ya había asistencia guardada (partidos), la avisa también. Partido sin convocados → 422 `callups_required`. Si ya estaba publicado responde igual sin volver a avisar. Cancelado → 422 `event_closed` |
+| POST ♻️ | `events` | `{team_id, type(match\|training\|other), starts_at, ends_at?, title?, location?, opponent_name?, home_away?(home\|away\|neutral), notes?, publish?(default true), callups?:[{player_id, status?}]}`. `publish:false` = **borrador**: no aparece en la App ni en `pending_sheet` y no avisa a nadie. `callups` crea y convoca en una sola llamada (jugadores activos del equipo; si no, 422 y no se crea nada); si se publica, avisa a los padres de los convocados. `starts_at` puede ser `null` solo en borradores. **Para publicar** (aquí con `publish:true` o en `publish`): fecha siempre; en partidos además rival → si falta, 422 `publish_incomplete` con `error.fields.starts_at`/`opponent_name`; y al menos un convocado → 422 `callups_required`. Los borradores se guardan sin fecha, rival ni convocados. **Envíe siempre `publish`**: si se omite se publica exigiendo solo la fecha (compatibilidad). |
+| POST ♻️ | `events/{id}/publish` | Publica un borrador: aparece en la App, avisa a los padres de los convocados y, si ya había asistencia guardada (partidos), la avisa también. Mismos requisitos: `publish_incomplete` (fecha; en partidos también rival) y `callups_required` (partidos). Si ya estaba publicado responde igual sin volver a avisar. Cancelado → 422 `event_closed` |
 | GET | `events/{id}` | Detalle con `sport{positions, stat_types}` del equipo, `callups`, `attendance`, `lineup`, `actions`, `player_stats` |
-| PATCH | `events/{id}` | Mismos campos + `status: scheduled\|cancelled`. Cambiar fecha/lugar o cancelar **avisa a los padres** |
-| DELETE | `events/{id}` | No si tiene resultado publicado (`event_has_result`) |
+| PATCH | `events/{id}` | Mismos campos + `status: scheduled\|cancelled`. Cambiar fecha/lugar o cancelar **avisa a los padres** (en borrador no). En borrador `starts_at:null` vale; publicado no se quita la fecha ni el rival (422 `validation_failed`) |
+| DELETE | `events/{id}` | Borradores y cancelados sin resultado. Publicado y programado → 422 `event_must_cancel` (primero cancelar, que avisa). Con resultado publicado → 422 `event_has_result` |
 | PUT ♻️ | `events/{id}/callups` | `{players:[{player_id, status?(called\|reserve)}], notify?}` Reemplaza la lista. Avisa a los padres de los **nuevos** convocados (una sola vez); en borrador guarda **sin avisar** (el aviso sale al publicar). Se ve la respuesta del padre en `guardian_response` |
 | PUT ♻️ | `events/{id}/attendance` | `{records:[{player_id, status(present\|excused\|injured\|absent\|null), note?}]}`: Asiste, No asiste con aviso, Lesión, No justificado. `status:null` borra la marca del jugador. Solo cambia los jugadores enviados. En un **partido publicado** avisa a los padres de cada jugador cuyo estado cambió ("Ana: Lesión."); repetir el mismo estado no avisa; en borrador no avisa (se avisa al publicar). Responde `{count, changed, notified}`. `late` ya no existe (se migró a `present`) |
 | PUT ♻️ | `events/{id}/match-sheet` | **Ficha del partido al final** (no hay tiempo real). En borrador → 422 `event_draft`. Ver abajo |

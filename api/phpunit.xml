@@ -19,6 +19,8 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="APP_LOCALE" value="es"/>
+        <env name="APP_FALLBACK_LOCALE" value="es"/>
         <!-- Llave SOLO para pruebas (no es la de producción). -->
         <env name="APP_KEY" value="base64:UhXklVuorqaJ3xPcIHeTiadD+DBZsKSQs2SjIHzXuqI="/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>

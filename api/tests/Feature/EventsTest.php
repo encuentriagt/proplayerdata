@@ -153,6 +153,58 @@ class EventsTest extends TestCase
         $this->as($papa)->getJson("/api/app/children/{$ana->id}/events/{$id}")->assertJsonPath('data.attendance.status', 'injured');
     }
 
+    public function test_borrador_sin_fecha_y_requisitos_para_publicar(): void
+    {
+        ['coach' => $coach, 'team' => $team, 'ana' => $ana] = $this->setupTeam();
+        $id = $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'match', 'starts_at' => null, 'publish' => false])
+            ->assertCreated()->assertJsonPath('data.starts_at', null)->assertJsonPath('data.display_title', 'Sub-12 · Partido')->json('data.id');
+        $this->as($coach)->patchJson($this->base."/events/{$id}", ['location' => 'Cancha 2', 'starts_at' => null])->assertOk();
+
+        // Aparece en undated_drafts (con filtros) y no en el calendario.
+        $this->as($coach)->getJson($this->base.'/events?undated_drafts=1&type=match')->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $id);
+        $this->as($coach)->getJson($this->base.'/events?undated_drafts=1&type=training')->assertJsonCount(0, 'data');
+        $this->as($coach)->getJson($this->base.'/events?undated_drafts=1&sport_id='.\App\Models\Sport::where('code', 'basketball')->value('id'))->assertJsonCount(0, 'data');
+        $this->assertNotContains($id, collect($this->as($coach)->getJson($this->base.'/events')->json('data'))->pluck('id')->all());
+
+        // Publicar sin fecha ni rival, y luego sin convocados.
+        $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertStatus(422)->assertJsonPath('error.code', 'publish_incomplete')
+            ->assertJsonStructure(['error' => ['fields' => ['starts_at', 'opponent_name']]]);
+        $this->as($coach)->patchJson($this->base."/events/{$id}", ['starts_at' => now()->addDays(3)->toDateTimeString(), 'opponent_name' => 'Rival'])->assertOk();
+        $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertStatus(422)->assertJsonPath('error.code', 'callups_required');
+        $this->as($coach)->putJson($this->base."/events/{$id}/callups", ['players' => [['player_id' => $ana->id]]])->assertOk();
+        $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertOk();
+
+        // Publicado: no se le quita la fecha ni el rival.
+        $this->as($coach)->patchJson($this->base."/events/{$id}", ['starts_at' => null])->assertStatus(422);
+        $this->as($coach)->patchJson($this->base."/events/{$id}", ['opponent_name' => ''])->assertStatus(422);
+
+        // POST con publish:true sin rival.
+        $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'match', 'starts_at' => now()->addDay()->toDateTimeString(), 'publish' => true, 'callups' => [['player_id' => $ana->id]]])
+            ->assertStatus(422)->assertJsonPath('error.code', 'publish_incomplete');
+        // Publicar un entreno sin fecha tampoco.
+        $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'training', 'publish' => true])
+            ->assertStatus(422)->assertJsonPath('error.fields.starts_at.0', 'La fecha es obligatoria para publicar.');
+    }
+
+    public function test_borrar_publicado_exige_cancelar(): void
+    {
+        ['coach' => $coach, 'team' => $team] = $this->setupTeam();
+        $mk = fn (bool $pub) => $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'training', 'starts_at' => now()->addDay()->toDateTimeString(), 'publish' => $pub])->json('data.id');
+        $pub = $mk(true);
+        $this->as($coach)->deleteJson($this->base."/events/{$pub}")->assertStatus(422)->assertJsonPath('error.code', 'event_must_cancel');
+        $this->as($coach)->patchJson($this->base."/events/{$pub}", ['status' => 'cancelled'])->assertOk();
+        $this->as($coach)->deleteJson($this->base."/events/{$pub}")->assertOk();
+        $this->as($coach)->deleteJson($this->base.'/events/'.$mk(false))->assertOk();
+    }
+
+    public function test_errores_de_validacion_en_espanol(): void
+    {
+        ['coach' => $coach] = $this->setupTeam();
+        $r = $this->as($coach)->postJson($this->base.'/events', ['type' => 'xx'])->assertStatus(422);
+        $this->assertSame('El equipo es obligatorio.', $r->json('error.fields.team_id.0'));
+        $this->assertStringNotContainsString('validation.', json_encode($r->json(), JSON_UNESCAPED_UNICODE));
+    }
+
     public function test_rango_de_120_dias(): void
     {
         ['coach' => $coach] = $this->setupTeam();

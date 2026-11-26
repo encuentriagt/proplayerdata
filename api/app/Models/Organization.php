@@ -77,6 +77,27 @@ class Organization extends Model
     }
 
     /** Datos públicos de marca blanca (sin datos internos ni de contacto). */
+    /** Mantiene search_key (nombre + slug, minúsculas y sin tildes) para el buscador público. */
+    protected static function booted(): void
+    {
+        static::saving(function (Organization $o) {
+            $o->search_key = self::normalizeSearch($o->name.' '.$o->slug);
+        });
+    }
+
+    public static function normalizeSearch(string $text): string
+    {
+        return \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii(trim($text)));
+    }
+
+    /** Lo único que muestra el buscador público: sin id, plan, cupos ni contactos. */
+    public function publicSearchPayload(): array
+    {
+        $b = $this->brandingPayload();
+
+        return ['name' => $b['name'], 'slug' => $b['slug'], 'logo_url' => $b['logo_url'], 'crest_url' => $b['crest_url'], 'colors' => $b['colors']];
+    }
+
     public function brandingPayload(): array
     {
         $url = fn (?string $p) => $p ? Storage::disk('public')->url($p) : null;

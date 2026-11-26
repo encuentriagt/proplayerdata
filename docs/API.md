@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.8 (2026-11-26)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.9 (2026-11-27)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -29,6 +29,7 @@ Códigos HTTP: 200/201 ok · 304 sin cambios · 401 `unauthenticated` (volver al
 | Método | Ruta | Uso |
 |---|---|---|
 | GET | `/public/health` | Estado: `{status:"ok"}` |
+| GET | `/public/orgs?search={texto}` | **Buscador de instituciones** (pantalla de inicio de la PC). Busca en nombre y slug sin importar mayúsculas ni tildes; mínimo 2 caracteres (menos → 422 `validation_failed`). Solo organizaciones **activas**, máximo **10**, primero las que empiezan con el texto. Responde `{data:[{name, slug, logo_url, crest_url, colors{primary,secondary,on_primary}}]}` (sin resultados: `data:[]`). No expone id, plan, cupos ni contactos. Límite por IP: **30/min y 300/día** → 429 `too_many_requests`. `Cache-Control: no-store` |
 | GET | `/public/orgs/{slug}/branding` | **Marca blanca** para la pantalla de login: `name, slug, type, active, logo_url, crest_url, cover_url, colors{primary,secondary,on_primary}, powered_by`. Caché 5 min + `ETag` (enviar `If-None-Match`) |
 | GET | `/public/invitations/{token}` | Datos de la invitación: `status (pending\|expired\|accepted), role, role_label, email_masked, user_exists, player_first_name, organization{marca}` |
 | POST ♻️ | `/public/invitations/{token}/accept` | Si `user_exists=false`: `{name, password, password_confirmation, relationship?}`. Si `true`: `{password}` (la de su cuenta). Luego el cliente hace login normal. Errores: `invalid_credentials`, `invitation_unusable` (410), `invitation_not_found` |

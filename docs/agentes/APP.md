@@ -1,0 +1,124 @@
+# PARA EL AGENTE DE LA APP (Flutter — App de padres) — NO PEGAR EN LA TERMINAL
+
+Usted construirá la **App de padres y encargados** de **ppd (ProPlayer Data)** para **Android e iOS**, en Flutter. Una sola App (“ppd”) que **adopta la marca del colegio o equipo** del hijo seleccionado. El backend ya está en producción y lo dirige el **agente de backend**: cualquier cambio en la API se le pide a él (usted no modifica `api/`).
+
+---
+
+## 1. Lea primero (repositorio `encuentriagt/proplayerdata`)
+
+1. `docs/ARQUITECTURA.md`: qué es ppd, roles, marca blanca, planes, emergencias (§13, futuro).
+2. `docs/API.md`: **todos los endpoints**. Para la App: §1 Reglas comunes, §2 Público, §3 Sesión, §4 Común (dispositivos y bandeja de avisos) y **§6 App de padres**.
+3. `docs/agentes/PC-WEB.md`: cómo trabaja el agente de la web (mismas reglas de equipo).
+
+Usted trabaja **solo en la carpeta `app/`**. No toque `api/`, `pc/`, `web/`, `docs/` ni `.github/`.
+
+---
+
+## 2. Cómo trabajamos con GitHub
+
+- Repositorio: `https://github.com/encuentriagt/proplayerdata` (monorepo: `api/`, `pc/`, `web/`, `app/`, `docs/`).
+- **`main` está protegida**: nadie sube directo. Todo cambio va por **Pull Request**.
+- Flujo:
+  1. Actualice: `git checkout main && git pull`.
+  2. Cree una rama **`app/<tema-corto>`** (ej. `app/login`, `app/calendario`).
+  3. Commits pequeños con mensajes en español que digan qué cambió.
+  4. `git push -u origin app/<tema>` y abra el **PR hacia `main`** con: qué hace, cómo probarlo, capturas, y una sección **“Pendientes de API”** si necesita algo que no está en `docs/API.md`.
+  5. El check **“App (Flutter)”** debe quedar en verde (`flutter analyze` + `flutter test`).
+  6. Avise al dueño; el **agente de backend revisa y une** (squash). Usted no une sus propios PR.
+- Un PR por tema. Si un PR depende de otro, dígalo en la descripción. Si `main` avanzó y hay conflicto, **rebase** sobre `main` y `git push --force-with-lease` (solo en su rama).
+- **No suba nunca**: llaves, keystores (`*.jks`, `*.keystore`), `key.properties`, contraseñas, certificados, `.env`, ni archivos de credenciales de Firebase **de servidor**. Ya están en `.gitignore`; si algo sensible aparece en `git status`, no lo agregue.
+- La publicación en Google Play / App Store **no** es automática: se hace al final, con el dueño.
+
+---
+
+## 3. Stack (decidido)
+
+- **Flutter estable** (Dart 3), Android mínimo **API 24**, iOS mínimo **15**.
+- Estado: **Riverpod**. Navegación: **go_router**. HTTP: **dio** (con interceptores). Modelos: `freezed` + `json_serializable`.
+- Sesión: **flutter_secure_storage** (Keychain / Keystore). Nunca `SharedPreferences` para el token.
+- Push: **firebase_messaging** + **flutter_local_notifications** (canal Android `general`; más adelante `emergencias`).
+- Fechas: `intl` con locale **`es`** y zona **America/Guatemala** (la API manda ISO 8601 con zona).
+- Imágenes: `cached_network_image` **solo para logos y escudos** (públicos). Las fotos de jugadores **no se cachean en disco** (URL firmada de 15 min).
+- Pruebas: `flutter_test` (unidades y widgets) y al menos una prueba del flujo principal con la API simulada.
+- Sin analíticas ni rastreadores de terceros (la App muestra datos de **menores**). Si más adelante se necesita, Crashlytics sin datos personales, previa aprobación.
+- Identificador propuesto: **`com.ppdguate.app`**, nombre visible **“ppd”** (el dueño confirma antes de crear el proyecto en Firebase y en las tiendas).
+- Base de la API: `https://api.ppdguate.com/api` (por `--dart-define=API_URL=...`; no hay CORS en móviles, se usa producción con la cuenta demo).
+
+---
+
+## 4. Reglas que no se rompen
+
+- **Textos en español de Guatemala, trato de usted** (“Ingrese su correo”, “Confirme la asistencia”). Única excepción: los **nombres de deportes** vienen en inglés desde la API (Soccer, Basketball…); se muestran tal cual.
+- **Nada de pagos**: nunca mostrar precios, “comprar”, “suscribirse”, “mejorar plan” ni mencionar cobros (regla de Apple 3.1.3). Los planes los asigna la institución. Al topar un límite: *“Esta función tiene un límite en su plan actual. Consulte con su institución.”*
+- **Marca blanca**: colores, logo y escudo del colegio del **hijo seleccionado** (`children[].organization`). ppd solo aparece como “Powered by ppd” en el login y en Ajustes. Contraste AA: si el primario no da contraste, use `colors.on_primary`.
+- **Seguridad**:
+  - Login con `X-App-Platform: android` o `ios`. Token en almacenamiento seguro; se envía como `Authorization: Bearer <token>` y siempre `Accept: application/json`.
+  - **401** → borrar token y volver al login. **403** → mostrar `error.message`. `password_change_required` → pantalla obligatoria de cambio de contraseña.
+  - El token vence a los 30 días: al vencer, login de nuevo (no hay refresh).
+  - Nunca registrar (log) tokens, contraseñas ni datos de jugadores. Nada de secretos en el código.
+  - Solo HTTPS. Sin `WebView` para mostrar datos de la API.
+- **Idempotencia**: en las rutas ♻️ de `docs/API.md` envíe `Idempotency-Key` con un UUID **por acción del usuario**; si se reintenta por falla de red, **la misma** clave. Deshabilite el botón mientras envía.
+- **Errores**: decida por `error.code` y muestre `error.message`. `validation_failed` → `error.fields` debajo de cada campo (ya vienen en español).
+- **Privacidad**: el padre ve **solo a sus hijos** y **solo los datos de su hijo**. La App nunca pide ni muestra datos de otros jugadores.
+- **Borrar cuenta** dentro de la App (Ajustes → “Eliminar mi cuenta”, `DELETE /app/account` con contraseña). Es obligatorio para las tiendas.
+- **No hay partido en tiempo real**: el resultado llega cuando el coach publica la ficha.
+
+---
+
+## 5. Pantallas (primera versión)
+
+| Pantalla | API |
+|---|---|
+| Inicio de sesión (correo y contraseña) + “Olvidé mi contraseña” | `POST /auth/login`, `POST /auth/password/forgot` |
+| Cambiar contraseña (obligatoria si `must_change_password`) | `POST /auth/password` |
+| Si el usuario no es padre (`is_guardian=false`): *“Esta App es para padres y encargados. El personal del colegio usa pc.ppdguate.com.”* | — |
+| **Mis hijos** (selector arriba si hay más de uno; cambia la marca) | `GET /app/children` |
+| **Calendario** del hijo: próximos y pasados, partidos/entrenos/otros, marcador cuando exista, cancelados tachados | `GET /app/children/{id}/events?from=&to=` |
+| **Detalle del evento**: convocatoria y botones **Confirmar / No puede asistir**, asistencia (Asiste, No asiste con aviso, Lesión, No justificado), minutos, titular y estadísticas del hijo | `GET …/events/{eventId}`, `POST …/callup-response` ♻️ |
+| **Estadísticas** del hijo por deporte y asistencia | `GET /app/children/{id}/stats?team_id=` |
+| **Avisos** (bandeja) con no leídos | `GET /me/notifications`, `POST /me/notifications/read` |
+| **Ajustes**: datos de la cuenta, plan actual (solo informativo), hijo del plan Pro, cerrar sesión, eliminar cuenta | `GET /app/plan`, `POST /app/plan/pro-child`, `POST /auth/logout`, `DELETE /app/account` |
+
+Al cambiar de hijo o volver a la App, refresque. Sin conexión: muestre lo último cargado con un aviso “Sin conexión”.
+
+---
+
+## 6. Avisos push
+
+- Tras el login y cada vez que FCM renueve el token: `POST /me/devices {token, platform}`. Al cerrar sesión: `DELETE /me/devices {token}`.
+- Pida el permiso de notificaciones **después** del login, con una pantalla previa que explique para qué.
+- `data` del push (todo texto): `kind`, y según el caso `event_id`, `player_id`, `team_id`, `status`, `series_id`, `count`.
+- Tipos (`kind`) y a dónde lleva al tocarlo:
+
+| kind | Cuándo | Abrir |
+|---|---|---|
+| `callup` | Convocaron al hijo | Detalle del evento |
+| `trainings` | Se programaron uno o varios entrenos (un solo aviso, sin nombres) | Calendario del equipo |
+| `event_changed` / `event_cancelled` | Cambió fecha/lugar o se canceló | Detalle del evento |
+| `attendance` | El coach registró o corrigió la asistencia de un partido | Detalle del evento |
+| `match_result` | Se publicó el resultado | Detalle del evento |
+
+- Con la App abierta, muestre el aviso dentro de la App y actualice la bandeja.
+- **Emergencias (después)**: tendrá canal propio con sonido insistente y pantalla completa. Deje la estructura preparada (canal y manejo de `kind`), sin implementarla todavía.
+
+---
+
+## 7. Enlaces de invitación y restablecer contraseña
+
+Hoy los padres aceptan la invitación y restablecen la contraseña en la web: `https://ppdguate.com/invitacion?token=` y `https://ppdguate.com/restablecer?token=`. Más adelante la App abrirá esos enlaces directamente (App Links / Universal Links). Para eso el agente de backend publicará `assetlinks.json` y `apple-app-site-association` en ppdguate.com; usted le pasará en su PR el **SHA-256 del certificado de firma de Android** y el **Team ID de Apple** cuando existan. Mientras tanto, la App solo ofrece **iniciar sesión**.
+
+---
+
+## 8. Cuenta para probar
+
+Organización de demostración **`colegio-demo`**. El dueño le dará el correo de una cuenta de **padre demo** y su contraseña **fuera del chat público y fuera de GitHub** (nunca en el código, issues ni PR).
+
+---
+
+## 9. Orden sugerido de PR
+
+1. `app/base`: proyecto, estructura, tema con marca blanca, cliente HTTP (errores, idempotencia, 401), login, cambio de contraseña, prueba del flujo.
+2. `app/hijos-calendario`: Mis hijos, calendario, detalle y respuesta a la convocatoria.
+3. `app/estadisticas-avisos`: estadísticas, bandeja, push (Firebase).
+4. `app/ajustes`: plan informativo, hijo Pro, cerrar sesión, eliminar cuenta.
+5. `app/tiendas`: íconos, pantalla de inicio, textos legales, preparación para Google Play y App Store (con el dueño).

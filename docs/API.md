@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.9 (2026-11-27)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.10 (2026-11-27)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -69,7 +69,7 @@ Ruteo sugerido tras el login: `memberships` no vacío → PC (si hay varias orga
 | GET | `/me/notifications` | Bandeja: `data[{id,kind,title,body,data,organization_id,player_id,read,created_at}]`, `meta.unread` |
 | POST | `/me/notifications/read` | `{ids?: [..]}` sin ids = todas |
 
-Tipos de aviso (`kind`): `callup`, `match_result`, `event_changed`, `event_cancelled`. El push trae en `data`: `kind`, `event_id`, `player_id`, `team_id` (todo texto). Canal Android: `general`.
+Tipos de aviso (`kind`): `callup`, `trainings`, `event_changed`, `event_cancelled`, `attendance`, `match_result`. El push trae en `data` (todo texto): `kind` y según el caso `event_id`, `player_id`, `team_id`, `status`, `series_id`, `count`. Canal Android: `general` (más adelante `emergencias`).
 
 ---
 

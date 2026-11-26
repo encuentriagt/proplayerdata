@@ -13,3 +13,16 @@
 .DS_Store
 node_modules/
 vendor/
+
+# App (Flutter): firmas y credenciales nunca al repositorio
+*.jks
+*.keystore
+key.properties
+*.mobileprovision
+*.p12
+*.cer
+app/android/local.properties
+app/ios/Flutter/Generated.xcconfig
+app/.dart_tool/
+app/build/
+**/service-account*.json

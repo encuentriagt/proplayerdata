@@ -24,6 +24,11 @@ class Event extends Model
         ];
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class)->withTrashed();

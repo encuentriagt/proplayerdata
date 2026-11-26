@@ -233,6 +233,7 @@ final class OrgAccess
             'manage_seasons' => $this->isAdmin(),
             'manage_plans' => $this->isAdmin(),
             'manage_sports' => $this->isAdmin(),
+            'staff_alerts' => $this->isAdmin(), // puede activar avisos opcionales (partido publicado)
             'manage_positions' => $this->visibleSportIds(),
             'manage_branding' => $this->isAdmin() && $this->organization->branding_editable_by_org,
             'create_teams' => $this->isAdmin() ? 'all' : $this->directorScope()['sport_ids'],

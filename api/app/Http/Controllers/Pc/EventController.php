@@ -149,6 +149,9 @@ class EventController extends Controller
             // Entreno con notify: un solo aviso por padre, sin nombres. Si no, el aviso de convocatoria de siempre.
             $trainingNotice ? $this->notifier->trainingsScheduled(collect([$event]), $ids, "event:{$event->id}") : $this->notifier->callups($event, $ids);
         }
+        if ($publish && $event->type === 'match') {
+            $this->notifier->matchPublished($event, $access->user->id);
+        }
         Audit::log('event.created', $event, ['type' => $event->type, 'team_id' => $team->id, 'draft' => ! $publish], $organization->id);
 
         return response()->json(['data' => $event->load('team:id,name')->payload()], 201);
@@ -262,6 +265,9 @@ class EventController extends Controller
             $withAttendance = Attendance::where('event_id', $event->id)->pluck('player_id')->map(fn ($i) => (int) $i)->all();
             if ($withAttendance && $event->type === 'match') {
                 $this->notifier->attendance($event, $withAttendance);
+            }
+            if ($event->type === 'match') {
+                $this->notifier->matchPublished($event, $access->user->id);
             }
             Audit::log('event.published', $event, ['callups' => count($called)], $organization->id);
         }

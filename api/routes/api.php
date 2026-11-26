@@ -90,6 +90,8 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     // ---- PC: Plataforma Coach (coach, director, org_admin) ----
     Route::prefix('pc/orgs/{organization:slug}')->middleware('org')->scopeBindings()->group(function () {
         Route::get('access', \App\Http\Controllers\Pc\AccessController::class);
+        Route::get('notification-prefs', [\App\Http\Controllers\Pc\NotificationPrefsController::class, 'show']);
+        Route::put('notification-prefs', [\App\Http\Controllers\Pc\NotificationPrefsController::class, 'update']);
         Route::get('sports', [\App\Http\Controllers\Pc\SportController::class, 'index']);
         Route::put('sports', [\App\Http\Controllers\Pc\SportController::class, 'update']);
         Route::post('sports/{sportId}/positions', [\App\Http\Controllers\Pc\PositionController::class, 'store'])->whereNumber('sportId')->middleware('idempotent');
@@ -160,6 +162,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'active', 'superadmin', 'thr
     Route::post('organizations/{organization}/branding/{kind}', [OrganizationAdminController::class, 'branding'])->whereIn('kind', ['logo', 'crest', 'cover']);
     Route::post('organizations/{organization}/invitations', [OrganizationAdminController::class, 'invite'])->middleware('idempotent');
     Route::get('organizations/{organization}/members', [OrganizationAdminController::class, 'members']);
+
+    Route::get('notification-prefs', [\App\Http\Controllers\Admin\NotificationPrefsAdminController::class, 'show']);
+    Route::put('notification-prefs', [\App\Http\Controllers\Admin\NotificationPrefsAdminController::class, 'update']);
 
     Route::get('sports', [SportAdminController::class, 'index']);
     Route::post('sports', [SportAdminController::class, 'store']);

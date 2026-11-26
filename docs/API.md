@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.10 (2026-11-27)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.11 (2026-11-28)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -69,7 +69,7 @@ Ruteo sugerido tras el login: `memberships` no vacío → PC (si hay varias orga
 | GET | `/me/notifications` | Bandeja: `data[{id,kind,title,body,data,organization_id,player_id,read,created_at}]`, `meta.unread` |
 | POST | `/me/notifications/read` | `{ids?: [..]}` sin ids = todas |
 
-Tipos de aviso (`kind`): `callup`, `trainings`, `event_changed`, `event_cancelled`, `attendance`, `match_result`. El push trae en `data` (todo texto): `kind` y según el caso `event_id`, `player_id`, `team_id`, `status`, `series_id`, `count`. Canal Android: `general` (más adelante `emergencias`).
+Tipos de aviso (`kind`): `callup`, `trainings`, `event_changed`, `event_cancelled`, `attendance`, `match_result` (padres) y `match_published` (staff que lo activó). El push trae en `data` (todo texto): `kind` y según el caso `event_id`, `player_id`, `team_id`, `status`, `series_id`, `count`. Canal Android: `general` (más adelante `emergencias`).
 
 ---
 
@@ -86,6 +86,7 @@ Permisos (v1.4, ver `docs/ARQUITECTURA.md` §2): **admin** todo · **director t�
   "manage_directors": false,                     // solo admin: alcance de directores
   "manage_seasons": false, "manage_plans": false, "manage_branding": false,
   "manage_sports": false,                        // solo admin: activar/desactivar deportes de la organización
+  "staff_alerts": false,                         // solo admin: puede activar avisos opcionales (GET/PUT notification-prefs)
   "manage_positions": [1],                       // ids de deportes donde puede editar posiciones (admin: activados; director: su alcance; coach: deportes de sus equipos)
   "create_teams": [1, 5],                        // "all" (admin: todos los ACTIVADOS) | ids de deportes donde puede crear equipos | []
   "delete_players": false,
@@ -108,6 +109,7 @@ Códigos y nombres de deporte en inglés (`soccer`/Soccer, `futsal`/Futsal, `bas
 | PUT | `sports` | admin (`manage_sports`) | `{sport_ids:[...]}` reemplaza la lista (repetirlo no cambia nada). Desactivar un deporte con equipos → 422 `sport_in_use` con `error.sport_ids`. Al desactivar se quita ese deporte del alcance de los directores. Al activar se copian las posiciones del catálogo (solo la primera vez; reactivar conserva la lista editada). Responde la lista nueva |
 | POST ♻️ | `sports/{sportId}/positions` | `manage_positions` | `{name, code?, sort?}`. Sin `code` se genera (p. ej. "LIB", "LIB2"). Nombre repetido o código tomado → 422 |
 | PATCH | `positions/{id}` | `manage_positions` | `{name?, sort?}` |
+| GET / PUT | `notification-prefs` | admin (`staff_alerts`) | `{match_published: bool}`. Si está activo, el admin recibe un aviso `match_published` («Partido publicado: {equipo} vs {rival}» · «{colegio}: {fecha}. Convocados: N.») cada vez que se publica un partido de su organización (no si lo publicó él). Desactivado por defecto. Se recibe en la bandeja (`/me/notifications`) y por push en los dispositivos que tenga registrados |
 | DELETE | `positions/{id}` | `manage_positions` | 422 `position_in_use` (con `error.players`) si algún jugador la tiene en una plantilla activa. Las fichas pasadas no bloquean y conservan el nombre (`lineup[].position_name`) |
 
 ### Temporadas y equipos
@@ -219,6 +221,7 @@ Requiere `is_super_admin` + TOTP verificado en la sesión (`/auth/totp/verify`).
 
 | Método | Ruta | Notas |
 |---|---|---|
+| GET / PUT | `notification-prefs` | Avisos opcionales del super admin: `{match_published: bool, organization_ids: null\|[ids]}` (`null` = todas las organizaciones). Mismo aviso `match_published` que el admin del colegio |
 | GET | `organizations?search=&status=` | paginado |
 | POST ♻️ | `organizations` | `{name, slug, type(school\|team), color_primary?, color_secondary?, color_on_primary?, quota_pro?, quota_premium?, branding_editable_by_org?, contact_email?, contact_phone?, notes?, admin_email?}` → `meta.admin_invite_url` |
 | GET / PATCH | `organizations/{id}` | PATCH acepta lo mismo + `status: active\|suspended` |

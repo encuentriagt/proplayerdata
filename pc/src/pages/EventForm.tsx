@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Users } from 'lucide-react'
 import { ApiError, newIdempotencyKey, request, requestIdempotent } from '../lib/api'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { fromInputValue, toInputValue } from '../lib/dates'
+import { fromInputValue, nowGt, toInputValue, ymd } from '../lib/dates'
 import { EVENT_TYPE } from '../lib/labels'
 import { pcPath, useOrg } from '../lib/org'
 import { useEvent, usePcMutation, useRoster, useTeams } from '../lib/queries'
@@ -114,6 +114,7 @@ export function EventFormPage() {
   }, [f.team_id, editing, existing.data])
   const missingPublish = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora', !f.opponent_name.trim() && 'rival', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
   const missingTraining = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
+  const seriesPastNotice = 'La serie debe empezar hoy o después.'
   const callupsBody = () => called.map((player_id) => ({ player_id, status: 'called' as const }))
 
   const qc = useQueryClient()
@@ -173,7 +174,9 @@ export function EventFormPage() {
   const isSeries = !editing && f.type === 'training' && rec.repeat
   const seriesUntil = untilDate(startDate, rec.mode, rec.custom)
   const seriesCount = isSeries ? seriesDates(startDate, seriesUntil, rec.weekdays).length : 0
-  const seriesOk = seriesCount > 0 && seriesCount <= MAX_SERIES
+  // La API solo crea series que empiezan hoy o después (hora de Guatemala).
+  const seriesInPast = isSeries && !!startDate && startDate < ymd(nowGt())
+  const seriesOk = seriesCount > 0 && seriesCount <= MAX_SERIES && !seriesInPast
   // Confirmación antes de crear entrenos: muestra el aviso que recibirán los padres (sin nombres de jugadores).
   const [confirmTraining, setConfirmTraining] = useState(false)
   const teamName = teamOptions.find((t) => String(t.id) === f.team_id)?.name ?? 'el equipo'
@@ -306,6 +309,7 @@ export function EventFormPage() {
         {!editing && isTraining && (missingTraining.length > 0) && (
           <p className="text-right text-sm text-amber-900" aria-live="polite">Para crear el entreno falta: {listar(missingTraining)}.</p>
         )}
+        {seriesInPast && <p className="text-right text-sm text-warn-ink" aria-live="polite">{seriesPastNotice}</p>}
         {isMatch && (!editing || isDraft) && (missingDraft.length > 0 || missingPublish.length > 0) && (
           <div className="flex gap-2 text-sm text-warn-ink" aria-live="polite">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />

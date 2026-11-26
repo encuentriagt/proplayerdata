@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import { ApiError } from '../../lib/api'
 import { usePcMutation, useOrgSports, useSports, useTeams } from '../../lib/queries'
-import { sportIcon } from '../../lib/sport'
+import { SportIcon } from '../../components/SportIcon'
 import { Alert, ErrorAlert, Spinner } from '../../components/ui'
 
 /**
@@ -62,7 +62,7 @@ export function AdminSports() {
             <li key={s.id}>
               <label className={`card flex min-h-20 cursor-pointer items-center gap-3 p-3 ring-2 ${on ? 'ring-org' : 'ring-transparent'} ${locked ? 'cursor-default' : ''} ${inUseIds.includes(s.id) ? 'ring-red-600' : ''}`}>
                 <input type="checkbox" className="sr-only" checked={on} disabled={locked} onChange={(e) => toggle(s.id, e.target.checked)} />
-                <span aria-hidden className="text-4xl leading-none">{sportIcon(s.code)}</span>
+                <span className="grid size-12 shrink-0 place-items-center rounded-[12px] bg-org-soft text-org-accent"><SportIcon code={s.code} size={28} /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-bold">{s.name}</span>
                   <span className="text-xs text-black/60">

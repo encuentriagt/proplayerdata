@@ -9,7 +9,7 @@ import {
 import { fmt } from '../../lib/dates'
 import type { EventDetail, PcEvent, RosterEntry } from '../../lib/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Alert, Avatar, Empty, ErrorAlert, Spinner } from '../../components/ui'
+import { Alert, Empty, ErrorAlert, Spinner } from '../../components/ui'
 
 export function MatchSheetTab({ event }: { event: EventDetail }) {
   const roster = useRoster(event.team_id)
@@ -68,7 +68,7 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
     update((s) => ({ ...s, lineup: { ...s.lineup, [id]: { ...row(id), ...patch } } }))
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="flex flex-col gap-4 pb-28 lg:pb-0">
       {draftOffer && draft && (
         <Alert tone="warning" title="Hay un borrador sin enviar en este dispositivo">
           Guardado el {fmt(draft.savedAt, "d 'de' MMM, HH:mm")}.
@@ -90,15 +90,15 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
       )}
 
       {/* Marcador */}
-      <section aria-labelledby="score-h" className="card p-4">
-        <h2 id="score-h" className="title mb-3 text-xl">Marcador</h2>
-        <div className="flex items-start justify-center gap-1 sm:gap-8">
-          <ScoreInput label="Nosotros" value={state.score_us} onChange={(v) => update((s) => ({ ...s, score_us: v }))} />
-          <span className="mt-8 font-display text-3xl font-extrabold italic text-black/30" aria-hidden>–</span>
+      <section aria-labelledby="score-h" className="card px-4 py-5">
+        <h2 id="score-h" className="sr-only">Marcador</h2>
+        <div className="flex items-start justify-center gap-2 sm:gap-10">
+          <ScoreInput label="Nosotros" primary value={state.score_us} onChange={(v) => update((s) => ({ ...s, score_us: v }))} />
+          <span className="num mt-10 text-3xl text-muted" aria-hidden>–</span>
           <ScoreInput label={event.opponent_name || 'Rival'} value={state.score_them} onChange={(v) => update((s) => ({ ...s, score_them: v }))} />
         </div>
         {state.stats.length > 0 && suggested !== state.score_us && (
-          <p className="mt-3 text-center text-sm text-amber-900">
+          <p className="mt-3 text-center text-sm text-warn-ink">
             Sus jugadores suman {suggested}.{' '}
             <button className="font-semibold underline" onClick={() => update((s) => ({ ...s, score_us: suggested }))}>Usar {suggested}</button>
           </p>
@@ -108,83 +108,120 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
       {/* Jugadores: alineación + estadísticas */}
       <section aria-labelledby="players-h" className="space-y-2">
         <div className="flex items-end justify-between">
-          <h2 id="players-h" className="title text-xl">Jugadores</h2>
-          <p className="text-sm text-black/60">{playing.length} jugaron · {playing.filter((p) => row(p.id).is_starter).length} titulares</p>
+          <h2 id="players-h" className="title text-2xl">Jugadores</h2>
+          <p className="text-sm text-muted">{playing.length} jugaron · {playing.filter((p) => row(p.id).is_starter).length} titulares</p>
         </div>
-        <ul className="space-y-2">
+        {/* Celular: filas que se expanden (diseño) */}
+        <ul className="space-y-2 lg:hidden">
           {players.map((p) => {
             const r = row(p.id)
             const expanded = open === p.id
-            const total = statTypes.reduce((n, t) => n + statCount(state, p.id, t.code), 0)
+            const summary = [
+              r.played ? (r.is_starter ? 'Titular' : 'Suplente') : 'No jugó',
+              r.minutes_played !== null ? `${r.minutes_played}'` : null,
+              ...statTypes.filter((t) => statCount(state, p.id, t.code)).map((t) => `${statCount(state, p.id, t.code)} ${t.name.toLowerCase()}`),
+            ].filter(Boolean).join(' · ')
             return (
               <li key={p.id} className={`card overflow-hidden ${r.played ? '' : 'opacity-70'}`}>
-                <div className="flex items-center gap-3 p-3">
-                  <input type="checkbox" className="size-6 shrink-0 accent-[var(--org-accent)]" checked={r.played}
+                <div className="flex items-center gap-3 px-3 py-2.5">
+                  <input type="checkbox" className="size-6 shrink-0 accent-[var(--org-primary)]" checked={r.played}
                     aria-label={`${p.full_name} jugó`} onChange={(e) => setRow(p.id, { played: e.target.checked, ...(e.target.checked ? {} : { is_starter: false }) })} />
-                  <Avatar name={p.full_name} url={p.photo_url} size={36} />
+                  <span className="num w-7 shrink-0 text-center text-2xl">{r.jersey_number ?? '–'}</span>
                   <button className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : p.id)}>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">
-                        {r.jersey_number !== null && <span className="text-black/50">#{r.jersey_number} </span>}{p.full_name}
-                      </span>
-                      <span className="text-xs text-black/60">
-                        {r.played ? (r.is_starter ? 'Titular' : 'Suplente') : 'No jugó'}
-                        {r.minutes_played !== null && ` · ${r.minutes_played} min`}
-                        {total > 0 && ` · ${statTypes.filter((t) => statCount(state, p.id, t.code)).map((t) => `${t.name} ${statCount(state, p.id, t.code)}`).join(', ')}`}
-                      </span>
+                      <span className="block truncate font-semibold">{p.full_name}</span>
+                      <span className="block truncate text-xs text-muted">{summary}</span>
                     </span>
                     <ChevronDown className={`size-5 shrink-0 transition ${expanded ? 'rotate-180' : ''}`} aria-hidden />
                   </button>
                 </div>
 
                 {expanded && (
-                  <div className="space-y-3 border-t border-black/5 bg-black/[0.02] p-3">
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      <label className="flex min-h-11 items-center gap-2 text-sm font-semibold">
-                        <input type="checkbox" className="size-5 accent-[var(--org-accent)]" checked={r.is_starter}
-                          onChange={(e) => setRow(p.id, { is_starter: e.target.checked, played: e.target.checked || r.played })} />
-                        Titular
-                      </label>
-                      <label className="text-sm">
-                        <span className="label">Posición</span>
-                        <select className="input" value={r.sport_position_id ?? ''} onChange={(e) => setRow(p.id, { sport_position_id: e.target.value ? Number(e.target.value) : null })}>
-                          <option value="">—</option>
-                          {sport.positions.map((pos) => <option key={pos.id} value={pos.id}>{pos.name}</option>)}
-                        </select>
-                      </label>
-                      <NumberInput label="Dorsal" value={r.jersey_number} max={999} onChange={(v) => setRow(p.id, { jersey_number: v })} />
-                      <NumberInput label="Minutos" value={r.minutes_played} max={600} onChange={(v) => setRow(p.id, { minutes_played: v, played: true })} />
+                  <div className="grid grid-cols-2 gap-3 border-t border-line bg-paper/60 p-3">
+                    <div className="col-span-2">
+                      <StarterToggle name={p.full_name} starter={r.is_starter} onChange={(v) => setRow(p.id, { is_starter: v, played: true })} />
                     </div>
+                    <label className="col-span-2 text-sm">
+                      <span className="label">Posición</span>
+                      <select className="input" value={r.sport_position_id ?? ''} onChange={(e) => setRow(p.id, { sport_position_id: e.target.value ? Number(e.target.value) : null })}>
+                        <option value="">—</option>
+                        {sport.positions.map((pos) => <option key={pos.id} value={pos.id}>{pos.name}</option>)}
+                      </select>
+                    </label>
+                    <NumberInput label="Dorsal" value={r.jersey_number} max={999} onChange={(v) => setRow(p.id, { jersey_number: v })} />
+                    <NumberInput label="Minutos" value={r.minutes_played} max={600} onChange={(v) => setRow(p.id, { minutes_played: v, played: true })} />
                   </div>
                 )}
 
-                {/* Estadísticas siempre visibles: + / − por cada tipo del deporte */}
+                {/* Estadísticas a la vista: en la cancha se anota sin abrir al jugador */}
                 {statTypes.length > 0 && (
-                  <div className="flex flex-wrap gap-2 border-t border-black/5 p-2">
-                    {statTypes.map((t) => {
-                      const n = statCount(state, p.id, t.code)
-                      return (
-                        <div key={t.code} className={`flex items-center rounded-xl ring-1 ${n ? 'bg-org/10 ring-org/40' : 'bg-white ring-black/10'}`}>
-                          <button type="button" className="grid size-10 place-items-center rounded-l-xl hover:bg-black/5 disabled:opacity-30" disabled={!n}
-                            aria-label={`Quitar ${t.name} a ${p.full_name}`} onClick={() => update((s) => tapMinus(s, p.id, t.code))}>
-                            <Minus className="size-4" aria-hidden />
-                          </button>
-                          <span className="min-w-16 px-1 text-center text-xs font-semibold leading-tight">
-                            {t.name}<span className="block text-base font-bold" aria-live="polite">{n}</span>
-                          </span>
-                          <button type="button" className="grid size-10 place-items-center rounded-r-xl hover:bg-black/5"
-                            aria-label={`Agregar ${t.name} a ${p.full_name}`} onClick={() => update((s) => tapPlus(s, p.id, t.code))}>
-                            <Plus className="size-4" aria-hidden />
-                          </button>
-                        </div>
-                      )
-                    })}
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-line px-3 py-2.5">
+                    {statTypes.map((t) => (
+                      <StatStepper key={t.code} label={t.name} player={p.full_name} value={statCount(state, p.id, t.code)}
+                        onMinus={() => update((s) => tapMinus(s, p.id, t.code))} onPlus={() => update((s) => tapPlus(s, p.id, t.code))} />
+                    ))}
                   </div>
                 )}
               </li>
             )
           })}
         </ul>
+
+        {/* Escritorio: tabla (diseño) */}
+        <div className="card hidden overflow-x-auto lg:block">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-line text-left">
+                <th className="caps px-3 py-3 font-semibold">Jugó</th>
+                <th className="caps px-1 py-3 font-semibold">#</th>
+                <th className="caps px-3 py-3 font-semibold">Jugador · {playing.length} jugaron</th>
+                <th className="caps px-3 py-3 text-center font-semibold">Titular</th>
+                <th className="caps px-3 py-3 text-center font-semibold">Minutos</th>
+                {statTypes.map((t) => <th key={t.code} className="caps px-2 py-3 text-center font-semibold">{t.name}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((p) => {
+                const r = row(p.id)
+                return (
+                  <tr key={p.id} className={`border-b border-line last:border-0 ${r.played ? '' : 'opacity-60'}`}>
+                    <td className="px-3 py-2">
+                      <input type="checkbox" className="size-5 accent-[var(--org-primary)]" checked={r.played}
+                        aria-label={`${p.full_name} jugó`} onChange={(e) => setRow(p.id, { played: e.target.checked, ...(e.target.checked ? {} : { is_starter: false }) })} />
+                    </td>
+                    <td className="px-1 py-2"><span className="num text-xl">{r.jersey_number ?? '–'}</span></td>
+                    <td className="px-3 py-2">
+                      <p className="font-semibold">{p.full_name}</p>
+                      <select className="-ml-1 bg-transparent text-xs text-muted focus:outline-none" aria-label={`Posición de ${p.full_name}`}
+                        value={r.sport_position_id ?? ''} onChange={(e) => setRow(p.id, { sport_position_id: e.target.value ? Number(e.target.value) : null })}>
+                        <option value="">Sin posición</option>
+                        {sport.positions.map((pos) => <option key={pos.id} value={pos.id}>{pos.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <StarterToggle name={p.full_name} starter={r.is_starter} onChange={(v) => setRow(p.id, { is_starter: v, played: true })} compact />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <RoundButton kind="minus" label={`Restar minutos a ${p.full_name}`} disabled={!r.minutes_played}
+                          onClick={() => setRow(p.id, { minutes_played: Math.max(0, (r.minutes_played ?? 0) - 5) })} />
+                        <span className="num w-8 text-center text-xl">{r.minutes_played ?? 0}</span>
+                        <RoundButton kind="plus" label={`Sumar minutos a ${p.full_name}`}
+                          onClick={() => setRow(p.id, { minutes_played: Math.min(600, (r.minutes_played ?? 0) + 5), played: true })} />
+                      </div>
+                    </td>
+                    {statTypes.map((t) => (
+                      <td key={t.code} className="px-2 py-2">
+                        <StatStepper label={t.name} player={p.full_name} value={statCount(state, p.id, t.code)} hideLabel
+                          onMinus={() => update((s) => tapMinus(s, p.id, t.code))} onPlus={() => update((s) => tapPlus(s, p.id, t.code))} />
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {/* Cambios (opcional) */}
@@ -215,8 +252,9 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
       </section>
 
       {/* Acciones fijas abajo para el celular */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-black/10 bg-white/95 p-3 backdrop-blur lg:left-64">
-        <div className="mx-auto flex max-w-6xl gap-2">
+      {/* Celular: barra fija abajo. Escritorio: arriba a la derecha (diseño). */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 p-3 backdrop-blur lg:static lg:order-first lg:border-0 lg:bg-transparent lg:p-0">
+        <div className="mx-auto flex max-w-6xl gap-2 lg:justify-end">
           {!published && (
             <button className="btn-secondary flex-1 sm:flex-none" disabled={save.isPending} onClick={() => save.mutate(false)}>
               {save.isPending && !confirmPublish ? 'Guardando…' : 'Guardar borrador'}
@@ -240,21 +278,32 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
   )
 }
 
-function ScoreInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function ScoreInput({ label, value, onChange, primary = false }: { label: string; value: number; onChange: (v: number) => void; primary?: boolean }) {
   const id = `score-${label}`
   return (
     <div className="flex flex-col items-center">
-      <label htmlFor={id} className="mb-1 max-w-32 truncate text-sm font-semibold">{label}</label>
-      <div className="flex items-center gap-0.5 sm:gap-1">
-        <button type="button" className="grid size-10 sm:size-11 place-items-center rounded-xl bg-black/5 disabled:opacity-30" disabled={value <= 0}
-          aria-label={`Restar a ${label}`} onClick={() => onChange(Math.max(0, value - 1))}><Minus className="size-5" aria-hidden /></button>
+      <label htmlFor={id} className="caps mb-2 max-w-36 truncate">{label}</label>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <RoundButton kind="minus" label={`Restar a ${label}`} disabled={value <= 0} onClick={() => onChange(Math.max(0, value - 1))} size="lg" />
         <input id={id} type="number" inputMode="numeric" min={0} max={999} value={value}
           onChange={(e) => onChange(Math.min(999, Math.max(0, Number(e.target.value) || 0)))}
-          className="h-12 w-14 rounded-xl border border-black/20 text-center font-display text-3xl sm:h-auto sm:w-20 sm:text-4xl font-extrabold italic" />
-        <button type="button" className="grid size-10 sm:size-11 place-items-center rounded-xl bg-black/5"
-          aria-label={`Sumar a ${label}`} onClick={() => onChange(Math.min(999, value + 1))}><Plus className="size-5" aria-hidden /></button>
+          className="num h-16 w-14 bg-transparent text-center text-6xl focus:outline-none sm:w-20" />
+        <RoundButton kind="plus" label={`Sumar a ${label}`} filled={primary} onClick={() => onChange(Math.min(999, value + 1))} size="lg" />
       </div>
     </div>
+  )
+}
+
+/** Botón redondo − / + del diseño: − con borde; + relleno con el color del colegio (o con borde). */
+function RoundButton({ kind, label, onClick, disabled, filled = true, size = 'md' }: { kind: 'plus' | 'minus'; label: string; onClick: () => void; disabled?: boolean; filled?: boolean; size?: 'md' | 'lg' }) {
+  const dim = size === 'lg' ? 'size-11' : 'size-8'
+  const Icon = kind === 'plus' ? Plus : Minus
+  const look = kind === 'plus' && filled ? 'bg-org text-on-org hover:brightness-110' : 'border border-line bg-surface text-ink hover:bg-black/5'
+  return (
+    <button type="button" aria-label={label} disabled={disabled} onClick={onClick}
+      className={`grid ${dim} shrink-0 place-items-center rounded-full disabled:opacity-35 ${look}`}>
+      <Icon className={size === 'lg' ? 'size-5' : 'size-4'} aria-hidden />
+    </button>
   )
 }
 
@@ -277,5 +326,32 @@ function PlayerSelect({ label, players, value, onChange }: { label: string; play
         {players.map((p) => <option key={p.id} value={p.id}>{p.jersey_number !== null ? `#${p.jersey_number} ` : ''}{p.full_name}</option>)}
       </select>
     </label>
+  )
+}
+
+/** Estadística: − número + (diseño). Las etiquetas accesibles se mantienen ("Agregar Gol a Ana López"). */
+function StatStepper({ label, player, value, onMinus, onPlus, hideLabel = false }: { label: string; player: string; value: number; onMinus: () => void; onPlus: () => void; hideLabel?: boolean }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5">
+      {!hideLabel && <span className="mr-0.5 text-xs font-semibold text-muted">{label}</span>}
+      <RoundButton kind="minus" label={`Quitar ${label} a ${player}`} disabled={!value} onClick={onMinus} />
+      <span className="num w-6 text-center text-xl" aria-live="polite">{value}</span>
+      <RoundButton kind="plus" label={`Agregar ${label} a ${player}`} onClick={onPlus} />
+    </div>
+  )
+}
+
+/** Titular / Suplente segmentado (diseño "Tit. | Sup."). */
+function StarterToggle({ name, starter, onChange, compact = false }: { name: string; starter: boolean; onChange: (v: boolean) => void; compact?: boolean }) {
+  const opts: [boolean, string][] = [[true, compact ? 'Tit.' : 'Titular'], [false, compact ? 'Sup.' : 'Suplente']]
+  return (
+    <div role="group" aria-label={`Titular o suplente: ${name}`} className="inline-flex rounded-[10px] bg-[#e4e2e1] p-0.5">
+      {opts.map(([v, t]) => (
+        <button key={t} type="button" aria-pressed={starter === v} onClick={() => onChange(v)}
+          className={`min-h-9 rounded-[8px] px-3 text-sm font-semibold ${starter === v ? 'bg-surface text-ink shadow-sm' : 'text-muted'}`}>
+          {t}
+        </button>
+      ))}
+    </div>
   )
 }

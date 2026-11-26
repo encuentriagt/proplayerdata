@@ -21,8 +21,10 @@ describe('color', () => {
     expect(readableOn('#0B1F4D', null)).toBe('#FFFFFF')
   })
 
-  it('oscurece el acento si el primario es muy claro', () => {
-    expect(accentOnLight('#FFE14D')).toBe('#201E1D')
+  it('primario como texto: se oscurece hasta 4.5:1 sobre el papel', () => {
+    const amarillo = accentOnLight('#FFE14D')
+    expect(amarillo).not.toBe('#FFE14D')
+    expect(contrast(amarillo, '#F3F2F2')).toBeGreaterThanOrEqual(4.5)
     expect(accentOnLight('#0B1F4D')).toBe('#0B1F4D')
   })
 

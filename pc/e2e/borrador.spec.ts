@@ -16,7 +16,8 @@ async function entrar(page: Page) {
   await page.getByRole('button', { name: 'Ingresar' }).click()
   await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
 }
-const manana = () => new Date(Date.now() + 864e5).toISOString().slice(0, 10)
+// "Mañana" en hora de Guatemala (UTC−6), igual que la PC
+const manana = () => new Date(Date.now() - 6 * 3600e3 + 864e5).toISOString().slice(0, 10)
 
 test('Borrador: se guarda sin publicar, se ve gris con "No publicado", se edita y se publica', async ({ page }) => {
   const api = mockApi(page)
@@ -346,4 +347,16 @@ test('Guardar borrador: basta equipo y fecha; la hora queda "por definir"', asyn
   await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click()
   const patch = api.calls.filter((c) => c.method === 'PATCH').at(-1)!
   expect(patch.body).toMatchObject({ starts_at: `${manana()} 16:00`, time_pending: false })
+})
+
+test('Entreno recurrente: la serie debe empezar hoy o después (regla de la API)', async ({ page }) => {
+  mockApi(page)
+  await entrar(page)
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=training')
+  const ayer = new Date(Date.now() - 6 * 3600e3 - 864e5).toISOString().slice(0, 10)
+  await fechaHora(page, ayer, '15:30')
+  await convocar(page)
+  await page.getByRole('checkbox', { name: 'Se repite' }).check()
+  await expect(page.getByText('La serie debe empezar hoy o después.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Crear .*entrenos$/ })).toBeDisabled()
 })

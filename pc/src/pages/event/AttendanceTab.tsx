@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { ATTENDANCE, ATTENDANCE_ORDER, normalizeAttendance } from '../../lib/labels'
 import { usePcMutation, useRoster } from '../../lib/queries'
 import type { AttendanceStatus, EventDetail } from '../../lib/types'
-import { Alert, Avatar, Empty, ErrorAlert, Spinner } from '../../components/ui'
+import { Check, X } from 'lucide-react'
+import { Alert, Empty, ErrorAlert, Spinner } from '../../components/ui'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 export function AttendanceTab({ event }: { event: EventDetail }) {
@@ -61,38 +62,42 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
         </Alert>
       )}
       <ErrorAlert error={save.error} />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-black/70">
-          {counts.map(([s, n]) => <span key={s} className="mr-3"><strong>{n}</strong> {ATTENDANCE[s].label}</span>)}
-        </p>
-        <button className="btn-secondary" onClick={allPresent}>Todos asisten</button>
-      </div>
+      {/* Resumen en etiquetas de color (diseño) */}
+      <p className="flex flex-wrap items-center gap-1.5 text-sm">
+        {counts.map(([st, n]) => <span key={st} className={`chip px-2.5 py-1 text-[13px] ${ATTENDANCE[st].soft}`}><strong>{n}</strong> {ATTENDANCE[st].label}</span>)}
+        <span className="ml-1 font-semibold text-muted">Sin marcar {missing}</span>
+      </p>
+      <button className="btn min-h-10 w-full border border-ink bg-transparent text-ink hover:bg-black/5" onClick={allPresent}>
+        <Check className="size-4" aria-hidden /> Todos asisten
+      </button>
 
-      <ul className="card divide-y divide-black/5">
+      <ul className="space-y-2">
         {players.map((p) => (
-          <li key={p.id} className="flex flex-wrap items-center gap-3 p-3">
-            <Avatar name={p.full_name} url={p.photo_url} size={36} />
-            <p className="min-w-0 flex-1 truncate font-semibold">
-              {p.jersey_number !== null && <span className="text-black/50">#{p.jersey_number} </span>}{p.full_name}
-            </p>
+          <li key={p.id} className="card flex items-center gap-3 px-3 py-2.5">
+            <span className="num w-7 shrink-0 text-center text-2xl">{p.jersey_number ?? '–'}</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold">{p.full_name}</p>
+              <p className="truncate text-xs text-muted">{p.position?.name ?? 'Sin posición'}</p>
+            </div>
             <div className="flex gap-1" role="group" aria-label={`Asistencia de ${p.full_name}`}>
               {(() => {
                 const chosen = sel[p.id]
-                // Elegido: un solo botón con el nombre completo; al tocarlo se quita la marca.
+                // Elegido: un solo botón con el nombre completo y una ×; al tocarlo se quita la marca.
                 if (chosen) {
                   return (
                     <button type="button" aria-pressed="true" aria-label={`${ATTENDANCE[chosen].label} (tocar para quitar)`}
                       onClick={() => set(p.id, chosen)}
-                      className={`min-h-11 min-w-[11.75rem] rounded-xl px-4 text-sm font-bold ${ATTENDANCE[chosen].cls}`}>
+                      className={`flex min-h-11 w-[11.75rem] items-center justify-between rounded-[10px] px-3.5 text-sm font-bold ${ATTENDANCE[chosen].cls}`}>
                       {ATTENDANCE[chosen].label}
+                      <X className="size-4" aria-hidden />
                     </button>
                   )
                 }
-                return ATTENDANCE_ORDER.map((s) => (
-                  <button key={s} type="button" aria-pressed="false" title={ATTENDANCE[s].label} aria-label={ATTENDANCE[s].label}
-                    onClick={() => set(p.id, s)}
-                    className="size-11 rounded-xl bg-white text-sm font-bold ring-1 ring-black/15 hover:bg-black/5">
-                    {ATTENDANCE[s].short}
+                return ATTENDANCE_ORDER.map((st) => (
+                  <button key={st} type="button" aria-pressed="false" title={ATTENDANCE[st].label} aria-label={ATTENDANCE[st].label}
+                    onClick={() => set(p.id, st)}
+                    className={`size-11 rounded-[10px] border-[1.5px] bg-surface text-sm font-bold hover:bg-black/5 ${ATTENDANCE[st].outline}`}>
+                    {ATTENDANCE[st].short}
                   </button>
                 ))
               })()}
@@ -100,10 +105,10 @@ export function AttendanceTab({ event }: { event: EventDetail }) {
           </li>
         ))}
       </ul>
-      <p className="text-xs text-black/60">A = asiste · NA = no asiste (con aviso) · L = lesión · NJ = no justificado</p>
+      <p className="text-xs text-muted">A = asiste · NA = no asiste (con aviso) · L = lesión · NJ = no justificado</p>
 
-      <div className="sticky bottom-0 -mx-4 bg-ppd-bg/95 px-4 py-3 backdrop-blur">
-        <button className="btn-primary w-full sm:w-auto" disabled={!dirty || save.isPending || !hasChanges} onClick={() => (event.is_draft ? save.mutate() : (save.reset(), setConfirm(true)))}>
+      <div className="sticky bottom-0 -mx-4 bg-paper/95 px-4 py-3 backdrop-blur">
+        <button className="btn-primary min-h-12 w-full sm:w-auto" disabled={!dirty || save.isPending || !hasChanges} onClick={() => (event.is_draft ? save.mutate() : (save.reset(), setConfirm(true)))}>
           {save.isPending ? 'Publicando…' : 'Guardar y publicar asistencia'}
         </button>
         {missing > 0 && <p className="mt-1 text-xs text-black/60">Faltan {missing} por marcar (se guardan solo los marcados).</p>}

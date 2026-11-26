@@ -6,25 +6,32 @@ import type { Branding } from '../lib/types'
 import { OrgLogo, PoweredBy } from '../components/OrgLogo'
 
 /** Pantalla de login/invitación con la marca de la organización (portada de fondo si existe). */
+/**
+ * Login, invitación y contraseñas con la marca del colegio (diseño): franja superior con el color del colegio
+ * (o su portada), logo en círculo blanco, nombre en titular y "Plataforma Coach"; debajo, el formulario.
+ * En escritorio es una tarjeta centrada.
+ */
 export function OrgAuthShell({ org, children }: { org: Branding; children: ReactNode }) {
   useEffect(() => applyTheme(org), [org])
   return (
-    <div className="relative grid min-h-dvh place-items-center bg-org p-4">
-      {org.cover_url && (
-        <>
-          <img src={org.cover_url} alt="" className="absolute inset-0 size-full object-cover" />
-          <div className="absolute inset-0 bg-black/45" aria-hidden />
-        </>
-      )}
-      <div className="relative w-full max-w-sm">
-        <div className="card p-6">
-          <div className="mb-5 flex flex-col items-center text-center">
-            <OrgLogo org={org} size={72} />
-            <p className="mt-3 text-lg font-semibold">{org.name}</p>
-            <p className="title text-xl text-org-accent">Plataforma Coach</p>
+    <div className="min-h-dvh bg-paper sm:grid sm:place-items-center sm:p-6">
+      <div className="flex min-h-dvh w-full flex-col overflow-hidden bg-paper sm:min-h-0 sm:max-w-md sm:rounded-[20px] sm:bg-surface sm:shadow-[0_12px_32px_rgba(45,43,43,0.18)]">
+        <header className="relative bg-org px-7 pb-8 pt-10 text-on-org">
+          {org.cover_url && (
+            <>
+              <img src={org.cover_url} alt="" className="absolute inset-0 size-full object-cover" />
+              <div className="absolute inset-0 bg-org/80" aria-hidden />
+            </>
+          )}
+          <div className="relative">
+            <OrgLogo org={org} size={76} onPrimary />
+            <p className="title mt-5 text-[40px] leading-[0.95]">{org.name}</p>
+            <p className="mt-1.5 font-semibold opacity-90">Plataforma Coach</p>
           </div>
-          {children}
-          <PoweredBy className="mt-6 text-center" />
+        </header>
+        <div className="flex flex-1 flex-col px-7 py-7">
+          <div className="flex-1">{children}</div>
+          <div className="mt-8 text-center"><PoweredBy /></div>
         </div>
       </div>
     </div>

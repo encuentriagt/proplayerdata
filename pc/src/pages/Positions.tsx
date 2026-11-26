@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Check, Pencil, Plus, Trash2, X } from 'lucide-react
 import { ApiError } from '../lib/api'
 import { useOrg } from '../lib/org'
 import { usePcMutation, useOrgSports } from '../lib/queries'
-import { useSport, sportIcon } from '../lib/sport'
+import { useSport } from '../lib/sport'
 import type { Position } from '../lib/types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SportSwitcher } from '../components/SportSwitcher'
@@ -99,7 +99,7 @@ export function PositionsPage() {
               {add.error instanceof ApiError && !Object.keys(add.error.fields).length && <div className="w-full"><ErrorAlert error={add.error} /></div>}
             </form>
           )}
-          <p className="text-xs text-black/60">{sportIcon(sport.code)} Las fichas de partidos pasados conservan el nombre de la posición aunque la cambie o la borre.</p>
+          <p className="text-xs text-black/60">Las fichas de partidos pasados conservan el nombre de la posición aunque la cambie o la borre.</p>
         </div>
       )}
 

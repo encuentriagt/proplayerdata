@@ -25,7 +25,7 @@ test('admin: activa un deporte del catálogo y aparece en el selector', async ({
   // El selector de deporte ahora lo ofrece (aunque aún no tenga equipos)
   await page.goto('/colegio-demo')
   await page.getByRole('button', { name: /Cambiar deporte/ }).click()
-  await expect(page.getByRole('option', { name: /Volleyball/ })).toContainText('🏐')
+  await expect(page.getByRole('option', { name: /Volleyball/ })).toBeVisible()
 })
 
 test('las listas piden a la API solo el deporte elegido (sport_id)', async ({ page }) => {
@@ -47,6 +47,6 @@ test('director y coach: sin pestaña Deportes', async ({ page }) => {
   mockApi(page, 'director')
   await entrar(page)
   await page.goto('/colegio-demo/admin/deportes')
-  await expect(page.getByRole('navigation', { name: 'Administración' }).getByRole('link', { name: 'Deportes' })).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: /dministración/ }).getByRole('link', { name: 'Deportes' })).toHaveCount(0)
   await expect(page).not.toHaveURL(/deportes/)
 })

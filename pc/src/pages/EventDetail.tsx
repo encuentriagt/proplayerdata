@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CalendarX, MapPin, Pencil, Trash2 } from 'lucide-react'
 import { capitalize, fmt } from '../lib/dates'
-import { EVENT_STATUS, EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle } from '../lib/labels'
+import { CHIP, EVENT_STATUS, EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle } from '../lib/labels'
+import { isPendingSheet } from '../components/EventCard'
 import { useOrg } from '../lib/org'
 import { useEvent, usePcMutation } from '../lib/queries'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -44,7 +45,7 @@ export function EventDetailPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'convocatoria', label: 'Convocatoria' },
     { key: 'asistencia', label: 'Asistencia' },
-    ...(e.type === 'match' ? [{ key: 'ficha' as Tab, label: 'Ficha' }] : []),
+    ...(e.type === 'match' ? [{ key: 'ficha' as Tab, label: 'Ficha del partido' }] : []),
   ]
   const isPast = !!e.starts_at && new Date(e.starts_at) < new Date()
   // Publicar un borrador: fecha, rival (partido) y al menos un convocado. Se completa con "Editar".
@@ -89,16 +90,17 @@ export function EventDetailPage() {
       )}
       <div className="mb-4">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`chip ${EVENT_TYPE_COLOR[e.type]}`}>{EVENT_TYPE[e.type]}</span>
-          {e.team_name && <Link to={`/${slug}/equipos/${e.team_id}`} className="chip bg-black/5 text-ink hover:bg-black/10">{e.team_name}</Link>}
-          <span className={`chip ${e.status === 'cancelled' ? 'bg-red-100 text-red-800' : e.status === 'finished' ? 'bg-emerald-100 text-emerald-800' : 'bg-black/5'}`}>
-            {EVENT_STATUS[e.status]}
-          </span>
+          <span className={`chip ${EVENT_TYPE_COLOR[e.type]}`}>{e.type === 'training' ? 'Entreno' : EVENT_TYPE[e.type]}</span>
+          {e.team_name && <Link to={`/${slug}/equipos/${e.team_id}`} className="chip bg-org-soft text-org-accent hover:brightness-95">{e.team_name}</Link>}
+          {e.is_draft ? <span className={`chip ${CHIP.draft}`}>No publicado</span>
+            : e.status === 'cancelled' ? <span className={`chip ${CHIP.cancelled}`}>Cancelado</span>
+            : isPendingSheet(e) ? <span className={`chip ${CHIP.pendingSheet}`}>Ficha pendiente</span>
+            : <span className={`chip ${e.status === 'finished' ? CHIP.ok : CHIP.neutral}`}>{EVENT_STATUS[e.status]}</span>}
         </div>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className={`title text-3xl sm:text-4xl ${e.status === 'cancelled' ? 'line-through opacity-60' : ''}`}>{eventTitle(e)}</h1>
-            <p className="mt-1 text-black/70">
+            <h1 className={`title text-[36px] sm:text-[48px] ${e.status === 'cancelled' ? 'line-through opacity-60' : ''}`}>{eventTitle(e)}</h1>
+            <p className="mt-1.5 text-muted">
               {e.starts_at
                 ? e.time_pending
                   ? `${capitalize(fmt(e.starts_at, "EEEE d 'de' MMMM"))} · Hora por definir`
@@ -107,7 +109,7 @@ export function EventDetailPage() {
               {e.ends_at && ` – ${fmt(e.ends_at, 'HH:mm')}`}
               {e.home_away && e.type === 'match' && ` · ${HOME_AWAY[e.home_away]}`}
             </p>
-            {e.location && <p className="flex items-center gap-1 text-black/60"><MapPin className="size-4" aria-hidden />{e.location}</p>}
+            {e.location && <p className="flex items-center gap-1 text-muted"><MapPin className="size-4" aria-hidden />{e.location}</p>}
           </div>
           {e.status === 'finished' && e.score_us !== null && (
             <p className="font-display text-5xl font-extrabold italic" aria-label={`Marcador ${e.score_us} a ${e.score_them}`}>{e.score_us}–{e.score_them}</p>
@@ -137,11 +139,12 @@ export function EventDetailPage() {
 
       {e.status !== 'cancelled' && (
         <>
-          <div role="tablist" aria-label="Secciones del evento" className="sticky top-[60px] z-10 -mx-4 mb-4 flex gap-1 overflow-x-auto bg-ppd-bg px-4 py-2 lg:top-0">
+          {/* Pestañas subrayadas (diseño) */}
+          <div role="tablist" aria-label="Secciones del evento" className="sticky top-[60px] z-10 -mx-4 mb-5 flex gap-6 overflow-x-auto border-b border-line bg-paper px-4 lg:top-0">
             {tabs.map((t) => (
               <button key={t.key} role="tab" aria-selected={tab === t.key} aria-controls={`panel-${t.key}`}
                 onClick={() => setParams({ tab: t.key }, { replace: true })}
-                className={`min-h-11 rounded-xl px-4 font-semibold ${tab === t.key ? 'bg-org text-on-org' : 'bg-white ring-1 ring-black/10'}`}>
+                className={`-mb-px min-h-12 shrink-0 border-b-[3px] px-0.5 ${tab === t.key ? 'border-org-accent font-semibold text-ink' : 'border-transparent text-muted hover:text-ink'}`}>
                 {t.label}
               </button>
             ))}

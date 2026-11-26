@@ -1,48 +1,82 @@
 @import 'tailwindcss';
-/* Fuentes de la marca ppd empaquetadas en el build (la CSP no permite Google Fonts). Subconjunto latino: cubre el español. */
+/* Fuentes de la línea gráfica ProPlayer (empaquetadas: la CSP no permite Google Fonts). Subconjunto latino: cubre el español.
+   Saira: textos e interfaz. Saira Extra Condensed: ExtraBold itálica en titulares y cifras; SemiBold en etiquetas y dorsales. */
 @import '@fontsource/saira/latin-400.css';
 @import '@fontsource/saira/latin-500.css';
 @import '@fontsource/saira/latin-600.css';
 @import '@fontsource/saira/latin-700.css';
+@import '@fontsource/saira-extra-condensed/latin-600.css';
 @import '@fontsource/saira-extra-condensed/latin-700.css';
 @import '@fontsource/saira-extra-condensed/latin-800.css';
 
-/* Variables de la organización (marca blanca). Se sobrescriben en tiempo de ejecución. */
+/* Variables del colegio (marca blanca). Se sobrescriben en tiempo de ejecución (lib/branding.ts). */
 :root {
-  --org-primary: #25984d;
+  --org-primary: #201e1d;
   --org-secondary: #d28316;
   --org-on-primary: #ffffff;
-  --org-accent: #25984d;
+  /* "Primario como texto": el primario oscurecido hasta 4.5:1 sobre el papel (enlaces, pestañas). */
+  --org-accent: #201e1d;
+  /* Tinte suave del primario: fondo del menú activo y de los mosaicos de íconos. */
+  --org-soft: color-mix(in srgb, var(--org-primary) 14%, #ffffff);
 }
 
 @theme {
   --font-sans: 'Saira', system-ui, sans-serif;
   --font-display: 'Saira Extra Condensed', 'Saira', system-ui, sans-serif;
+
+  /* Línea gráfica ProPlayer */
+  --color-paper: #f3f2f2;
   --color-ppd-bg: #f3f2f2;
+  --color-surface: #ffffff;
   --color-ink: #201e1d;
+  --color-muted: #57524f;
+  --color-line: #d6d3d1;
   --color-ppd-green: #25984d;
   --color-ppd-star: #d28316;
+  --color-ppd-cyan: #0088b0;
+  --color-ppd-leather: #9a5328;
+
+  /* Estados */
+  --color-ok: #1f7f41;
+  --color-ok-bg: #dcefe2;
+  --color-warn-bg: #fbeed6;
+  --color-warn-ink: #6b4100;
+  --color-err: #b3261e;
+  --color-err-bg: #f9e3e1;
+  --color-info-bg: #e3eef3;
+  --color-info-ink: #0b4f66;
+
+  /* Colegio */
   --color-org: var(--org-primary);
   --color-org-2: var(--org-secondary);
   --color-on-org: var(--org-on-primary);
   --color-org-accent: var(--org-accent);
+  --color-org-soft: var(--org-soft);
+
+  --radius-control: 10px;
+  --radius-card: 16px;
 }
 
 @layer base {
   html { -webkit-tap-highlight-color: transparent; }
-  body { @apply bg-ppd-bg text-ink font-sans antialiased; }
+  body { @apply bg-paper text-ink font-sans antialiased; }
   :focus-visible { outline: 3px solid var(--org-accent); outline-offset: 2px; }
   input, select, textarea { font-size: 16px; } /* evita zoom en iOS */
 }
 
 /* Componentes base (Tailwind 4: @utility para poder combinarlos con variantes) */
-@utility title { @apply font-display italic font-extrabold uppercase tracking-tight; }
-@utility card { @apply rounded-2xl bg-white shadow-sm ring-1 ring-black/5; }
-@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-11 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed; }
-@utility btn-primary { @apply btn bg-org text-on-org hover:brightness-95 active:brightness-90; }
-@utility btn-secondary { @apply btn bg-white text-ink ring-1 ring-black/15 hover:bg-black/5; }
-@utility btn-ghost { @apply btn text-ink hover:bg-black/5; }
-@utility btn-danger { @apply btn bg-red-700 text-white hover:bg-red-800; }
-@utility input { @apply w-full rounded-xl border border-black/20 bg-white px-3 min-h-11 text-ink placeholder:text-black/40 focus:border-org-accent focus:outline-none focus:ring-2 focus:ring-org-accent/30 aria-[invalid=true]:border-red-700; }
-@utility label { @apply mb-1 block text-sm font-semibold; }
+/* Titular: Saira Extra Condensed ExtraBold itálica, mayúsculas (56/40 pantalla, 24 sección). */
+@utility title { @apply font-display italic font-extrabold uppercase tracking-tight leading-none; }
+/* Etiqueta: Saira Extra Condensed SemiBold, mayúsculas espaciadas ("NOVIEMBRE 2026", "NOSOTROS"). */
+@utility caps { @apply font-display font-semibold uppercase tracking-[0.14em] text-xs text-muted; }
+/* Cifra: dorsales, días, marcador. */
+@utility num { @apply font-display italic font-extrabold leading-none; }
+@utility card { @apply rounded-[16px] bg-surface; }
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-4 min-h-11 font-semibold transition disabled:cursor-not-allowed; }
+@utility btn-primary { @apply btn bg-org text-on-org hover:brightness-110 active:brightness-95 disabled:bg-[#8f9db3] disabled:text-white/90; }
+@utility btn-secondary { @apply btn bg-surface text-ink border border-ink hover:bg-black/5 disabled:opacity-50; }
+@utility btn-ghost { @apply btn text-org-accent hover:bg-black/5 disabled:opacity-50; }
+@utility btn-danger { @apply btn bg-err text-white hover:brightness-110 disabled:opacity-50; }
+@utility input { @apply w-full rounded-[10px] border border-line bg-surface px-3.5 min-h-12 text-ink placeholder:text-black/40 focus:border-org-accent focus:outline-none focus:ring-2 focus:ring-org-accent/25 aria-[invalid=true]:border-err; }
+@utility label { @apply mb-1.5 block text-sm font-semibold; }
 @utility chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }

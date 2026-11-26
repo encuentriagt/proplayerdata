@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Users } from 'lucide-react'
+import { AlertTriangle, Users } from 'lucide-react'
 import { ApiError, newIdempotencyKey, request, requestIdempotent } from '../lib/api'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { fromInputValue, toInputValue } from '../lib/dates'
+import { fromInputValue, nowGt, toInputValue, ymd } from '../lib/dates'
 import { EVENT_TYPE } from '../lib/labels'
 import { pcPath, useOrg } from '../lib/org'
 import { useEvent, usePcMutation, useRoster, useTeams } from '../lib/queries'
@@ -114,6 +114,7 @@ export function EventFormPage() {
   }, [f.team_id, editing, existing.data])
   const missingPublish = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora', !f.opponent_name.trim() && 'rival', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
   const missingTraining = [!f.team_id && 'equipo', !startDate && 'fecha', !startTime && 'hora', called.length === 0 && 'al menos un convocado'].filter(Boolean) as string[]
+  const seriesPastNotice = 'La serie debe empezar hoy o después.'
   const callupsBody = () => called.map((player_id) => ({ player_id, status: 'called' as const }))
 
   const qc = useQueryClient()
@@ -173,7 +174,9 @@ export function EventFormPage() {
   const isSeries = !editing && f.type === 'training' && rec.repeat
   const seriesUntil = untilDate(startDate, rec.mode, rec.custom)
   const seriesCount = isSeries ? seriesDates(startDate, seriesUntil, rec.weekdays).length : 0
-  const seriesOk = seriesCount > 0 && seriesCount <= MAX_SERIES
+  // La API solo crea series que empiezan hoy o después (hora de Guatemala).
+  const seriesInPast = isSeries && !!startDate && startDate < ymd(nowGt())
+  const seriesOk = seriesCount > 0 && seriesCount <= MAX_SERIES && !seriesInPast
   // Confirmación antes de crear entrenos: muestra el aviso que recibirán los padres (sin nombres de jugadores).
   const [confirmTraining, setConfirmTraining] = useState(false)
   const teamName = teamOptions.find((t) => String(t.id) === f.team_id)?.name ?? 'el equipo'
@@ -217,7 +220,7 @@ export function EventFormPage() {
   return (
     <>
       <PageHeader title={editing ? (f.type === 'match' ? (isDraft ? 'Editar borrador' : 'Editar partido') : f.type === 'training' ? 'Editar entreno' : 'Editar actividad') : f.type === 'match' ? 'Nuevo partido' : f.type === 'training' ? 'Nuevo entreno' : 'Nueva actividad'} subtitle={f.type === 'training' ? undefined : 'Las horas son de Guatemala.'} />
-      <form onSubmit={submit} className="card max-w-2xl space-y-4 p-4 sm:p-6" noValidate>
+      <form onSubmit={submit} className="max-w-2xl space-y-5 sm:card sm:p-7" noValidate>
         <ErrorAlert error={formError} />
 
         <SelectField label="Equipo" value={f.team_id} onChange={(e) => set('team_id', e.target.value)} disabled={editing} required error={err('team_id')}>
@@ -237,10 +240,9 @@ export function EventFormPage() {
           </div>
         </fieldset>}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <DatePicker label="Fecha" value={startDate} onChange={setStartDate} error={err('starts_at')} />
-          </div>
+        {/* Fecha y hora lado a lado (diseño); atajos Hoy / Mañana debajo de la fecha */}
+        <div className="grid grid-cols-[1.25fr_1fr] gap-3">
+          <DatePicker label="Fecha" value={startDate} onChange={setStartDate} error={err('starts_at')} compact quick />
           <TimePicker label="Hora" value={startTime} onChange={setStartTime} />
         </div>
 
@@ -307,33 +309,43 @@ export function EventFormPage() {
         {!editing && isTraining && (missingTraining.length > 0) && (
           <p className="text-right text-sm text-amber-900" aria-live="polite">Para crear el entreno falta: {listar(missingTraining)}.</p>
         )}
+        {seriesInPast && <p className="text-right text-sm text-warn-ink" aria-live="polite">{seriesPastNotice}</p>}
         {isMatch && (!editing || isDraft) && (missingDraft.length > 0 || missingPublish.length > 0) && (
-          <div className="text-right text-sm text-amber-900" aria-live="polite">
-            {missingDraft.length > 0 && <p>Para guardar el borrador falta: {listar(missingDraft)}.</p>}
-            {missingPublish.length > 0 && <p>Para publicar falta: {listar(missingPublish)}.</p>}
+          <div className="flex gap-2 text-sm text-warn-ink" aria-live="polite">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <div>
+              {missingDraft.length > 0 && <p>Para guardar el borrador falta: {listar(missingDraft)}.</p>}
+              {missingPublish.length > 0 && <p>Para publicar falta: {listar(missingPublish)}.{missingDraft.length === 0 ? ' El borrador se puede guardar ya.' : ''}</p>}
+            </div>
           </div>
         )}
-        <div className="flex flex-wrap justify-end gap-2 pt-2">
-          <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
-          {isMatch && (!editing || isDraft) ? (
-            <>
+        {isMatch && (!editing || isDraft) ? (
+          // Diseño: publicar a lo ancho; debajo, Cancelar y Guardar borrador
+          <div className="space-y-2.5 pt-1 sm:flex sm:flex-row-reverse sm:items-center sm:gap-2 sm:space-y-0">
+            {/* Regla: para publicar un partido hace falta al menos un convocado. */}
+            <button type="button" className="btn-primary min-h-12 w-full sm:w-auto" disabled={busy || missingPublish.length > 0}
+              title={missingPublish.length ? `Para publicar falta: ${listar(missingPublish)}` : undefined}
+              onClick={() => (editing ? void saveDraft(true) : createPublished.mutate())}>
+              {createPublished.isPending || savingDraft === 'publish' ? 'Publicando…' : editing ? 'Guardar y publicar' : 'Crear partido y publicar'}
+            </button>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <button type="button" className="btn-ghost text-ink" onClick={() => navigate(-1)}>Cancelar</button>
               <button type="button" className="btn-secondary" disabled={busy || missingDraft.length > 0}
                 onClick={() => (editing ? void saveDraft(false) : createDraft.mutate())}>
                 {createDraft.isPending || savingDraft === 'draft' ? 'Guardando…' : 'Guardar borrador'}
               </button>
-              {/* Regla: para publicar un partido hace falta al menos un convocado. */}
-              <button type="button" className="btn-primary" disabled={busy || missingPublish.length > 0}
-                title={missingPublish.length ? `Para publicar falta: ${listar(missingPublish)}` : undefined}
-                onClick={() => (editing ? void saveDraft(true) : createPublished.mutate())}>
-                {createPublished.isPending || savingDraft === 'publish' ? 'Publicando…' : editing ? 'Guardar y publicar' : 'Crear partido y publicar'}
-              </button>
-            </>
-          ) : (
+            </div>
+          </div>
+        ) : (
+        <div className="flex flex-wrap justify-end gap-2 pt-2">
+          <button type="button" className="btn-ghost text-ink" onClick={() => navigate(-1)}>Cancelar</button>
+          {(
             <button className="btn-primary" disabled={busy || !f.team_id || !startOk || (isSeries && !seriesOk) || (isTraining && called.length === 0)}>
               {busy ? 'Guardando…' : editing ? 'Guarde los cambios' : isSeries ? `Crear ${seriesCount || ''} entrenos`.replace('  ', ' ') : f.type === 'training' ? 'Crear entreno' : 'Crear actividad'}
             </button>
           )}
         </div>
+        )}
       <ConfirmDialog open={confirmTraining} title={isSeries ? `¿Crear ${seriesCount} entrenos y avisar?` : '¿Crear el entreno y avisar?'}
         confirmLabel={isSeries ? `Crear ${seriesCount} y avisar` : 'Crear y avisar'} busy={createSeries.isPending || create.isPending}
         onConfirm={() => { if (isSeries) createSeries.mutate(); else create.mutate() }} onCancel={() => setConfirmTraining(false)}>

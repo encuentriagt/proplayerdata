@@ -19,7 +19,7 @@ const TABS: Tab[] = [
   { to: 'invitaciones', label: 'Invitaciones', show: (p) => p.manage_members },
 ]
 
-function useVisibleTabs() {
+export function useVisibleTabs() {
   const { can } = useOrg()
   const teams = useTeams()
   const some = (teams.data ?? []).some((t) => t.can_manage)
@@ -32,7 +32,7 @@ export function AdminLayout() {
   return (
     <>
       <PageHeader title="Administración" />
-      <nav aria-label="Administración" className="-mx-4 mb-5 flex gap-1 overflow-x-auto px-4 pb-1">
+      <nav aria-label="Administración" className="-mx-4 mb-5 flex gap-1 overflow-x-auto px-4 pb-1 lg:hidden">
         {tabs.map(({ to, label }) => (
           <NavLink key={to} to={`/${slug}/admin/${to}`}
             className={({ isActive }) => `min-h-11 shrink-0 rounded-xl px-4 py-2.5 font-semibold ${isActive ? 'bg-org text-on-org' : 'bg-white ring-1 ring-black/10'}`}>

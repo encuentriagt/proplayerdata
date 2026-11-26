@@ -1,20 +1,18 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ArrowRight, ChevronRight, Search } from 'lucide-react'
-import { useMutation } from '@tanstack/react-query'
+import { useEffect, type ReactNode } from 'react'
+import { Link, Navigate } from 'react-router-dom'
+import { ArrowRight, ChevronRight } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { applyTheme, themeFor, useBranding } from '../lib/branding'
 import { getLastOrg } from '../lib/session'
 import { initials } from '../lib/color'
-import { searchOrgs, type OrgResult } from '../lib/orgSearch'
 import { Spinner } from '../components/ui'
 import { OrgLogo } from '../components/OrgLogo'
 import { ProPlayerLogo } from '../components/Brand'
-import type { Membership } from '../lib/types'
+import type { Branding, Membership } from '../lib/types'
 
 const HOST = 'pc.ppdguate.com'
 
-/** Inicio sin sesión (pc.ppdguate.com): el último colegio usado y el buscador de instituciones. */
+/** Inicio sin sesión (pc.ppdguate.com): el último colegio usado; si no hay, se pide el enlace. */
 export function Landing() {
   const { session, loading } = useAuth()
 
@@ -55,7 +53,6 @@ export function Landing() {
         <p className="text-muted">Ingrese a través del enlace de su institución.</p>
       </div>
       <LastOrg />
-      <OrgFinder />
     </PpdShell>
   )
 }
@@ -64,7 +61,9 @@ export function Landing() {
 function LastOrg() {
   const slug = getLastOrg()
   const branding = useBranding(slug ?? undefined)
-  if (!slug || branding.isError) return null
+  if (!slug || branding.isError) {
+    return <p className="rounded-[12px] bg-paper p-4 text-[15px]">Si no tiene el enlace de su institución, pídalo a su coordinador o al administrador de su colegio.</p>
+  }
   const org = branding.data
   const t = themeFor(org)
   const name = org?.name ?? slug
@@ -87,73 +86,8 @@ function LastOrg() {
   )
 }
 
-function OrgFinder() {
-  const navigate = useNavigate()
-  const [text, setText] = useState('')
-  const [err, setErr] = useState<string>()
-  const search = useMutation({ mutationFn: (q: string) => searchOrgs(q) })
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    const q = text.trim()
-    if (q.length < 2) return setErr('Escriba al menos dos letras del nombre de su institución.')
-    search.mutate(q)
-  }
-
-  const results = search.data
-  return (
-    <div>
-      <form onSubmit={submit} noValidate role="search">
-        <label htmlFor="org-search" className="mb-2 block text-[15px] font-semibold">¿No tiene el enlace? Busque su institución</label>
-        <div className="flex gap-2">
-          <span className="relative flex min-w-0 flex-1">
-            <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-muted" />
-            <input
-              id="org-search"
-              className="input pl-11"
-              placeholder="Nombre del colegio o equipo"
-              value={text}
-              autoComplete="organization"
-              aria-invalid={!!err}
-              aria-describedby={err ? 'org-search-err' : undefined}
-              onChange={(e) => { setText(e.target.value); setErr(undefined) }}
-            />
-          </span>
-          <button className="btn-secondary min-h-12 shrink-0 px-[18px]" disabled={search.isPending}>Buscar</button>
-        </div>
-        {err && <p id="org-search-err" className="mt-1 text-sm text-err">{err}</p>}
-      </form>
-
-      <div aria-live="polite" className="mt-3">
-        {search.isPending && <p className="text-sm text-muted">Buscando…</p>}
-        {search.isError && <p className="text-sm text-err">{(search.error as Error).message || 'No se pudo buscar. Intente de nuevo.'}</p>}
-        {results && results.length === 0 && (
-          <p className="text-sm text-muted">No encontramos esa institución. Revise el nombre o pida el enlace a su coordinador.</p>
-        )}
-        {results && results.length > 0 && (
-          <ul className="space-y-0.5" aria-label="Instituciones encontradas">
-            {results.map((o) => (
-              <li key={o.slug}>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/${o.slug}/login`)}
-                  className="flex min-h-[52px] w-full items-center gap-3 rounded-[10px] px-2.5 text-left hover:bg-paper focus-visible:bg-paper"
-                >
-                  <OrgBadge org={o} name={o.name} size={34} />
-                  <span className="min-w-0 flex-1 text-[15px] font-semibold">{o.name}</span>
-                  <span className="text-[13px] text-muted">{o.slug}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  )
-}
-
 /** Logo o iniciales con los colores de una institución (no la del tema activo). */
-function OrgBadge({ org, name, size, inverted = false }: { org?: Pick<OrgResult, 'logo_url' | 'crest_url' | 'colors'>; name: string; size: number; inverted?: boolean }) {
+function OrgBadge({ org, name, size, inverted = false }: { org?: Pick<Branding, 'logo_url' | 'crest_url' | 'colors'>; name: string; size: number; inverted?: boolean }) {
   const src = org?.logo_url ?? org?.crest_url
   if (src) return <img src={src} alt="" className="shrink-0 rounded-full bg-white object-contain" style={{ width: size, height: size }} />
   const t = themeFor(org)

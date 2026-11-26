@@ -52,6 +52,14 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
     const pc = path.replace(/^pc\/orgs\/colegio-demo\//, '')
 
     if (path === 'public/orgs/colegio-demo/branding') return ok(route, org)
+    if (path === 'public/orgs' && method === 'GET') {
+      const others = [
+        { name: 'Colegio Montebello', slug: 'montebello', logo_url: null, crest_url: null, colors: { primary: '#14305E', secondary: null, on_primary: '#FFFFFF' } },
+        { name: 'Liceo Altamira', slug: 'altamira', logo_url: null, crest_url: null, colors: { primary: '#F2C230', secondary: null, on_primary: '#201E1D' } },
+      ]
+      const q = (url.searchParams.get('search') ?? '').toLowerCase()
+      return ok(route, [org, ...others].filter((o) => o.name.toLowerCase().includes(q)).map(({ name, slug, logo_url, crest_url, colors }) => ({ name, slug, logo_url, crest_url, colors })))
+    }
     if (path === 'auth/login' && method === 'POST') {
       if (req.headers()['x-app-platform'] !== 'web') return ok(route, { error: { code: 'platform_invalid' } }, 422)
       if (body.password !== 'Secreta12345') {

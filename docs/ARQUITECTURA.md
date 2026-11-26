@@ -236,6 +236,8 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 
 ---
 
+**Avisos al publicar un partido** (decisión del dueño): a los padres de los **convocados**; además, de forma **opcional**, a los admins de la organización y al super admin que lo activen (`notification_subscriptions`, tipo `match_published`; el super admin elige todas o algunas organizaciones). Nadie recibe el aviso de lo que él mismo publicó.
+
 ## 13. Módulo de emergencia (se construye después; el diseño lo contempla desde ya)
 
 **Objetivo**: si un coach/director activa una emergencia sobre un jugador (lesión, accidente, malestar), TODOS sus padres/encargados vinculados reciben avisos push insistentes hasta que alguien confirme.

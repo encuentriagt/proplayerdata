@@ -166,6 +166,30 @@ final class EventNotifier
         return TeamPlayer::where('team_id', $event->team_id)->where('active', true)->pluck('player_id')->all();
     }
 
+    /**
+     * Partido publicado: aviso opcional al staff suscrito (admins de la organización y super admins).
+     * No avisa a quien lo publicó. Una sola vez por partido.
+     */
+    public function matchPublished(Event $event, ?int $actorId): int
+    {
+        $event->loadMissing('team', 'organization');
+        $users = array_values(array_diff(\App\Support\StaffAlerts::recipients($event->organization_id), [(int) $actorId]));
+        if (! $users) {
+            return 0;
+        }
+        $called = \App\Models\EventCallup::where('event_id', $event->id)->count();
+
+        return $this->notifications->notify(
+            $users,
+            'match_published',
+            "event:{$event->id}:published",
+            'Partido publicado: '.$event->displayTitle(),
+            "{$event->organization->name}: {$this->when($event)}. Convocados: {$called}.",
+            ['event_id' => $event->id, 'team_id' => $event->team_id],
+            $event->organization_id,
+        );
+    }
+
     private function guardiansOf(array $playerIds): array
     {
         return GuardianPlayer::whereIn('player_id', $playerIds)

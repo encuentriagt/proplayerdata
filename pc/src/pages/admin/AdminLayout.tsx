@@ -19,7 +19,7 @@ const TABS: Tab[] = [
   { to: 'invitaciones', label: 'Invitaciones', show: (p) => p.manage_members },
 ]
 
-function useVisibleTabs() {
+export function useVisibleTabs() {
   const { can } = useOrg()
   const teams = useTeams()
   const some = (teams.data ?? []).some((t) => t.can_manage)

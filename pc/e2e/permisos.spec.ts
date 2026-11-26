@@ -30,7 +30,7 @@ test('director técnico: sus coaches, crear equipos solo de su deporte, sin temp
   await entrar(page)
   await abrirMenu(page)
   await page.getByRole('link', { name: 'Administración' }).click()
-  const nav = page.getByRole('navigation', { name: 'Administración' })
+  const nav = page.getByRole('navigation', { name: 'Administración', exact: true })
   await expect(nav.getByRole('link', { name: 'Miembros' })).toBeVisible()
   await expect(nav.getByRole('link', { name: 'Equipos' })).toBeVisible()
   for (const n of ['Temporadas', 'Planes', 'Marca']) await expect(nav.getByRole('link', { name: n })).toHaveCount(0)

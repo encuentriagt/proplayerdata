@@ -16,7 +16,8 @@ async function entrar(page: Page) {
   await page.getByRole('button', { name: 'Ingresar' }).click()
   await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
 }
-const manana = () => new Date(Date.now() + 864e5).toISOString().slice(0, 10)
+// "Mañana" en hora de Guatemala (UTC−6), igual que la PC
+const manana = () => new Date(Date.now() - 6 * 3600e3 + 864e5).toISOString().slice(0, 10)
 
 test('Borrador: se guarda sin publicar, se ve gris con "No publicado", se edita y se publica', async ({ page }) => {
   const api = mockApi(page)

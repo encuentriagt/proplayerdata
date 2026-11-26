@@ -20,7 +20,7 @@ test('selector de deporte: Inicio muestra el deporte y Partidos solo el elegido'
   // Junto al saludo: el deporte con su ícono (el primero en el orden del catálogo: Soccer)
   const switcher = page.getByRole('button', { name: /Deporte: Soccer/ })
   await expect(switcher).toBeVisible()
-  await expect(switcher).toContainText('⚽')
+  await expect(switcher).toContainText('Soccer')
 
   await page.goto('/colegio-demo/partidos')
   await expect(page.getByText('vs Rival Fútbol')).toBeVisible()
@@ -35,7 +35,7 @@ test('selector de deporte: Inicio muestra el deporte y Partidos solo el elegido'
 
   // Se recuerda al volver a Inicio
   await page.goto('/colegio-demo')
-  await expect(page.getByRole('button', { name: /Deporte: Basketball/ })).toContainText('🏀')
+  await expect(page.getByRole('button', { name: /Deporte: Basketball/ })).toContainText('Basketball')
 })
 
 test('con un solo deporte se muestra el ícono sin menú', async ({ page }) => {
@@ -44,6 +44,6 @@ test('con un solo deporte se muestra el ícono sin menú', async ({ page }) => {
   await page.getByLabel('Correo electrónico').fill('coach@demo.gt')
   await page.getByLabel('Contraseña', { exact: true }).fill('Secreta12345')
   await page.getByRole('button', { name: 'Ingresar' }).click()
-  await expect(page.getByLabel('Deporte: Soccer')).toContainText('⚽')
+  await expect(page.getByLabel('Deporte: Soccer')).toContainText('Soccer')
   await expect(page.getByRole('button', { name: /Cambiar deporte/ })).toHaveCount(0)
 })

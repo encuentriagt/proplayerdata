@@ -13,16 +13,17 @@ export function Spinner({ label = 'Cargando…' }: { label?: string }) {
 
 type Tone = 'info' | 'success' | 'warning' | 'error'
 const TONES: Record<Tone, { cls: string; Icon: typeof Info }> = {
-  info: { cls: 'bg-sky-50 text-sky-900 ring-sky-200', Icon: Info },
-  success: { cls: 'bg-emerald-50 text-emerald-900 ring-emerald-200', Icon: CheckCircle2 },
-  warning: { cls: 'bg-amber-50 text-amber-900 ring-amber-300', Icon: AlertTriangle },
-  error: { cls: 'bg-red-50 text-red-900 ring-red-200', Icon: XCircle },
+  // Avisos del diseño: fondo de color suave, ícono y texto del mismo tono, sin borde.
+  info: { cls: 'bg-info-bg text-info-ink ring-transparent', Icon: Info },
+  success: { cls: 'bg-ok-bg text-ok ring-transparent', Icon: CheckCircle2 },
+  warning: { cls: 'bg-warn-bg text-warn-ink ring-transparent', Icon: AlertTriangle },
+  error: { cls: 'bg-err-bg text-err ring-transparent', Icon: XCircle },
 }
 
 export function Alert({ tone = 'info', children, title }: { tone?: Tone; children: ReactNode; title?: string }) {
   const { cls, Icon } = TONES[tone]
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`flex gap-3 rounded-xl p-3 ring-1 ${cls}`}>
+    <div role={tone === 'error' ? 'alert' : 'status'} className={`flex gap-3 rounded-[12px] px-4 py-3 ring-1 ${cls}`}>
       <Icon className="mt-0.5 size-5 shrink-0" aria-hidden />
       <div className="text-sm">
         {title && <p className="font-semibold">{title}</p>}
@@ -110,18 +111,18 @@ export function TextAreaField({ label, error, hint, ...rest }: { label: string; 
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="title text-3xl sm:text-4xl">{title}</h1>
-        {subtitle && <p className="mt-1 text-black/60">{subtitle}</p>}
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="title text-[40px] sm:text-[56px]">{title}</h1>
+        {subtitle && <p className="mt-1.5 text-muted">{subtitle}</p>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="rounded-2xl border border-dashed border-black/20 p-6 text-center text-black/60">{children}</p>
+  return <p className="rounded-[16px] border border-dashed border-line p-6 text-center text-muted">{children}</p>
 }
 
 export function Avatar({ name, url, size = 40 }: { name: string; url?: string | null; size?: number }) {

@@ -151,7 +151,7 @@ test('Inicio → Partidos y Entrenos por separado, con lista y botón de nuevo',
   // Desde Partidos el formulario es solo de partido: no se ofrece Entrenamiento ni Otro
   await expect(page.getByRole('group', { name: 'Tipo' })).toHaveCount(0)
   await expect(page.getByText('Entrenamiento', { exact: true })).toHaveCount(0)
-  const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
+  const manana = new Date(Date.now() - 6 * 3600e3 + 864e5).toISOString().slice(0, 10) // en hora de Guatemala
   await page.getByLabel('Equipo').selectOption('1')
   await fechaHora(page, manana, '10:00')
   await page.getByLabel('Rival').fill('Colegio Sur')
@@ -204,7 +204,7 @@ test('Nuevo partido: sin fin, condición ni título; convocar y "Crear partido y
   await expect(page.getByRole('heading', { name: 'Nuevo partido' })).toBeVisible()
   for (const campo of ['Fin (opcional)', 'Condición', 'Título (opcional)']) await expect(page.getByLabel(campo)).toHaveCount(0)
 
-  const manana = new Date(Date.now() + 864e5).toISOString().slice(0, 10)
+  const manana = new Date(Date.now() - 6 * 3600e3 + 864e5).toISOString().slice(0, 10) // en hora de Guatemala
   await fechaHora(page, manana, '10:00')
   // Sin rival no se puede publicar
   await expect(page.getByRole('button', { name: 'Crear partido y publicar' })).toBeDisabled()

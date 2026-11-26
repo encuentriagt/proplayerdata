@@ -1,20 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Sport, Team } from './types'
 
-// Ícono por código del catálogo. Los códigos son en inglés (soccer, futsal, basketball, volleyball,
-// american_football, baseball…). Los códigos anteriores en español quedan como respaldo mientras el
-// catálogo de la API termina de migrar. Si llega un deporte sin ícono, se usa la medalla.
-const ICONS: Record<string, string> = {
-  soccer: '⚽', futsal: '⚽', basketball: '🏀', volleyball: '🏐', beach_volleyball: '🏐', american_football: '🏈',
-  baseball: '⚾', softball: '🥎', tennis: '🎾', table_tennis: '🏓', rugby: '🏉', handball: '🤾', field_hockey: '🏑',
-  ice_hockey: '🏒', swimming: '🏊', athletics: '🏃', track_and_field: '🏃', chess: '♟️', badminton: '🏸', cycling: '🚴',
-  // respaldo: códigos anteriores en español
-  futbol: '⚽', futbol_sala: '⚽', basquetbol: '🏀', voleibol: '🏐', futbol_americano: '🏈', beisbol: '⚾',
-}
-export function sportIcon(code?: string | null): string {
-  return (code && ICONS[code]) || '🏅'
-}
-
 interface SportContextValue {
   /** Deportes activados por la organización que el miembro ve (GET sports). */
   sports: Sport[]

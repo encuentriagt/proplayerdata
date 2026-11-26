@@ -9,7 +9,7 @@ import { capitalize, nowGt } from '../lib/dates'
 const WEEK = { weekStartsOn: 1 as const }
 
 /** Calendario propio (más grande y claro que el del navegador). `value` y `onChange` en "yyyy-MM-dd". */
-export function DatePicker({ label, value, onChange, error }: { label: string; value: string; onChange: (v: string) => void; error?: string }) {
+export function DatePicker({ label, value, onChange, error, compact = false, quick = false }: { label: string; value: string; onChange: (v: string) => void; error?: string; compact?: boolean; quick?: boolean }) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const selected = value ? parseISO(value) : null
@@ -39,11 +39,19 @@ export function DatePicker({ label, value, onChange, error }: { label: string; v
         onClick={() => setOpen((o) => !o)}
         className="input flex items-center gap-2 text-left aria-[invalid=true]:border-red-700">
         <CalendarDays className="size-5 shrink-0 text-org-accent" aria-hidden />
-        <span className={selected ? '' : 'text-black/40'}>
-          {selected ? capitalize(format(selected, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })) : 'Elija la fecha'}
+        <span className={`truncate ${selected ? '' : 'text-black/40'}`}>
+          {selected ? capitalize(format(selected, compact ? 'EEE d MMM' : "EEEE d 'de' MMMM 'de' yyyy", { locale: es })) : 'Elija la fecha'}
         </span>
       </button>
-      {error && <p className="mt-1 text-sm text-red-700">{error}</p>}
+      {error && <p className="mt-1 text-sm text-err">{error}</p>}
+      {quick && (
+        <div className="mt-2 flex gap-2">
+          {[['Hoy', 0], ['Mañana', 1]].map(([t, n]) => (
+            <button key={t} type="button" onClick={() => pick(addDays(today, n as number))}
+              className="min-h-9 rounded-full border border-line bg-surface px-3.5 text-sm hover:bg-black/5">{t}</button>
+          ))}
+        </div>
+      )}
 
       {open && (
         <div role="dialog" aria-label={`Elegir ${label.toLowerCase()}`}

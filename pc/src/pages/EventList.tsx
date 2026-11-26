@@ -88,13 +88,13 @@ export function EventList({ type }: { type: Kind }) {
 
       {created ? <div className="mb-4"><Alert tone="success">Se crearon {created} entrenos.</Alert></div> : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div role="tablist" aria-label="Periodo" className="flex rounded-xl bg-black/5 p-1">
+        <div role="tablist" aria-label="Periodo" className="grid w-full grid-cols-2 rounded-[12px] bg-[#e4e2e1] p-1 sm:w-80">
           {([['proximos', 'Próximos'], ['anteriores', 'Anteriores']] as const).map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => set('ver', k === 'proximos' ? undefined : k)}
-              className={`min-h-10 rounded-lg px-4 text-sm font-semibold ${tab === k ? 'bg-white shadow' : ''}`}>{label}</button>
+              className={`min-h-10 rounded-[9px] px-4 font-semibold ${tab === k ? 'bg-surface text-ink shadow-sm' : 'text-muted'}`}>{label}</button>
           ))}
         </div>
-        <select className="input ml-auto min-h-10 w-auto py-1 text-sm" aria-label="Filtrar por equipo" value={teamId ?? ''}
+        <select className="input min-h-11 w-full sm:ml-auto sm:w-64" aria-label="Filtrar por equipo" value={teamId ?? ''}
           onChange={(e) => set('equipo', e.target.value || undefined)}>
           <option value="">Todos los equipos</option>
           {sport.teams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -110,8 +110,8 @@ export function EventList({ type }: { type: Kind }) {
         <div className="space-y-5">
           {ordered.map(([key, { title, items }]) => (
             <section key={key} aria-label={title}>
-              <h2 className="mb-2 text-sm font-bold uppercase text-black/60">{title}</h2>
-              <div className="space-y-2">{items.map((e) => <EventCard key={e.id} ev={e} showType={false} />)}</div>
+              <h2 className="caps mb-2.5">{title}</h2>
+              <div className="space-y-3">{items.map((e) => <EventCard key={e.id} ev={e} showType={false} />)}</div>
             </section>
           ))}
         </div>

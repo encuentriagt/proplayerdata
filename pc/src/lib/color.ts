@@ -34,9 +34,24 @@ export function readableOn(bg: string, preferred?: string | null): string {
   return contrast(bg, '#FFFFFF') >= contrast(bg, PPD.ink) ? '#FFFFFF' : PPD.ink
 }
 
-/** Color del primario usado como texto/borde sobre fondo claro: si no da 3:1, se oscurece a la tinta ppd. */
-export function accentOnLight(primary: string, bg = '#FFFFFF'): string {
-  return contrast(primary, bg) >= 3 ? primary : PPD.ink
+/** Mezcla un color hacia negro (t = 0..1). */
+function darken(hex: string, t: number): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(c * (1 - t)))
+  return '#' + ch.map((c) => c.toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+
+/**
+ * "Primario como texto" (diseño): el color del colegio oscurecido hasta 4.5:1 sobre el fondo papel,
+ * para enlaces, pestañas y textos cuando el primario es claro (p. ej. amarillo).
+ */
+export function accentOnLight(primary: string, bg = PPD.bg): string {
+  if (!isHex(primary)) return PPD.ink
+  for (let t = 0; t <= 1; t += 0.05) {
+    const c = darken(primary.startsWith('#') ? primary : `#${primary}`, t)
+    if (contrast(c, bg) >= 4.5) return t === 0 ? primary : c
+  }
+  return PPD.ink
 }
 
 export function initials(name: string): string {

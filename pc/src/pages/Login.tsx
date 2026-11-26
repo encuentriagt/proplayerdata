@@ -71,7 +71,7 @@ export function Login() {
           </Alert>
         )}
         <TextField label="Correo electrónico" type="email" autoComplete="username" inputMode="email" required
-          placeholder="Ingrese su correo" value={email} onChange={(e) => setEmail(e.target.value)} error={fieldError(error, 'email')} />
+          placeholder="nombre@colegio.edu.gt" value={email} onChange={(e) => setEmail(e.target.value)} error={fieldError(error, 'email')} />
         <div className="relative">
           <TextField label="Contraseña" type={show ? 'text' : 'password'} autoComplete="current-password" required
             placeholder="Ingrese su contraseña" value={password} onChange={(e) => setPassword(e.target.value)} error={fieldError(error, 'password')} />
@@ -80,12 +80,14 @@ export function Login() {
             {show ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
           </button>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" className="size-5 accent-[var(--org-accent)]" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-          Mantener sesión en este dispositivo
-        </label>
-        <button className="btn-primary w-full" disabled={busy || !email || !password}>{busy ? 'Ingresando…' : 'Ingresar'}</button>
-        <Link to={`/${slug}/olvide-contrasena`} className="block text-center text-sm underline">¿Olvidó su contraseña?</Link>
+        <div className="flex items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="size-5 accent-[var(--org-primary)]" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            Mantener sesión
+          </label>
+          <Link to={`/${slug}/olvide-contrasena`} className="text-sm font-semibold text-org-accent underline">¿Olvidó su contraseña?</Link>
+        </div>
+        <button className="btn-primary min-h-12 w-full" disabled={busy || !email || !password}>{busy ? 'Ingresando…' : 'Ingresar'}</button>
       </form>
     </OrgAuthShell>
   )

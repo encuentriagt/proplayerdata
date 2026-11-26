@@ -47,6 +47,6 @@ test('director y coach: sin pestaña Deportes', async ({ page }) => {
   mockApi(page, 'director')
   await entrar(page)
   await page.goto('/colegio-demo/admin/deportes')
-  await expect(page.getByRole('navigation', { name: 'Administración', exact: true }).getByRole('link', { name: 'Deportes' })).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: /dministración/ }).getByRole('link', { name: 'Deportes' })).toHaveCount(0)
   await expect(page).not.toHaveURL(/deportes/)
 })

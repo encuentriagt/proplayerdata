@@ -6,6 +6,7 @@ import { applyTheme } from '../lib/branding'
 import { getLastOrg } from '../lib/session'
 import { Spinner } from '../components/ui'
 import { OrgLogo } from '../components/OrgLogo'
+import { ProPlayerLogo } from '../components/Brand'
 import type { Membership } from '../lib/types'
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -57,8 +58,8 @@ export function Landing() {
 
   return (
     <PpdShell>
-      <h1 className="title text-4xl">Plataforma Coach</h1>
-      <p className="mt-2 text-black/70">Ingrese a través del enlace de su institución.</p>
+      <h1 className="title text-[40px]">Plataforma Coach</h1>
+      <p className="mt-2 text-muted">Ingrese a través del enlace de su institución.</p>
       {last && (
         <Link to={`/${last}/login`} className="btn-primary mt-6 w-full">Continuar a {last}</Link>
       )}
@@ -92,11 +93,10 @@ function uniqueOrgs(ms: Membership[]): Membership[] {
 
 function PpdShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-dvh place-items-center bg-ppd-bg p-4">
+    <div className="grid min-h-dvh place-items-center bg-paper p-4">
       <div className="w-full max-w-md">
-        <p className="title mb-6 text-5xl normal-case text-ppd-green" aria-label="ppd">ppd<span className="text-ppd-star" aria-hidden>★</span></p>
-        <div className="card p-6">{children}</div>
-        <p className="mt-6 text-center text-xs text-black/50">ProPlayer Data</p>
+        <div className="mb-8 flex justify-center"><ProPlayerLogo size={60} /></div>
+        <div className="card p-6 sm:p-8">{children}</div>
       </div>
     </div>
   )

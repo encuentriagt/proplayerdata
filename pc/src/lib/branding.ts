@@ -55,7 +55,8 @@ export interface Theme {
 }
 
 export function themeFor(b?: Pick<Branding, 'colors'> | null): Theme {
-  const primary = isHex(b?.colors.primary) ? b!.colors.primary! : PPD.green
+  // Sin colegio (páginas ppd): tinta de la línea gráfica ProPlayer.
+  const primary = isHex(b?.colors.primary) ? b!.colors.primary! : PPD.ink
   const secondary = isHex(b?.colors.secondary) ? b!.colors.secondary! : PPD.star
   return {
     primary,

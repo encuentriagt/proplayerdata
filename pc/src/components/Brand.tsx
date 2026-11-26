@@ -3,9 +3,12 @@
  * (la más alta en verde cancha) y tres balones; logotipo en Saira Extra Condensed ExtraBold itálica.
  * Colores: tinta #201E1D, verde cancha #25984D, oro #D28316, cuero #9A5328 (solo el balón), papel #F3F2F2.
  */
+import { useId } from 'react'
+
 type MarkProps = { size?: number; className?: string; title?: string; negative?: boolean }
 
 export function ProPlayerMark({ size = 32, className = '', title = 'ProPlayer', negative = false }: MarkProps) {
+  const clip = `pp-clip-${useId().replace(/:/g, '')}` // id único si hay varios escudos en la página
   const ink = negative ? '#F3F2F2' : '#201E1D'
   const paper = negative ? '#201E1D' : '#F3F2F2'
   const shield = 'M18 8H82V46C82 69 68 83 50 93C32 83 18 69 18 46Z'
@@ -13,10 +16,10 @@ export function ProPlayerMark({ size = 32, className = '', title = 'ProPlayer', 
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className={className} role="img" aria-label={title}>
       <defs>
-        <clipPath id="pp-clip"><path d={shield} /></clipPath>
+        <clipPath id={clip}><path d={shield} /></clipPath>
       </defs>
       <path d={shield} fill={paper} />
-      <g clipPath="url(#pp-clip)" fill={ink}>
+      <g clipPath={`url(#${clip})`} fill={ink}>
         <rect x="27" y="67" width="14" height="42" />
         <rect x="43" y="56" width="14" height="53" />
         <rect x="59" y="43" width="14" height="66" fill="#25984D" />

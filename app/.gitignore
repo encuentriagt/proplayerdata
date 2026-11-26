@@ -57,3 +57,6 @@ app.*.map.json
 key.properties
 .env
 .env.*
+
+# Salidas de compilación de Gradle
+/android/build/

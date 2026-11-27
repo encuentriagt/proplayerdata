@@ -43,11 +43,6 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(1)->by('resend:'.($r->user()?->id ?: $r->ip())),
             Limit::perDay(10)->by('resend-day:'.($r->user()?->id ?: $r->ip())),
         ]);
-        // Buscador público de instituciones: 30/min y 300/día por IP, para que no se pueda listar el directorio.
-        RateLimiter::for('org-search', fn (Request $r) => [
-            Limit::perMinute(30)->by('orgsearch:'.$r->ip()),
-            Limit::perDay(300)->by('orgsearch-day:'.$r->ip()),
-        ]);
         RateLimiter::for('api', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->getAuthIdentifier() ?: $r->ip()));
         RateLimiter::for('login', fn (Request $r) => [
             Limit::perMinute(5)->by(mb_strtolower((string) $r->input('email')).'|'.$r->ip()),

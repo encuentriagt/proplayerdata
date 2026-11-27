@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Attendance extends Model
 {
-    /** Asiste, no asiste con aviso, lesión, no justificado. ("late" se migró a present.) */
-    public const STATUSES = ['present', 'excused', 'injured', 'absent'];
+    /** Asiste, no asiste con aviso, lesión, no justificado, llegó tarde. (Los "late" anteriores al 2026-11-25 quedaron como present.) */
+    public const STATUSES = ['present', 'excused', 'injured', 'absent', 'late'];
 
     protected $fillable = ['event_id', 'player_id', 'status', 'note', 'recorded_by'];
 

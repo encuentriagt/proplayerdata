@@ -142,7 +142,7 @@ class PlayerController extends Controller
             'first_name' => [$req, 'string', 'min:1', 'max:80'],
             'last_name' => [$req, 'string', 'min:1', 'max:80'],
             'birthdate' => ['nullable', 'date', 'before:today', 'after:1940-01-01'],
-            'gender' => ['nullable', Rule::in(['male', 'female', 'other'])],
+            'gender' => ['nullable', Rule::in(['male', 'female'])],
             'document_number' => ['nullable', 'string', 'max:40'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];

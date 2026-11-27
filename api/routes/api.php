@@ -38,7 +38,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('public')->middleware('throttle:public')->group(function () {
     Route::get('health', HealthController::class);
-    Route::get('orgs', \App\Http\Controllers\Public\OrgSearchController::class)->middleware('throttle:org-search');
     Route::get('orgs/{slug}/branding', BrandingController::class);
     Route::get('invitations/{token}', [InvitationAcceptController::class, 'show'])->middleware('throttle:codes');
     Route::post('invitations/{token}/accept', [InvitationAcceptController::class, 'accept'])->middleware(['throttle:codes', 'idempotent']);

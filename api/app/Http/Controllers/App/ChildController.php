@@ -176,6 +176,11 @@ class ChildController extends Controller
             'callup' => $callup ? ['status' => $callup->status, 'response' => $callup->guardian_response] : null,
             'attendance' => $att ? ['status' => $att->status, 'note' => $att->note] : null,
             'child_played' => $lineup ? ['is_starter' => $lineup->is_starter, 'minutes_played' => $lineup->minutes_played] : null,
+            'child_shootout' => $event->result_published_at && $event->shootout_us !== null ? (function () use ($event, $player) {
+                $mine = collect($event->shootout_kicks ?? [])->where('player_id', $player->id);
+
+                return $mine->isEmpty() ? null : ['taken' => $mine->count(), 'scored' => $mine->where('scored', true)->count()];
+            })() : null,
             'child_stats' => $event->result_published_at && $stat ? $this->namedStats($event->team->sport_id, (array) $stat->stats) : null,
         ]), 'meta' => ['plan_level' => $level]]);
     }
@@ -239,7 +244,7 @@ class ChildController extends Controller
                 'sport_id' => $sid, 'matches' => $v['matches'], 'minutes' => $v['minutes'],
                 'stats' => $this->namedStats($sid, $v['stats']),
             ])->values(),
-            'attendance' => ['present' => (int) ($att['present'] ?? 0), 'excused' => (int) ($att['excused'] ?? 0), 'injured' => (int) ($att['injured'] ?? 0), 'absent' => (int) ($att['absent'] ?? 0)],
+            'attendance' => ['present' => (int) ($att['present'] ?? 0), 'excused' => (int) ($att['excused'] ?? 0), 'injured' => (int) ($att['injured'] ?? 0), 'absent' => (int) ($att['absent'] ?? 0), 'late' => (int) ($att['late'] ?? 0)],
         ], 'meta' => ['plan_level' => $level, 'limited' => $limits['stats_last_matches'] !== null]]);
     }
 
@@ -272,6 +277,9 @@ class ChildController extends Controller
         if (! $e->result_published_at) {
             $p['score_us'] = null;
             $p['score_them'] = null;
+            $p['shootout'] = null;
+        } elseif ($p['shootout']) {
+            unset($p['shootout']['kicks']); // los cobros de otros jugadores no se muestran al padre
         }
 
         return $p;

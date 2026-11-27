@@ -13,7 +13,7 @@ class Event extends Model
 
     protected $fillable = [
         'organization_id', 'team_id', 'series_id', 'type', 'title', 'starts_at', 'time_pending', 'ends_at', 'location',
-        'opponent_name', 'home_away', 'status', 'score_us', 'score_them', 'result_published_at', 'published_at', 'notes', 'created_by',
+        'opponent_name', 'home_away', 'status', 'score_us', 'score_them', 'shootout_us', 'shootout_them', 'shootout_kicks', 'result_published_at', 'published_at', 'notes', 'created_by',
     ];
 
     protected function casts(): array
@@ -21,6 +21,7 @@ class Event extends Model
         return [
             'starts_at' => 'datetime', 'ends_at' => 'datetime', 'result_published_at' => 'datetime', 'published_at' => 'datetime', 'time_pending' => 'boolean',
             'score_us' => 'integer', 'score_them' => 'integer',
+            'shootout_us' => 'integer', 'shootout_them' => 'integer', 'shootout_kicks' => 'array',
         ];
     }
 
@@ -67,6 +68,14 @@ class Event extends Model
                 $e->published_at = now();
             }
         });
+    }
+
+    /** "1–1 (4–3 en penales)" o "2–1". */
+    public function scoreText(): string
+    {
+        $t = "{$this->score_us}–{$this->score_them}";
+
+        return $this->shootout_us !== null ? $t." ({$this->shootout_us}–{$this->shootout_them} en penales)" : $t;
     }
 
     public function isDraft(): bool
@@ -119,6 +128,8 @@ class Event extends Model
             'published_at' => $this->published_at?->toIso8601String(),
             'score_us' => $this->score_us,
             'score_them' => $this->score_them,
+            // Penales (solo si el partido terminó empatado y se cobraron). kicks: [{player_id, scored}] en orden.
+            'shootout' => $this->shootout_us !== null ? ['score_us' => $this->shootout_us, 'score_them' => $this->shootout_them, 'kicks' => $this->shootout_kicks ?? []] : null,
             'result_published_at' => $this->result_published_at?->toIso8601String(),
             'notes' => $this->notes,
         ];

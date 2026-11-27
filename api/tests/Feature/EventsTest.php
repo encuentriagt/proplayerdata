@@ -147,7 +147,12 @@ class EventsTest extends TestCase
         // status null quita la marca; "late" ya no se acepta.
         $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $beto->id, 'status' => null]]])->assertOk();
         $this->as($coach)->getJson($this->base."/events/{$id}")->assertJsonCount(1, 'data.attendance');
-        $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'late']]])->assertStatus(422);
+        // "Llegó tarde" (late) vuelve a existir: avisa y cuenta aparte.
+        $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'late']]])->assertJsonPath('data.notified', 1);
+        $this->assertSame('Ana: Llegó tarde.', $q()->latest('id')->value('body'));
+        $this->as($papa)->getJson("/api/app/children/{$ana->id}/stats")->assertJsonPath('data.attendance.late', 1);
+        $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'injured']]])->assertOk();
+        $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'tarde']]])->assertStatus(422);
 
         // La App ve "injured" en estadísticas y en el detalle.
         $this->as($papa)->getJson("/api/app/children/{$ana->id}/stats")->assertOk()->assertJsonPath('data.attendance.injured', 1);
@@ -309,6 +314,45 @@ class EventsTest extends TestCase
         $this->as($coach)->getJson($this->base."/events/{$id}")->assertOk()->assertJsonCount(2, 'data.attendance');
     }
 
+    public function test_penales_gol_en_contra_y_avisos(): void
+    {
+        ['coach' => $coach, 'team' => $team, 'ana' => $ana, 'beto' => $beto, 'papa' => $papa] = $this->setupTeam();
+        $id = $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'match', 'starts_at' => now()->subHours(3)->toDateTimeString(),
+            'opponent_name' => 'Liceo Norte', 'publish' => true, 'callups' => [['player_id' => $ana->id]]])->json('data.id');
+        $sheet = fn (array $extra) => $this->as($coach)->putJson($this->base."/events/{$id}/match-sheet", array_merge([
+            'score_us' => 1, 'score_them' => 1, 'publish' => true, 'lineup' => [['player_id' => $ana->id], ['player_id' => $beto->id]],
+            'actions' => [['stat_code' => 'goal', 'player_id' => $ana->id], ['stat_code' => 'goal_conceded', 'player_id' => $beto->id]],
+        ], $extra));
+        $kicks = [['player_id' => $ana->id, 'scored' => true], ['player_id' => $beto->id, 'scored' => false], ['player_id' => $ana->id, 'scored' => true]];
+
+        // Validaciones.
+        $sheet(['score_us' => 2, 'shootout' => ['score_us' => 2, 'score_them' => 1, 'kicks' => $kicks]])->assertStatus(422)->assertJsonPath('error.fields.shootout.0', 'Solo hay penales si el partido terminó empatado.');
+        $sheet(['shootout' => ['score_us' => 3, 'score_them' => 1, 'kicks' => $kicks]])->assertStatus(422);
+        $sheet(['shootout' => ['score_us' => 2, 'score_them' => 2, 'kicks' => $kicks]])->assertStatus(422);
+        $ajeno = $this->player($this->makeOrg('otra'), null, 'Zoe');
+        $sheet(['shootout' => ['score_us' => 1, 'score_them' => 0, 'kicks' => [['player_id' => $ajeno->id, 'scored' => true]]]])->assertStatus(422);
+
+        // Válido: 1–1 (2–1 en penales). Gol en contra no suma al marcador ni da advertencia.
+        $r = $sheet(['shootout' => ['score_us' => 2, 'score_them' => 1, 'kicks' => $kicks]])->assertOk()
+            ->assertJsonPath('data.shootout.score_us', 2)->assertJsonPath('data.warnings', []);
+        $this->assertCount(3, $r->json('data.shootout.kicks'));
+        $this->assertSame('Sub-12 1–1 Liceo Norte (2–1 en penales). Ana: 1 gol.', UserNotification::where('user_id', $papa->id)->where('kind', 'match_result')->value('body'));
+        $this->as($coach)->getJson($this->base.'/events?from='.now()->subDay()->toDateString())->assertJsonPath('data.0.shootout.score_them', 1);
+
+        // App: marcador de penales sin los cobros ajenos; penales y gol en contra del hijo.
+        $app = $this->as($papa)->getJson("/api/app/children/{$ana->id}/events/{$id}")->assertOk()
+            ->assertJsonPath('data.shootout', ['score_us' => 2, 'score_them' => 1])->assertJsonPath('data.child_shootout', ['taken' => 2, 'scored' => 2]);
+        $this->as($papa)->getJson('/api/app/events?from='.now()->subDay()->toDateString())->assertJsonPath('data.0.shootout.score_us', 2);
+        $this->as($papa)->getJson("/api/app/children/{$beto->id}/events/{$id}")->assertStatus(403);
+
+        // Corregir solo los penales vuelve a avisar.
+        $before = UserNotification::where('user_id', $papa->id)->where('kind', 'match_result')->count();
+        $sheet(['shootout' => ['score_us' => 3, 'score_them' => 1, 'kicks' => array_merge($kicks, [['player_id' => $beto->id, 'scored' => true]])]])->assertOk();
+        $this->assertSame($before + 1, UserNotification::where('user_id', $papa->id)->where('kind', 'match_result')->count());
+        // null borra los penales.
+        $sheet(['shootout' => null])->assertOk()->assertJsonPath('data.shootout', null);
+    }
+
     public function test_ficha_del_partido_estadisticas_y_aviso_de_resultado(): void
     {
         ['coach' => $coach, 'team' => $team, 'ana' => $ana, 'beto' => $beto, 'papa' => $papa] = $this->setupTeam();
@@ -336,7 +380,7 @@ class EventsTest extends TestCase
         $this->as($coach)->putJson($this->base."/events/{$id}/match-sheet", $sheet + ['publish' => true])->assertOk()->assertJsonPath('data.status', 'finished');
         $n = UserNotification::where('user_id', $papa->id)->where('kind', 'match_result')->first();
         $this->assertNotNull($n);
-        $this->assertStringContainsString('Sub-12 2 - 1 Colegio Rival', $n->body);
+        $this->assertStringContainsString('Sub-12 2–1 Colegio Rival', $n->body);
         $this->assertStringContainsString('Ana: 2 gol', $n->body);
 
         $stats = PlayerEventStat::where('event_id', $id)->where('player_id', $ana->id)->first();

@@ -54,16 +54,30 @@ final class MatchSheetService
                 }
             }
         }
+        // Penales: solo con empate; anotados = cobros convertidos; cobradores del equipo. null/ausente = sin penales.
+        $shootout = $data['shootout'] ?? null;
+        if ($shootout !== null) {
+            $kicks = collect($shootout['kicks'] ?? []);
+            if ((int) $data['score_us'] !== (int) $data['score_them']) {
+                $errors['shootout'] = 'Solo hay penales si el partido terminó empatado.';
+            } elseif ($kicks->where('scored', true)->count() !== (int) $shootout['score_us']) {
+                $errors['shootout'] = 'Los penales anotados ('.$kicks->where('scored', true)->count().') no coinciden con el marcador de penales ('.$shootout['score_us'].').';
+            } elseif ((int) $shootout['score_us'] === (int) $shootout['score_them']) {
+                $errors['shootout'] = 'La tanda de penales no puede terminar empatada.';
+            } elseif ($kicks->contains(fn ($k) => ! in_array((int) $k['player_id'], $rosterIds, true))) {
+                $errors['shootout'] = 'Hay cobradores que no pertenecen al equipo.';
+            }
+        }
         if ($errors) {
             throw ValidationException::withMessages($errors);
         }
 
         // Una vez publicado, toda corrección se trata como publicación (si cambia el marcador, se avisa).
         $publish = (bool) ($data['publish'] ?? false) || $event->result_published_at !== null;
-        $oldScore = [$event->score_us, $event->score_them];
+        $oldScore = [$event->score_us, $event->score_them, $event->shootout_us, $event->shootout_them];
         $firstPublish = $publish && ! $event->result_published_at;
 
-        DB::transaction(function () use ($event, $data, $lineup, $actions, $statTypes, $by, $publish) {
+        DB::transaction(function () use ($event, $data, $lineup, $actions, $statTypes, $by, $publish, $shootout) {
             $locked = Event::whereKey($event->id)->lockForUpdate()->first();
 
             MatchLineup::where('event_id', $event->id)->delete();
@@ -115,6 +129,9 @@ final class MatchSheetService
             $locked->forceFill([
                 'score_us' => $data['score_us'],
                 'score_them' => $data['score_them'],
+                'shootout_us' => $shootout['score_us'] ?? null,
+                'shootout_them' => $shootout['score_them'] ?? null,
+                'shootout_kicks' => $shootout ? array_map(fn ($k) => ['player_id' => (int) $k['player_id'], 'scored' => (bool) $k['scored']], $shootout['kicks']) : null,
                 'status' => $publish ? 'finished' : $locked->status,
                 'result_published_at' => $publish ? ($locked->result_published_at ?? now()) : $locked->result_published_at,
             ])->save();
@@ -134,7 +151,7 @@ final class MatchSheetService
             'event' => $event,
             'warnings' => $warnings,
             'first_publish' => $firstPublish,
-            'score_changed' => $publish && ! $firstPublish && $oldScore !== [$event->score_us, $event->score_them],
+            'score_changed' => $publish && ! $firstPublish && $oldScore !== [$event->score_us, $event->score_them, $event->shootout_us, $event->shootout_them],
         ];
     }
 }

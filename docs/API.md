@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.16 (2026-12-01)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.17 (2026-12-02)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -29,7 +29,6 @@ Códigos HTTP: 200/201 ok · 304 sin cambios · 401 `unauthenticated` (volver al
 | Método | Ruta | Uso |
 |---|---|---|
 | GET | `/public/health` | Estado: `{status:"ok"}` |
-| GET | `/public/orgs?search={texto}` | **Buscador de instituciones** (pantalla de inicio de la PC). Busca en nombre y slug sin importar mayúsculas ni tildes; mínimo 2 caracteres (menos → 422 `validation_failed`). Solo organizaciones **activas**, máximo **10**, primero las que empiezan con el texto. Responde `{data:[{name, slug, logo_url, crest_url, colors{primary,secondary,on_primary}}]}` (sin resultados: `data:[]`). No expone id, plan, cupos ni contactos. Límite por IP: **30/min y 300/día** → 429 `too_many_requests`. `Cache-Control: no-store` |
 | GET | `/public/orgs/{slug}/branding` | **Marca blanca** para la pantalla de login: `name, slug, type, active, logo_url, crest_url, cover_url, colors{primary,secondary,on_primary}, powered_by`. Caché 5 min + `ETag` (enviar `If-None-Match`) |
 | GET | `/public/invitations/{token}` | Datos de la invitación: `status (pending\|expired\|accepted), role, role_label, email_masked, user_exists, player_first_name, organization{marca}` |
 | POST ♻️ | `/public/invitations/{token}/accept` | Si `user_exists=false`: `{name, password, password_confirmation, relationship?}`. Si `true`: `{password}` (la de su cuenta). Luego el cliente hace login normal. Errores: `invalid_credentials`, `invitation_unusable` (410), `invitation_not_found` |
@@ -151,7 +150,7 @@ Códigos y nombres de deporte en inglés (`soccer`/Soccer, `futsal`/Futsal, `bas
 | Método | Ruta | Quién | Notas |
 |---|---|---|---|
 | GET | `players?team_id=&search=` | todos (coach: de sus equipos) | paginado 50 |
-| POST ♻️ | `players` | admin; coach/director con `team_id` de su equipo | `{first_name, last_name, birthdate?, gender?, document_number?, notes?, team_id?, jersey_number?, sport_position_id?}` |
+| POST ♻️ | `players` | admin; coach/director con `team_id` de su equipo | `{first_name, last_name, birthdate?, gender?(male\|female), document_number?, notes?, team_id?, jersey_number?, sport_position_id?}` |
 | GET | `players/{id}` | quien lo ve | incluye `teams`, `guardians` (correo solo para admin), `document_number`, `notes` |
 | PATCH | `players/{id}` | quien lo ve | |
 | DELETE | `players/{id}` | admin | |
@@ -174,7 +173,7 @@ Cada evento trae `is_draft`, `published_at`, `time_pending` y `series_id` (borra
 | PATCH | `events/{id}` | Mismos campos + `status: scheduled\|cancelled`. Cambiar fecha/lugar o cancelar **avisa a los padres** (en borrador no). En borrador `starts_at:null` vale; publicado no se quita la fecha, la hora (`time_pending:true`) ni el rival (422 `validation_failed`) |
 | DELETE | `events/{id}` | Borradores y cancelados sin resultado. Publicado y programado → 422 `event_must_cancel` (primero cancelar, que avisa). Con resultado publicado → 422 `event_has_result` |
 | PUT ♻️ | `events/{id}/callups` | `{players:[{player_id, status?(called\|reserve)}], notify?}` Reemplaza la lista. Avisa a los padres de los **nuevos** convocados (una sola vez); en borrador guarda **sin avisar** (el aviso sale al publicar). Se ve la respuesta del padre en `guardian_response` |
-| PUT ♻️ | `events/{id}/attendance` | `{records:[{player_id, status(present\|excused\|injured\|absent\|null), note?}]}`: Asiste, No asiste con aviso, Lesión, No justificado. `status:null` borra la marca del jugador. Solo cambia los jugadores enviados. En un **partido publicado** avisa a los padres de cada jugador cuyo estado cambió ("Ana: Lesión."); repetir el mismo estado no avisa; en borrador no avisa (se avisa al publicar). Responde `{count, changed, notified}`. `late` ya no existe (se migró a `present`) |
+| PUT ♻️ | `events/{id}/attendance` | `{records:[{player_id, status(present\|excused\|injured\|absent\|late\|null), note?}]}`: Asiste, No asiste con aviso, Lesión, No justificado, **Llegó tarde**. `status:null` borra la marca del jugador. Solo cambia los jugadores enviados. En un **partido publicado** avisa a los padres de cada jugador cuyo estado cambió ("Ana: Lesión."); repetir el mismo estado no avisa; en borrador no avisa (se avisa al publicar). Responde `{count, changed, notified}`. Aviso de `late`: «Ana: Llegó tarde.». (Los `late` guardados antes del 2026-11-25 se migraron a `present` y se quedan así.) |
 | PUT ♻️ | `events/{id}/match-sheet` | **Ficha del partido al final** (no hay tiempo real). En borrador → 422 `event_draft`. Ver abajo |
 
 Ficha del partido:
@@ -185,10 +184,14 @@ Ficha del partido:
   "actions": [
     {"stat_code": "goal", "player_id": 15, "minute": 10, "period": 1},
     {"stat_code": "yellow_card", "player_id": 18},
-    {"type": "sub_in", "player_id": 18, "related_player_id": 15, "minute": 40}
-  ]
+    {"type": "sub_in", "player_id": 18, "related_player_id": 15, "minute": 40},
+    {"stat_code": "goal_conceded", "player_id": 1}
+  ],
+  "shootout": null
 }
 ```
+- **Penales** (opcional): `shootout: {score_us, score_them, kicks:[{player_id, scored}]}` en el orden de los cobros, o `null` para quitarlos. Reglas (si no, 422 `validation_failed` en `error.fields.shootout`): solo con `score_us == score_them`; `score_us` = cobros con `scored:true`; la tanda no puede quedar empatada; cobradores del equipo. Se devuelve `shootout{score_us, score_them, kicks}` en `GET events` y `GET events/{id}` (mostrar «1–1 (4–3 pen.)»). El aviso de resultado dice «Sub-15 1–1 Liceo Norte (4–3 en penales).» y **corregir solo los penales vuelve a avisar** («Resultado corregido»).
+- **Gol en contra** (`goal_conceded`, Soccer y Futsal): para el portero; no suma al marcador ni cuenta en la advertencia de goles. Aparece en las estadísticas del jugador en la App.
 - `stat_code` sale de `/catalog/sports` del deporte del equipo; `value` (1–99) para sumar varias de una vez.
 - Guardar reemplaza la ficha completa (idempotente). `publish:false` = borrador.
 - **Una vez publicado, toda corrección cuenta como publicación** aunque se envíe `publish:false` (no se puede "despublicar").
@@ -227,11 +230,11 @@ El padre solo ve **a sus hijos** y **solo los datos de su hijo** (no los de otro
 | POST ♻️ | `invitations/redeem` | `{code}`: aceptar con el **código corto del correo** (`ABCD-2345`; acepta minúsculas, espacios o sin guion), p. ej. si la invitación llegó a otro correo. Mal → 422 `code_invalid`. Mismos errores y respuesta que `accept`. Límite 5/min |
 | DELETE | `children/{id}` | Desvincular a un hijo (lo decide el padre) |
 | GET | `children` | Todos los hijos vinculados, de todas las organizaciones (sin hijos: `data:[]`): `id, first_name, last_name, birthdate, photo_url, organization{id, name, slug, logo_url, crest_url, colors}, teams[{id, name, category, sport{id,code,name}, season{id,name}\|null, jersey_number, position{id,name}\|null}], plan_level`. La App no usa la marca para pintarse (siempre ProPlayer Data): solo muestra el nombre y escudo del colegio como dato |
-| GET | `events?from=&to=&child_id=&sport_id=&type=` | **Calendario unificado**: eventos publicados de **todos** los hijos (todas sus organizaciones) en un llamado (máx. 120 días, 500 eventos). Cada evento como en el calendario por hijo + `team{id,name}`, `sport{id,code,name}`, `organization{id,name}`, `child_ids[]` y `children[{child_id, first_name, callup{status,response}\|null}]`. **Un evento con dos hijos viene una sola vez** con ambos. Gratis: el pasado se limita por hijo (`meta.history_limited`). `child_id` ajeno → 403 |
+| GET | `events?from=&to=&child_id=&sport_id=&type=` | **Calendario unificado** (cada evento trae `shootout{score_us,score_them}\|null`): eventos publicados de **todos** los hijos (todas sus organizaciones) en un llamado (máx. 120 días, 500 eventos). Cada evento como en el calendario por hijo + `team{id,name}`, `sport{id,code,name}`, `organization{id,name}`, `child_ids[]` y `children[{child_id, first_name, callup{status,response}\|null}]`. **Un evento con dos hijos viene una sola vez** con ambos. Gratis: el pasado se limita por hijo (`meta.history_limited`). `child_id` ajeno → 403 |
 | GET | `children/{id}/events?from=&to=&sport_id=&team_id=&type=` | Eventos **publicados** de los equipos del hijo (los borradores no aparecen) con `callup{status,response}`. `meta.history_limited=true` si el plan recortó el pasado. Marcador `null` hasta que se publique |
-| GET | `children/{id}/events/{eventId}` | Detalle: `callup`, `attendance{status(present\|excused\|injured\|absent), note}`, `child_played{is_starter,minutes_played}`, `child_stats[{code,name,value}]`. Fuera del límite del plan: 403 `plan_limit` |
+| GET | `children/{id}/events/{eventId}` | Detalle: `callup`, `attendance{status(present\|excused\|injured\|absent\|late), note}`, `child_played{is_starter,minutes_played}`, `child_stats[{code,name,value}]`, `shootout{score_us,score_them}\|null` (sin los cobros de otros jugadores) y `child_shootout{taken, scored}\|null` (penales de su hijo). Fuera del límite del plan: 403 `plan_limit` |
 | POST ♻️ | `children/{id}/events/{eventId}/callup-response` | `{response: confirmed\|declined}` antes del partido (`not_called`, `event_closed`) |
-| GET | `children/{id}/stats?team_id=` | `by_sport[{sport_id, matches, minutes, stats[{code,name,value}]}]`, `attendance{present,excused,injured,absent}` (solo actividades publicadas). `meta.limited` en Gratis |
+| GET | `children/{id}/stats?team_id=` | `by_sport[{sport_id, matches, minutes, stats[{code,name,value}]}]`, `attendance{present,excused,injured,absent,late}` (solo actividades publicadas). `meta.limited` en Gratis |
 | GET | `plan` | `level(free\|pro\|premium), label, assigned_by (organización), ends_at, pro_player_id, can_change_pro_child, limits` |
 | POST | `plan/pro-child` | `{player_id}` elegir el hijo del plan Pro (cambios cada 30 días: `pro_child_locked`) |
 | DELETE | `account` | Borrar cuenta (obligatorio en tiendas). Con contraseña: `{password}`. Cuenta creada con Google/Apple (`password_set:false`): `{confirm:"ELIMINAR"}` |

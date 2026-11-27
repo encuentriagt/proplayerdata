@@ -120,8 +120,9 @@ final class EventNotifier
     public function result(Event $event, bool $corrected): void
     {
         $event->loadMissing('team.sport');
-        $score = "{$event->score_us}-{$event->score_them}";
-        $headline = $event->team->name.' '.$event->score_us.' - '.$event->score_them.($event->opponent_name ? ' '.$event->opponent_name : '');
+        $score = "{$event->score_us}-{$event->score_them}".($event->shootout_us !== null ? "p{$event->shootout_us}-{$event->shootout_them}" : '');
+        $headline = $event->team->name.' '.$event->score_us.'–'.$event->score_them.($event->opponent_name ? ' '.$event->opponent_name : '')
+            .($event->shootout_us !== null ? " ({$event->shootout_us}–{$event->shootout_them} en penales)" : '');
         $names = SportStatType::where('sport_id', $event->team->sport_id)->pluck('name', 'code');
         $stats = PlayerEventStat::where('event_id', $event->id)->get()->keyBy('player_id');
 
@@ -157,7 +158,7 @@ final class EventNotifier
     public function attendance(Event $event, array $playerIds): int
     {
         $event->loadMissing('team');
-        $labels = ['present' => 'Asiste', 'excused' => 'No asiste (con aviso)', 'injured' => 'Lesión', 'absent' => 'No asiste (sin justificar)'];
+        $labels = ['present' => 'Asiste', 'excused' => 'No asiste (con aviso)', 'injured' => 'Lesión', 'absent' => 'No asiste (sin justificar)', 'late' => 'Llegó tarde'];
         $rows = \App\Models\Attendance::with('player')->where('event_id', $event->id)->whereIn('player_id', $playerIds)->get();
         $sent = 0;
         foreach ($rows as $a) {

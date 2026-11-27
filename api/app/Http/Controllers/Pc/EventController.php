@@ -443,6 +443,12 @@ class EventController extends Controller
             'actions.*.minute' => ['nullable', 'integer', 'min:0', 'max:600'],
             'actions.*.value' => ['nullable', 'integer', 'min:1', 'max:99'],
             'actions.*.note' => ['nullable', 'string', 'max:200'],
+            'shootout' => ['sometimes', 'nullable', 'array'],
+            'shootout.score_us' => ['required_with:shootout', 'integer', 'min:0', 'max:99'],
+            'shootout.score_them' => ['required_with:shootout', 'integer', 'min:0', 'max:99'],
+            'shootout.kicks' => ['required_with:shootout', 'array', 'max:60'],
+            'shootout.kicks.*.player_id' => ['required', 'integer'],
+            'shootout.kicks.*.scored' => ['required', 'boolean'],
         ]);
 
         $result = $sheets->save($event, $data, $access->user);

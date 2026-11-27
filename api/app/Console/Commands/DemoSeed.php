@@ -70,6 +70,7 @@ class DemoSeed extends Command
             $director = $mk('director', 'Diego Director');
             $coach = $mk('coach', 'Carlos Coach');
             $papa = $mk('padre', 'Pedro Padre');
+            $papa->forceFill(['account_type' => User::GUARDIAN])->save(); // cuenta de padre: entra solo a la App
             foreach ([[$admin, 'org_admin'], [$director, 'director'], [$coach, 'coach']] as [$u, $role]) {
                 OrganizationMember::create(['organization_id' => $org->id, 'user_id' => $u->id, 'role' => $role, 'status' => 'active']);
             }

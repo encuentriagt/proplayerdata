@@ -61,6 +61,14 @@ Route::prefix('auth')->group(function () {
     });
 });
 
+// ---- App de padres: registro y contraseña (sin sesión) ----
+Route::prefix('app/auth')->group(function () {
+    Route::post('register', [\App\Http\Controllers\App\GuardianAuthController::class, 'register'])->middleware(['throttle:register', 'idempotent']);
+    Route::post('social', [\App\Http\Controllers\App\GuardianAuthController::class, 'social'])->middleware('throttle:social');
+    Route::post('password/forgot', [\App\Http\Controllers\App\GuardianAuthController::class, 'forgot'])->middleware('throttle:codes');
+    Route::post('password/reset', [\App\Http\Controllers\App\GuardianAuthController::class, 'reset'])->middleware(['throttle:codes', 'idempotent']);
+});
+
 // Archivos privados: solo con URL firmada y vigente (sin sesión).
 Route::prefix('files')->middleware(['signed', 'throttle:public'])->group(function () {
     Route::get('players/{player}/photo', PlayerPhotoController::class)->name('files.player-photo');
@@ -76,7 +84,9 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::post('me/notifications/read', [MeController::class, 'markRead']);
 
     // ---- App de padres ----
-    Route::prefix('app')->group(function () {
+    Route::prefix('app')->middleware('account:guardian')->group(function () {
+        Route::post('auth/verify-email', [\App\Http\Controllers\App\GuardianAuthController::class, 'verifyEmail'])->middleware(['throttle:codes'])->name('app.auth.verify');
+        Route::post('auth/verify-email/resend', [\App\Http\Controllers\App\GuardianAuthController::class, 'resend'])->middleware('throttle:email-resend')->name('app.auth.verify_resend');
         Route::get('children', [ChildController::class, 'index']);
         Route::get('children/{player}/events', [ChildController::class, 'events']);
         Route::get('children/{player}/events/{eventId}', [ChildController::class, 'event'])->whereNumber('eventId');
@@ -88,7 +98,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     });
 
     // ---- PC: Plataforma Coach (coach, director, org_admin) ----
-    Route::prefix('pc/orgs/{organization:slug}')->middleware('org')->scopeBindings()->group(function () {
+    Route::prefix('pc/orgs/{organization:slug}')->middleware(['account:staff', 'org'])->scopeBindings()->group(function () {
         Route::get('access', \App\Http\Controllers\Pc\AccessController::class);
         Route::get('notification-prefs', [\App\Http\Controllers\Pc\NotificationPrefsController::class, 'show']);
         Route::put('notification-prefs', [\App\Http\Controllers\Pc\NotificationPrefsController::class, 'update']);
@@ -154,7 +164,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
 });
 
 // ---- Panel de super admin (TOTP verificado en esta sesión) ----
-Route::prefix('admin')->middleware(['auth:sanctum', 'active', 'superadmin', 'throttle:api'])->group(function () {
+Route::prefix('admin')->middleware(['auth:sanctum', 'active', 'account:staff', 'superadmin', 'throttle:api'])->group(function () {
     Route::get('organizations', [OrganizationAdminController::class, 'index']);
     Route::post('organizations', [OrganizationAdminController::class, 'store'])->middleware('idempotent');
     Route::get('organizations/{organization}', [OrganizationAdminController::class, 'show']);

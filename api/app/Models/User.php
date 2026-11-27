@@ -31,6 +31,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
             'must_change_password' => 'boolean',
+            'password_set' => 'boolean',
             'totp_secret' => 'encrypted',
             'totp_confirmed_at' => 'datetime',
             'apple_refresh_token' => 'encrypted',
@@ -54,6 +55,26 @@ class User extends Authenticatable
     public function staffTeams(): HasMany
     {
         return $this->hasMany(TeamStaff::class);
+    }
+
+    /** staff: PC y Panel (login web). guardian: App de padres (login android/ios). Mismo correo puede existir en ambos. */
+    public const STAFF = 'staff';
+
+    public const GUARDIAN = 'guardian';
+
+    public function isGuardianAccount(): bool
+    {
+        return $this->account_type === self::GUARDIAN;
+    }
+
+    public function scopeGuardians($q)
+    {
+        return $q->where('account_type', self::GUARDIAN);
+    }
+
+    public function scopeStaff($q)
+    {
+        return $q->where('account_type', self::STAFF);
     }
 
     public function isActive(): bool

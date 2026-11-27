@@ -22,7 +22,7 @@ class PasswordResetController extends Controller
     public function forgot(Request $request): JsonResponse
     {
         $data = $request->validate(['email' => ['required', 'email:rfc', 'max:191'], 'slug' => ['nullable', 'string', 'max:60']]);
-        $user = User::where('email', Str::lower(trim($data['email'])))->first();
+        $user = User::staff()->where('email', Str::lower(trim($data['email'])))->first();
 
         if ($user && $user->isActive()) {
             $org = ! empty($data['slug']) ? Organization::where('slug', $data['slug'])->first() : null;

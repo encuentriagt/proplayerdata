@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.11 (2026-11-28)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.13 (2026-11-30)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -40,6 +40,8 @@ Enlaces de invitación: staff → `https://pc.ppdguate.com/{slug}/invitacion?tok
 
 ## 3. Sesión (`/auth`)
 
+**Cuentas separadas (desde v1.12):** `account_type` = `staff` (PC y Panel) o `guardian` (App de padres). El mismo correo puede existir en ambos tipos, con contraseña, sesiones y dispositivos independientes. El login con `X-App-Platform: android|ios` solo busca cuentas de padre; con `web`, solo staff. Una cuenta del otro tipo responde igual que una contraseña incorrecta (`invalid_credentials`). `/app/*` es solo para padres y `/pc/*` y `/admin/*` solo para staff (403 `forbidden`). La cuenta de padre no pertenece a ninguna organización: se relaciona con ellas solo a través de sus hijos.
+
 | Método | Ruta | Cuerpo / Notas |
 |---|---|---|
 | POST | `/auth/login` | `{email, password}` + `X-App-Platform`. Respuesta: `token, token_type, expires_at, user{id,name,email,must_change_password,is_super_admin}, memberships[{organization_id, role, role_label, branding_editable, permissions, organization{marca}}], is_guardian, admin_totp (null\|setup\|verify)`. `branding_editable` es `true` solo para `org_admin` cuando el super admin permitió que la organización edite su marca. Errores: `invalid_credentials` (mismo mensaje exista o no el correo), `account_locked` (423, `retry_after_minutes`), `no_active_organization` (403), `platform_invalid` |
@@ -54,6 +56,22 @@ Enlaces de invitación: staff → `https://pc.ppdguate.com/{slug}/invitacion?tok
 | POST | `/auth/totp/verify` | `{code}` habilita el Panel en esta sesión (30 min sin uso) |
 
 **Contraseña temporal**: si `must_change_password=true`, la API solo permite `/auth/me`, `/auth/logout` y `/auth/password`; todo lo demás responde 403 `password_change_required`. El cliente debe llevar al usuario a cambiarla.
+
+El login y `/auth/me` traen además `user.account_type`, `user.phone`, `user.email_verified`, `user.password_set` (false = cuenta creada con Google/Apple; puede crear contraseña con «olvidé mi contraseña»), `user.linked` (`["google","apple"]`), `is_guardian` (= cuenta de padre) y `must_verify_email` (padre sin correo verificado).
+
+**Correo sin verificar (padres):** hasta verificar, la API solo permite `/auth/me`, `/auth/logout`, `/app/auth/verify-email` y `/app/auth/verify-email/resend`; todo lo demás responde 403 `email_unverified`.
+
+### Registro y contraseña de padres (`/app/auth`)
+| Método | Ruta | Cuerpo / Notas |
+|---|---|---|
+| POST ♻️ | `/app/auth/register` | Sin sesión. `X-App-Platform: android\|ios` (si no, 422 `platform_invalid`). `{name, email, phone?, password, password_confirmation}` (contraseña: mín. 10, letras y números). Correo ya registrado como padre → 422 `email_taken`. Responde **201 igual que el login**, con `must_verify_email: true`, y envía un código de 6 dígitos al correo. Límite: 5/hora y 20/día por IP |
+| POST | `/app/auth/social` | **Continuar con Google o Apple** (crear cuenta o iniciar sesión). Sin sesión. `X-App-Platform: android\|ios`. `{provider: google\|apple, id_token, nonce?, name?}`. La API valida el ID token con las llaves públicas del proveedor (firma, emisor, destinatario = nuestros client IDs, vencimiento; `nonce` si se envía: igual o su SHA-256). Busca la cuenta de padre por el usuario del proveedor; si no, por el **correo verificado** (la vincula y la marca verificada); si no, **crea la cuenta** ya verificada (sin contraseña: `password_set:false`) y envía un **correo de bienvenida**. Responde como el login + `created` (201 si se creó, 200 si no). Errores: `social_token_invalid` 422, `social_email_required` 422 (sin correo verificado y sin cuenta previa), `social_conflict` 409 (ese correo ya está vinculado a otra cuenta del mismo proveedor), `social_unavailable` 503 (falta configurar los client IDs). Apple da el nombre solo la primera vez: envíelo en `name`. Límite 15/min y 60/hora por IP |
+| POST | `/app/auth/verify-email` | Con sesión. `{code}` (6 dígitos, vence en 15 min, máx. 5 intentos). Mal o vencido → 422 `code_invalid`. Responde `{ok, email_verified:true}` |
+| POST | `/app/auth/verify-email/resend` | Con sesión. Anula el código anterior y manda otro. Límite 1/min y 10/día → 429 |
+| POST | `/app/auth/password/forgot` | Sin sesión. `{email}`. Siempre 200 con el mismo mensaje; si existe la cuenta de padre, envía un **código** de 6 dígitos (15 min) |
+| POST ♻️ | `/app/auth/password/reset` | Sin sesión. `{email, code, password, password_confirmation}`. Cambia la contraseña, verifica el correo, desbloquea y **cierra todas las sesiones**. Mal → 422 `code_invalid` |
+
+`/auth/password/forgot` (con enlace) queda **solo para staff**. Teléfono: se guarda pero todavía no se verifica por SMS.
 
 Ruteo sugerido tras el login: `memberships` no vacío → PC (si hay varias organizaciones, que el usuario elija) · `is_guardian` → App · `is_super_admin` → Panel (pedir TOTP según `admin_totp`).
 
@@ -209,7 +227,7 @@ El padre solo ve **a sus hijos** y **solo los datos de su hijo** (no los de otro
 | GET | `children/{id}/stats?team_id=` | `by_sport[{sport_id, matches, minutes, stats[{code,name,value}]}]`, `attendance{present,excused,injured,absent}` (solo actividades publicadas). `meta.limited` en Gratis |
 | GET | `plan` | `level(free\|pro\|premium), label, assigned_by (organización), ends_at, pro_player_id, can_change_pro_child, limits` |
 | POST | `plan/pro-child` | `{player_id}` elegir el hijo del plan Pro (cambios cada 30 días: `pro_child_locked`) |
-| DELETE | `account` | `{password}` borrar cuenta (obligatorio en tiendas). Admin de organización: 409 `is_org_admin` |
+| DELETE | `account` | Borrar cuenta (obligatorio en tiendas). Con contraseña: `{password}`. Cuenta creada con Google/Apple (`password_set:false`): `{confirm:"ELIMINAR"}` |
 
 Texto sugerido al topar un límite: *"Esta función tiene un límite en su plan actual. Consulte con su institución."*
 

@@ -49,7 +49,7 @@ class PlanAdminController extends Controller
             'ends_at' => ['nullable', 'date', 'after:today'],
             'note' => ['nullable', 'string', 'max:200'],
         ]);
-        $user = User::where('email', Str::lower(trim($data['email'])))->first();
+        $user = User::guardians()->where('email', Str::lower(trim($data['email'])))->first();
         if (! $user) {
             return ApiError::response('user_not_found', 'No existe un usuario con ese correo.', 422);
         }

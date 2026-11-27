@@ -130,8 +130,11 @@ class AuthTest extends TestCase
     public function test_una_sesion_por_plataforma(): void
     {
         $this->coach($this->org());
+        // Mismo correo como padre: cuenta aparte, sesión de la App independiente.
+        $p = new User(['name' => 'Padre', 'email' => 'coach@demo.test', 'password' => 'OtraClave2026']);
+        $p->forceFill(['status' => 'active', 'account_type' => User::GUARDIAN, 'email_verified_at' => now()])->save();
         $web1 = $this->login()->json('data.token');
-        $android = $this->login(platform: 'android')->json('data.token');
+        $android = $this->login(pass: 'OtraClave2026', platform: 'android')->json('data.token');
         $web2 = $this->login()->json('data.token');
 
         $this->app['auth']->forgetGuards();
@@ -193,8 +196,9 @@ class AuthTest extends TestCase
 
     public function test_cambio_de_contrasena_cierra_otras_sesiones(): void
     {
-        $this->coach($this->org());
-        $web = $this->login()->json('data.token');
+        $p = new User(['name' => 'Padre', 'email' => 'coach@demo.test', 'password' => self::PASS]);
+        $p->forceFill(['status' => 'active', 'account_type' => User::GUARDIAN, 'email_verified_at' => now()])->save();
+        $web = $this->login(platform: 'ios')->json('data.token');
         $android = $this->login(platform: 'android')->json('data.token');
 
         $this->withToken($web)->postJson('/api/auth/password', [

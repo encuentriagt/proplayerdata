@@ -38,7 +38,9 @@ class AuthController extends Controller
         }
 
         $email = Str::lower(trim($request->string('email')));
-        $user = User::where('email', $email)->first();
+        // App (android/ios) → solo cuentas de padre. Web → solo staff. Una cuenta del otro tipo "no existe" aquí.
+        $type = in_array($platform, ['android', 'ios'], true) ? User::GUARDIAN : User::STAFF;
+        $user = User::where('email', $email)->where('account_type', $type)->first();
 
         // Mismo tiempo de respuesta exista o no el correo.
         $hash = $user?->password ?? self::DUMMY_HASH;
@@ -61,8 +63,8 @@ class AuthController extends Controller
             return ApiError::response('invalid_credentials', 'Correo o contraseña incorrectos.', 422);
         }
 
-        $memberships = $this->activeMemberships($user);
-        if (! $user->is_super_admin && $memberships->isEmpty() && ! $this->hasActiveChildren($user)) {
+        $memberships = $type === User::STAFF ? $this->activeMemberships($user) : collect();
+        if ($type === User::STAFF && ! $user->is_super_admin && $memberships->isEmpty()) {
             Audit::log('auth.login_denied', $user, ['reason' => 'no_active_organization'], null, $user->id);
 
             return ApiError::response(
@@ -72,33 +74,37 @@ class AuthController extends Controller
             );
         }
 
-        $token = DB::transaction(function () use ($user, $platform) {
-            // Una sesión por plataforma: se cierran las anteriores de la misma plataforma.
+        $token = self::issueToken($user, $platform);
+        Audit::log('auth.login', $user, ['platform' => $platform], null, $user->id);
+
+        return response()->json(['data' => $this->sessionPayload($user, $token, $memberships)]);
+    }
+
+    /** Una sesión por plataforma: se cierran las anteriores de la misma plataforma. */
+    public static function issueToken(User $user, string $platform)
+    {
+        return DB::transaction(function () use ($user, $platform) {
             $user->tokens()->where('name', 'platform:'.$platform)->delete();
-
             $user->forceFill(['failed_logins' => 0, 'locked_until' => null, 'last_login_at' => now()])->save();
-
             $minutes = (int) config('sanctum.expiration');
 
             return $user->createToken('platform:'.$platform, ['basic'], $minutes > 0 ? now()->addMinutes($minutes) : null);
         });
+    }
 
-        Audit::log('auth.login', $user, ['platform' => $platform], null, $user->id);
-
-        // Super admin: el panel exige además el código TOTP en esta sesión.
-        $totp = $user->is_super_admin ? ($user->totp_confirmed_at ? 'verify' : 'setup') : null;
-
-        return response()->json([
-            'data' => [
-                'token' => $token->plainTextToken,
-                'token_type' => 'Bearer',
-                'expires_at' => $token->accessToken->expires_at?->toIso8601String(),
-                'user' => $this->userPayload($user),
-                'memberships' => $this->membershipsPayload($memberships),
-                'is_guardian' => $this->hasActiveChildren($user),
-                'admin_totp' => $totp,
-            ],
-        ]);
+    public function sessionPayload(User $user, $token, $memberships): array
+    {
+        return [
+            'token' => $token->plainTextToken,
+            'token_type' => 'Bearer',
+            'expires_at' => $token->accessToken->expires_at?->toIso8601String(),
+            'user' => $this->userPayload($user),
+            'memberships' => $this->membershipsPayload($memberships),
+            'is_guardian' => $user->isGuardianAccount(),
+            'must_verify_email' => $user->isGuardianAccount() && ! $user->email_verified_at,
+            // Super admin: el panel exige además el código TOTP en esta sesión.
+            'admin_totp' => $user->is_super_admin ? ($user->totp_confirmed_at ? 'verify' : 'setup') : null,
+        ];
     }
 
     public function me(Request $request): JsonResponse
@@ -107,8 +113,9 @@ class AuthController extends Controller
 
         return response()->json(['data' => [
             'user' => $this->userPayload($user),
-            'memberships' => $this->membershipsPayload($this->activeMemberships($user)),
-            'is_guardian' => $this->hasActiveChildren($user),
+            'memberships' => $this->membershipsPayload($user->isGuardianAccount() ? collect() : $this->activeMemberships($user)),
+            'is_guardian' => $user->isGuardianAccount(),
+            'must_verify_email' => $user->isGuardianAccount() && ! $user->email_verified_at,
         ]]);
     }
 
@@ -175,18 +182,17 @@ class AuthController extends Controller
             ->get();
     }
 
-    /** Padre/encargado con al menos un hijo en una organización activa. */
-    private function hasActiveChildren(User $user): bool
-    {
-        return $user->children()->whereHas('organization', fn ($q) => $q->where('status', 'active'))->exists();
-    }
-
     private function userPayload(User $user): array
     {
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'phone' => $user->phone,
+            'account_type' => $user->account_type,
+            'email_verified' => $user->email_verified_at !== null,
+            'password_set' => (bool) ($user->password_set ?? true),
+            'linked' => array_values(array_filter(['google' => $user->google_sub ? 'google' : null, 'apple' => $user->apple_sub ? 'apple' : null])),
             'must_change_password' => (bool) $user->must_change_password,
             'is_super_admin' => (bool) $user->is_super_admin,
         ];

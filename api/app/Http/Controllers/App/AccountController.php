@@ -74,9 +74,14 @@ class AccountController extends Controller
     public function destroy(Request $request): JsonResponse
     {
         $user = $request->user();
-        $request->validate(['password' => ['required', 'string', 'max:200']]);
-        if (! Hash::check((string) $request->input('password'), $user->password)) {
-            return ApiError::response('invalid_credentials', 'La contraseña no es correcta.', 422);
+        if ($user->password_set) {
+            $request->validate(['password' => ['required', 'string', 'max:200']]);
+            if (! Hash::check((string) $request->input('password'), $user->password)) {
+                return ApiError::response('invalid_credentials', 'La contraseña no es correcta.', 422);
+            }
+        } else {
+            // Cuenta creada con Google o Apple (sin contraseña): confirma escribiendo ELIMINAR.
+            $request->validate(['confirm' => ['required', 'in:ELIMINAR']]);
         }
         if (OrganizationMember::where('user_id', $user->id)->where('role', 'org_admin')->where('status', 'active')->exists()) {
             return ApiError::response('is_org_admin', 'Usted es administrador de una organización. Comuníquese con soporte para borrar su cuenta.', 409);

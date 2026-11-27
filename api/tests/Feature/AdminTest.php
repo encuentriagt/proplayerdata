@@ -118,7 +118,7 @@ class AdminTest extends TestCase
     public function test_planes_por_super_admin(): void
     {
         $t = $this->adminToken();
-        $this->makeUser('papa@x.test');
+        $this->guardian('papa@x.test');
         $this->withToken($t)->postJson('/api/admin/plans', ['email' => 'papa@x.test', 'plan' => 'premium', 'note' => 'cortesía'])->assertCreated();
         $this->withToken($t)->postJson('/api/admin/plans', ['email' => 'nadie@x.test', 'plan' => 'pro'])->assertStatus(422);
         $this->assertSame(1, PlanGrant::active()->count());

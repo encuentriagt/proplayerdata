@@ -149,6 +149,7 @@ String attendanceLabel(String status) => switch (status) {
   'excused' => 'No asiste (con aviso)',
   'injured' => 'Lesión',
   'absent' => 'No justificado',
+  'late' => 'Llegó tarde',
   _ => status,
 };
 
@@ -171,6 +172,10 @@ class ChildEventDetail {
     this.attendance,
     this.played,
     this.stats,
+    this.shootoutUs,
+    this.shootoutThem,
+    this.childShotsTaken,
+    this.childShotsScored,
   });
 
   final CalendarEvent event;
@@ -181,12 +186,27 @@ class ChildEventDetail {
   /// null mientras no se publique la ficha.
   final List<NamedStat>? stats;
 
+  /// Tanda de penales (si hubo).
+  final int? shootoutUs;
+  final int? shootoutThem;
+
+  /// Penales del hijo en la tanda.
+  final int? childShotsTaken;
+  final int? childShotsScored;
+
+  bool get hasShootout => shootoutUs != null && shootoutThem != null;
+
   factory ChildEventDetail.fromJson(Map<String, dynamic> json) {
     T? obj<T>(String key, T Function(Map<String, dynamic>) f) =>
         json[key] is Map
         ? f(Map<String, dynamic>.from(json[key] as Map))
         : null;
     final rawStats = json['child_stats'];
+    final shootout = json['shootout'] is Map ? json['shootout'] as Map : null;
+    final mine = json['child_shootout'] is Map
+        ? json['child_shootout'] as Map
+        : null;
+    int? n(Object? v) => v is int ? v : int.tryParse('${v ?? ''}');
     return ChildEventDetail(
       event: CalendarEvent.fromJson(json),
       callup: obj('callup', Callup.fromJson),
@@ -198,6 +218,10 @@ class ChildEventDetail {
                 .map((e) => NamedStat.fromJson(Map<String, dynamic>.from(e)))
                 .toList()
           : null,
+      shootoutUs: n(shootout?['score_us']),
+      shootoutThem: n(shootout?['score_them']),
+      childShotsTaken: n(mine?['taken']),
+      childShotsScored: n(mine?['scored']),
     );
   }
 }

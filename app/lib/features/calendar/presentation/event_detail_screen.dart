@@ -314,6 +314,16 @@ class _ChildData extends StatelessWidget {
           alert: d.attendance!.isInjury,
           note: d.attendance!.note,
         ),
+      if (d.hasShootout)
+        _Field(
+          label: 'Penales',
+          value: [
+            'Tanda ${d.shootoutUs} – ${d.shootoutThem}',
+            if (d.childShotsTaken != null && d.childShotsTaken! > 0)
+              '${d.childShotsTaken == 1 ? 'Cobró 1' : 'Cobró ${d.childShotsTaken}'}, '
+                  'anotó ${d.childShotsScored ?? 0}',
+          ].join(' · '),
+        ),
       if (d.played != null)
         _Field(
           label: 'Participación',

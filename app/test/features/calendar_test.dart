@@ -146,6 +146,8 @@ FakeApi calendarApi() => FakeApi((r) {
           'callup': {'status': 'called', 'response': 'confirmed'},
           'attendance': {'status': 'present', 'note': null},
           'child_played': {'is_starter': true, 'minutes_played': 60},
+          'shootout': {'score_us': 4, 'score_them': 3},
+          'child_shootout': {'taken': 1, 'scored': 1},
           'child_stats': [
             {'code': 'goal', 'name': 'Goles', 'value': 2},
             {'code': 'assist', 'name': 'Asistencias', 'value': 1},
@@ -196,6 +198,10 @@ Future<void> tap(WidgetTester tester, Finder finder) async {
 
 void main() {
   setUpAll(() => initializeDateFormatting('es'));
+
+  test('asistencia «Llegó tarde»', () {
+    expect(attendanceLabel('late'), 'Llegó tarde');
+  });
 
   group('CalendarFilter', () {
     final events = apiEvents.map(CalendarEvent.fromJson).toList();
@@ -256,6 +262,7 @@ void main() {
     expect(find.text('Convocado · Asistencia confirmada'), findsOneWidget);
     expect(find.text('Titular · 60 minutos'), findsOneWidget);
     expect(find.text('Goles'), findsOneWidget);
+    expect(find.text('Tanda 4 – 3 · Cobró 1, anotó 1'), findsOneWidget);
     // Luis
     await tester.scrollUntilVisible(
       find.text('Lesión'),

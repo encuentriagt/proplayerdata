@@ -18,6 +18,17 @@ class SeasonController extends Controller
         return response()->json(['data' => $organization->seasons()->orderByDesc('starts_on')->get()->map->payload()]);
     }
 
+    /** Vista previa para el formulario: el ciclo y el mensaje al elegir las fechas (misma regla que al guardar). */
+    public function cycle(Request $request, Organization $organization): JsonResponse
+    {
+        $data = $request->validate([
+            'starts_on' => ['required', 'date'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+        ]);
+
+        return response()->json(['data' => Season::cycleInfo($data['starts_on'], $data['ends_on'])]);
+    }
+
     public function store(Request $request, Organization $organization, OrgAccess $access): JsonResponse
     {
         $access->authorize($access->isAdmin());

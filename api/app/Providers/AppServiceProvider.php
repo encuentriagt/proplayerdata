@@ -29,11 +29,8 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Contraseñas: mínimo 10, letras y números; en producción, verificación contra filtraciones.
-        Password::defaults(function () {
-            $rule = Password::min(10)->letters()->numbers();
-
-            return $this->app->isProduction() ? $rule->uncompromised() : $rule;
-        });
+        // Decisión del dueño (2026-11-26): sin revisión de contraseñas filtradas; mín. 10 con letras y números.
+        Password::defaults(fn () => Password::min(10)->letters()->numbers());
 
         // Límites de peticiones (docs/ARQUITECTURA.md, sección 12).
         RateLimiter::for('public', fn (Request $r) => Limit::perMinute(60)->by($r->ip()));

@@ -21,7 +21,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
   const sport = {
     id: 1, code: 'soccer', name: 'Soccer', periods: 2, period_minutes: 40, max_on_field: 11, unlimited_substitutions: false,
     positions: [{ id: 1, code: 'POR', name: 'Portero', sort: 1 }, { id: 3, code: 'DEL', name: 'Delantero', sort: 2 }] as any[],
-    stat_types: [{ id: 1, code: 'goal', name: 'Gol', scores: 1 }, { id: 2, code: 'assist', name: 'Asistencia', scores: 0 }, { id: 3, code: 'yellow_card', name: 'Amarilla', scores: 0 }],
+    stat_types: [{ id: 1, code: 'goal', name: 'Gol', scores: 1 }, { id: 2, code: 'assist', name: 'Asistencia', scores: 0 }, { id: 3, code: 'yellow_card', name: 'Amarilla', scores: 0 }, { id: 4, code: 'goal_conceded', name: 'Gol en contra', scores: 0 }],
   }
   const team = { id: 1, name: 'Sub-15 Masculino', category: 'Sub-15', gender: 'male', color: '#0B3D91', sport: { id: 1, code: 'soccer', name: 'Soccer' }, season: null }
   const basketSport = { id: 2, code: 'basketball', name: 'Basketball', periods: 4, period_minutes: 10, max_on_field: 5, unlimited_substitutions: true, positions: [], stat_types: [{ id: 9, code: 'point_2', name: 'Doble', scores: 2 }] }
@@ -223,6 +223,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
         e.score_us = body.score_us
         e.score_them = body.score_them
         e.lineup = body.lineup
+        e.shootout = body.shootout ?? null
         e.actions = body.actions.map((a: any) => ({ type: 'stat', ...a }))
         if (body.publish) { e.status = 'finished'; e.result_published_at ??= new Date().toISOString() }
         const scored = body.actions.filter((a: any) => a.stat_code === 'goal').reduce((n: number, a: any) => n + (a.value ?? 1), 0)

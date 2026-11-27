@@ -43,6 +43,7 @@ final class NotificationService
             return 0;
         }
 
+        $data = $this->enrich($data, $organizationId, $playerId);
         // FCM solo acepta textos en "data".
         $payload = array_map(fn ($v) => is_scalar($v) || $v === null ? (string) $v : json_encode($v), array_merge($data, ['kind' => $kind]));
         foreach (array_chunk($fresh, 200) as $chunk) {
@@ -71,5 +72,35 @@ final class NotificationService
         });
 
         return count($fresh);
+    }
+
+    /**
+     * Todos los avisos llevan con qué colegio, hijo, equipo y deporte tienen que ver, para que la App
+     * los muestre ("Colegio A · Ana · Soccer") y abra la pantalla correcta. Se respetan los datos ya enviados.
+     */
+    private function enrich(array $data, ?int $organizationId, ?int $playerId): array
+    {
+        if ($organizationId && ! isset($data['organization_id'])) {
+            $data['organization_id'] = $organizationId;
+        }
+        if (! empty($data['organization_id']) && ! isset($data['organization_name'])) {
+            $data['organization_name'] = DB::table('organizations')->where('id', $data['organization_id'])->value('name');
+        }
+        if ($playerId && ! isset($data['player_id'])) {
+            $data['player_id'] = $playerId;
+        }
+        if (! empty($data['player_id']) && ! isset($data['child_name'])) {
+            $data['child_name'] = DB::table('players')->where('id', $data['player_id'])->value('first_name');
+        }
+        if (! empty($data['event_id']) && empty($data['team_id'])) {
+            $data['team_id'] = DB::table('events')->where('id', $data['event_id'])->value('team_id');
+        }
+        if (! empty($data['team_id']) && ! isset($data['sport_code'])) {
+            $t = DB::table('teams')->join('sports', 'sports.id', '=', 'teams.sport_id')->where('teams.id', $data['team_id'])->first(['teams.name', 'sports.code']);
+            $data['sport_code'] = $t?->code;
+            $data['team_name'] ??= $t?->name;
+        }
+
+        return $data;
     }
 }

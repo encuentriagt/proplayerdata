@@ -1,4 +1,4 @@
-import { loadDraft, saveDraft, clearDraft, scoredByPlayers, sheetFromEvent, statCount, tapMinus, tapPlus, toPayload } from './matchSheet'
+import { loadDraft, saveDraft, clearDraft, scoredByPlayers, sheetFromEvent, statCount, tapMinus, tapPlus, toPayload, visibleStatTypes, rivalScore, goalkeeperFor } from './matchSheet'
 import type { EventDetail, RosterEntry, StatType } from './types'
 
 const roster: RosterEntry[] = [
@@ -72,6 +72,47 @@ describe('ficha del partido', () => {
     let s = sheetFromEvent(event(), roster)
     s = tapPlus(tapPlus(tapPlus(s, 15, 'goal'), 18, 'assist'), 18, 'own_goal')
     expect(scoredByPlayers(s, statTypes)).toBe(1)
+  })
+
+  it('con el catálogo, + y − de un gol actualizan el marcador de nuestro equipo', () => {
+    let s = { ...sheetFromEvent(event(), roster), score_them: 2 }
+    s = tapPlus(tapPlus(s, 15, 'goal', statTypes), 18, 'goal', statTypes)
+    expect(s.score_us).toBe(2)
+    s = tapPlus(s, 18, 'assist', statTypes)
+    expect(s.score_us).toBe(2)
+    s = tapMinus(s, 15, 'goal', statTypes)
+    expect(s.score_us).toBe(1)
+    expect(s.score_them).toBe(2)
+  })
+
+  it('gol del rival: suma gol en contra al portero que jugó (el titular si hubo dos) y − lo quita', () => {
+    const positions = [{ id: 1, code: 'POR', name: 'Portero' }, { id: 3, code: 'DEL', name: 'Delantero' }]
+    const types = [...statTypes, { id: 9, code: 'goal_conceded', name: 'Gol en contra', scores: 0 }]
+    let s = sheetFromEvent(event(), roster)
+    // Sin portero que jugó: solo cambia el marcador
+    s = rivalScore(s, 1, types, positions)
+    expect(s.score_them).toBe(1)
+    expect(s.stats).toHaveLength(0)
+    s.lineup[18] = { ...s.lineup[18], played: true, sport_position_id: 1 }
+    s.lineup[15] = { ...s.lineup[15], played: true, is_starter: true, sport_position_id: 1 }
+    expect(goalkeeperFor(s, positions)).toBe(15)
+    s = rivalScore(rivalScore(s, 1, types, positions), 1, types, positions)
+    expect(s.score_them).toBe(3)
+    expect(statCount(s, 15, 'goal_conceded')).toBe(2)
+    s = rivalScore(s, -1, types, positions)
+    expect(s.score_them).toBe(2)
+    expect(statCount(s, 15, 'goal_conceded')).toBe(1)
+    expect(s.score_us).toBe(0)
+    // Sin "Gol en contra" en el catálogo, no se agrega nada
+    expect(rivalScore(s, 1, statTypes, positions).stats).toEqual(s.stats)
+  })
+
+  it('la ficha no muestra asistencia, autogol ni atajada', () => {
+    const codes = visibleStatTypes([...statTypes, { id: 9, code: 'save', name: 'Atajada', scores: 0 }]).map((t) => t.code)
+    expect(codes).toContain('goal')
+    expect(codes).not.toContain('assist')
+    expect(codes).not.toContain('own_goal')
+    expect(codes).not.toContain('save')
   })
 
   it('arma el cuerpo de PUT match-sheet como lo espera la API', () => {

@@ -3,7 +3,7 @@ import { ChevronDown, Minus, Plus, Trash2 } from 'lucide-react'
 import { useOrg } from '../../lib/org'
 import { usePcMutation, useRoster } from '../../lib/queries'
 import {
-  clearDraft, emptyRow, loadDraft, saveDraft, scoredByPlayers, sheetFromEvent, statCount, tapMinus, tapPlus, toPayload,
+  CONCEDED, clearDraft, emptyRow, goalkeeperFor, isGoalkeeper, loadDraft, rivalScore, saveDraft, sheetFromEvent, statCount, tapMinus, tapPlus, toPayload, visibleStatTypes,
   type LineupRow, type SheetState,
 } from '../../lib/matchSheet'
 import { fmt } from '../../lib/dates'
@@ -57,8 +57,16 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
   const rosterById = new Map(roster.map((r) => [r.id, r]))
   // Jugadores de la ficha: plantilla activa + quien ya esté en la alineación aunque ya no esté activo.
   const players = roster.filter((r) => r.active || state.lineup[r.id]?.played)
-  const statTypes = sport.stat_types
-  const suggested = scoredByPlayers(state, statTypes)
+  // Todas cuentan para el marcador; en pantalla solo las visibles (sin asistencia, autogol ni atajada).
+  const allStatTypes = sport.stat_types
+  const statTypes = visibleStatTypes(allStatTypes).filter((t) => t.code !== CONCEDED)
+  // "Gol en contra" solo existe si el catálogo lo trae, y solo se muestra en el portero.
+  const conceded = allStatTypes.find((t) => t.code === CONCEDED)
+  const isGk = (id: number) => isGoalkeeper(row(id).sport_position_id, sport.positions)
+  const statsFor = (id: number) => (conceded && isGk(id) ? [...statTypes, conceded] : statTypes)
+  const gkMissing = !!conceded && goalkeeperFor(state, sport.positions) === null
+  const plus = (id: number, code: string) => update((s) => tapPlus(s, id, code, allStatTypes))
+  const minus = (id: number, code: string) => update((s) => tapMinus(s, id, code, allStatTypes))
   const playing = players.filter((p) => state.lineup[p.id]?.played)
 
   if (!players.length) return <Empty>El equipo no tiene jugadores activos.</Empty>
@@ -93,15 +101,18 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
       <section aria-labelledby="score-h" className="card px-4 py-5">
         <h2 id="score-h" className="sr-only">Marcador</h2>
         <div className="flex items-start justify-center gap-2 sm:gap-10">
-          <ScoreInput label="Nosotros" primary value={state.score_us} onChange={(v) => update((s) => ({ ...s, score_us: v }))} />
+          <ScoreAuto label="Nosotros" value={state.score_us} />
           <span className="num mt-10 text-3xl text-muted" aria-hidden>–</span>
-          <ScoreInput label={event.opponent_name || 'Rival'} value={state.score_them} onChange={(v) => update((s) => ({ ...s, score_them: v }))} />
+          <ScoreInput label={event.opponent_name || 'Rival'} value={state.score_them}
+            onStep={(d) => update((s) => rivalScore(s, d, allStatTypes, sport.positions))}
+            onChange={(v) => update((s) => ({ ...s, score_them: v }))} />
         </div>
-        {state.stats.length > 0 && suggested !== state.score_us && (
-          <p className="mt-3 text-center text-sm text-warn-ink">
-            Sus jugadores suman {suggested}.{' '}
-            <button className="font-semibold underline" onClick={() => update((s) => ({ ...s, score_us: suggested }))}>Usar {suggested}</button>
-          </p>
+        <p className="mt-3 text-center text-xs text-muted">
+          El marcador de su equipo se suma solo con los goles que marque a sus jugadores.
+          {conceded && ' Cada gol del rival se le suma como gol en contra a su portero.'}
+        </p>
+        {gkMissing && state.score_them > 0 && (
+          <p className="mt-1 text-center text-sm text-warn-ink">Marque quién jugó de Portero para sumarle los goles en contra.</p>
         )}
       </section>
 
@@ -119,7 +130,7 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
             const summary = [
               r.played ? (r.is_starter ? 'Titular' : 'Suplente') : 'No jugó',
               r.minutes_played !== null ? `${r.minutes_played}'` : null,
-              ...statTypes.filter((t) => statCount(state, p.id, t.code)).map((t) => `${statCount(state, p.id, t.code)} ${t.name.toLowerCase()}`),
+              ...statsFor(p.id).filter((t) => statCount(state, p.id, t.code)).map((t) => `${statCount(state, p.id, t.code)} ${t.name.toLowerCase()}`),
             ].filter(Boolean).join(' · ')
             return (
               <li key={p.id} className={`card overflow-hidden ${r.played ? '' : 'opacity-70'}`}>
@@ -154,11 +165,11 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
                 )}
 
                 {/* Estadísticas a la vista: en la cancha se anota sin abrir al jugador */}
-                {statTypes.length > 0 && (
+                {statsFor(p.id).length > 0 && (
                   <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-line px-3 py-2.5">
-                    {statTypes.map((t) => (
+                    {statsFor(p.id).map((t) => (
                       <StatStepper key={t.code} label={t.name} player={p.full_name} value={statCount(state, p.id, t.code)}
-                        onMinus={() => update((s) => tapMinus(s, p.id, t.code))} onPlus={() => update((s) => tapPlus(s, p.id, t.code))} />
+                        onMinus={() => minus(p.id, t.code)} onPlus={() => plus(p.id, t.code)} />
                     ))}
                   </div>
                 )}
@@ -178,6 +189,7 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
                 <th className="caps px-3 py-3 text-center font-semibold">Titular</th>
                 <th className="caps px-3 py-3 text-center font-semibold">Minutos</th>
                 {statTypes.map((t) => <th key={t.code} className="caps px-2 py-3 text-center font-semibold">{t.name}</th>)}
+                {conceded && <th className="caps px-2 py-3 text-center font-semibold">{conceded.name} <span className="normal-case tracking-normal">(portero)</span></th>}
               </tr>
             </thead>
             <tbody>
@@ -213,9 +225,17 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
                     {statTypes.map((t) => (
                       <td key={t.code} className="px-2 py-2">
                         <StatStepper label={t.name} player={p.full_name} value={statCount(state, p.id, t.code)} hideLabel
-                          onMinus={() => update((s) => tapMinus(s, p.id, t.code))} onPlus={() => update((s) => tapPlus(s, p.id, t.code))} />
+                          onMinus={() => minus(p.id, t.code)} onPlus={() => plus(p.id, t.code)} />
                       </td>
                     ))}
+                    {conceded && (
+                      <td className="px-2 py-2 text-center">
+                        {isGk(p.id) ? (
+                          <StatStepper label={conceded.name} player={p.full_name} value={statCount(state, p.id, CONCEDED)} hideLabel
+                            onMinus={() => minus(p.id, CONCEDED)} onPlus={() => plus(p.id, CONCEDED)} />
+                        ) : <span className="text-muted" aria-hidden>—</span>}
+                      </td>
+                    )}
                   </tr>
                 )
               })}
@@ -278,17 +298,27 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
   )
 }
 
-function ScoreInput({ label, value, onChange, primary = false }: { label: string; value: number; onChange: (v: number) => void; primary?: boolean }) {
+/** Marcador de nuestro equipo: solo lectura, se calcula con los goles de los jugadores. */
+function ScoreAuto({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="caps mb-2 max-w-36 truncate">{label}</span>
+      <output aria-label={`Marcador de ${label}`} aria-live="polite" className="num grid h-16 min-w-14 place-items-center text-6xl sm:min-w-20">{value}</output>
+    </div>
+  )
+}
+
+function ScoreInput({ label, value, onChange, onStep, primary = false }: { label: string; value: number; onChange: (v: number) => void; onStep: (d: 1 | -1) => void; primary?: boolean }) {
   const id = `score-${label}`
   return (
     <div className="flex flex-col items-center">
       <label htmlFor={id} className="caps mb-2 max-w-36 truncate">{label}</label>
       <div className="flex items-center gap-2 sm:gap-3">
-        <RoundButton kind="minus" label={`Restar a ${label}`} disabled={value <= 0} onClick={() => onChange(Math.max(0, value - 1))} size="lg" />
+        <RoundButton kind="minus" label={`Restar a ${label}`} disabled={value <= 0} onClick={() => onStep(-1)} size="lg" />
         <input id={id} type="number" inputMode="numeric" min={0} max={999} value={value}
           onChange={(e) => onChange(Math.min(999, Math.max(0, Number(e.target.value) || 0)))}
           className="num h-16 w-14 bg-transparent text-center text-6xl focus:outline-none sm:w-20" />
-        <RoundButton kind="plus" label={`Sumar a ${label}`} filled={primary} onClick={() => onChange(Math.min(999, value + 1))} size="lg" />
+        <RoundButton kind="plus" label={`Sumar a ${label}`} filled={primary} onClick={() => onStep(1)} size="lg" />
       </div>
     </div>
   )

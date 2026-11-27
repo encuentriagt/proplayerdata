@@ -4,7 +4,7 @@ import { ApiError, newIdempotencyKey, request, requestIdempotent, type RequestOp
 import { pcPath, useOrg } from './org'
 import type {
   EventDetail, EventType, Invitation, Position, StatType, Member, PcEvent, PlanGrant, PlanUsage, Player, PlayerDetail,
-  RosterEntry, Season, Sport, Team, TeamDetail,
+  RosterEntry, Season, Sport, Team, TeamDetail, SeasonCycleInfo,
 } from './types'
 
 export interface Paged<T> { data: T[]; meta: { current_page: number; last_page: number; total: number } }
@@ -41,6 +41,19 @@ export function useRoster(teamId: number | undefined) {
 export function useSeasons() {
   const { slug, path } = usePc()
   return useQuery({ queryKey: [slug, 'seasons'], queryFn: async () => (await request<Season[]>(path('seasons'))).data })
+}
+
+/** Vista previa del ciclo al elegir las fechas de una temporada (antes de guardar). */
+export function useSeasonCycle(starts_on: string, ends_on: string) {
+  const { slug, path } = usePc()
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(starts_on) && /^\d{4}-\d{2}-\d{2}$/.test(ends_on)
+  return useQuery({
+    queryKey: [slug, 'seasons', 'cycle', starts_on, ends_on],
+    queryFn: async () => (await request<SeasonCycleInfo>(path('seasons/cycle'), { query: { starts_on, ends_on } })).data,
+    enabled: ok,
+    retry: false,
+    staleTime: 60 * 60_000,
+  })
 }
 
 /** Deportes activados por la organización que el miembro ve (admin: todos los activados; director/coach: su alcance). */

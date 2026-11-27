@@ -78,7 +78,23 @@ export interface Sport {
   stat_types?: StatType[]
 }
 
-export interface Season { id: number; name: string; starts_on: string | null; ends_on: string | null; is_current: boolean }
+export type SeasonCycle = 'guatemalan' | 'american'
+export interface SeasonProgress {
+  status: 'upcoming' | 'in_progress' | 'finished'
+  percent: number
+  percent_exact: number
+  days_total: number
+  days_elapsed: number
+  days_left: number
+}
+/** Ciclo y avance de una temporada (API v1.15). Sin fechas: todo null. */
+export interface SeasonCycleInfo {
+  cycle: SeasonCycle | null
+  cycle_label: string | null
+  cycle_message: string | null
+  progress: SeasonProgress | null
+}
+export interface Season extends Partial<SeasonCycleInfo> { id: number; name: string; starts_on: string | null; ends_on: string | null; is_current: boolean }
 
 export type Gender = 'male' | 'female' | 'mixed'
 

@@ -111,7 +111,34 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
     }
     if (pc === 'teams/1') return ok(route, { ...team, sport, staff: [{ user_id: 1, name: 'Carlos Coach', role: 'head_coach' }], can_manage: role !== 'coach' })
     if (pc === 'teams/1/roster') return ok(route, roster)
-    if (pc === 'seasons') return ok(route, [{ id: 1, name: '2026-2027', starts_on: '2026-07-01', ends_on: '2027-06-30', is_current: true }])
+    // Ciclo y avance (API v1.15): misma regla que la API, con la fecha de Guatemala
+    const cycleOf = (a: string | null, b: string | null) => {
+      if (!a || !b) return { cycle: null, cycle_label: null, cycle_message: null, progress: null }
+      const ya = a.slice(0, 4), yb = b.slice(0, 4)
+      const american = ya !== yb
+      const day = (x: string) => Date.parse(`${x}T00:00:00Z`) / 864e5
+      const today = Math.floor((Date.now() - 6 * 3600e3) / 864e5)
+      const total = day(b) - day(a) + 1
+      const elapsed = Math.max(0, Math.min(total, today - day(a) + 1))
+      const status = today < day(a) ? 'upcoming' : today > day(b) ? 'finished' : 'in_progress'
+      const exact = Math.round((elapsed / total) * 1000) / 10
+      return {
+        cycle: american ? 'american' : 'guatemalan',
+        cycle_label: american ? 'Ciclo americano' : 'Ciclo guatemalteco',
+        cycle_message: american ? `Empieza en ${ya} y termina en ${yb}: es ciclo americano.` : `Empieza y termina en ${ya}: es ciclo guatemalteco.`,
+        progress: { status, percent: status === 'in_progress' ? Math.max(1, Math.floor(exact)) : status === 'finished' ? 100 : 0, percent_exact: exact, days_total: total, days_elapsed: elapsed, days_left: total - elapsed },
+      }
+    }
+    if (pc === 'seasons/cycle') {
+      const a = url.searchParams.get('starts_on'), b = url.searchParams.get('ends_on')
+      if (a && b && b < a) return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'validation_failed', message: 'La fecha de fin debe ser posterior al inicio.' } }) })
+      return ok(route, cycleOf(a, b))
+    }
+    if (pc === 'seasons') return ok(route, [
+      { id: 1, name: '2026-2027', starts_on: '2026-07-01', ends_on: '2027-06-30', is_current: true },
+      { id: 2, name: '2025', starts_on: '2025-01-15', ends_on: '2025-10-31', is_current: false },
+      { id: 3, name: '2030', starts_on: '2030-01-15', ends_on: '2030-10-31', is_current: false },
+    ].map((s) => ({ ...s, ...cycleOf(s.starts_on, s.ends_on) })))
     if (pc === 'invitations' && method === 'GET') return ok(route, [])
     if (pc === 'events' && method === 'GET') {
       const list = Object.values(events).map(({ sport: _s, callups, attendance, lineup, actions, player_stats, ...e }) => e)

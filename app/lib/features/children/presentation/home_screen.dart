@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/brand_colors.dart';
 import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/home_actions.dart';
 import '../../../core/widgets/org_crest.dart';
 import '../../../core/widgets/sport_icon.dart';
 import '../../auth/application/session_controller.dart';
@@ -56,39 +57,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ProPlayer Data'),
-        actions: [
-          IconButton(
-            tooltip: 'Invitaciones',
-            onPressed: () => context.push('/invitaciones'),
-            icon: Badge(
-              isLabelVisible: pending > 0,
-              label: Text('$pending'),
-              child: const Icon(Icons.mail_outline),
-            ),
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Opciones',
-            onSelected: (value) {
-              switch (value) {
-                case 'code':
-                  context.push('/codigo');
-                case 'password':
-                  context.push('/contrasena');
-                case 'logout':
-                  ref.read(sessionControllerProvider.notifier).logout();
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'code', child: Text('Tengo un código')),
-              PopupMenuItem(
-                value: 'password',
-                child: Text('Cambiar contraseña'),
-              ),
-              PopupMenuItem(value: 'logout', child: Text('Cerrar sesión')),
-            ],
-          ),
-        ],
+        title: const Text('Mis hijos'),
+        actions: const [HomeActions()],
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,

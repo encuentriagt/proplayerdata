@@ -11,6 +11,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_google.dart';
+import '../support/fake_photos.dart';
 
 Map<String, dynamic> childJson({
   int id = 15,
@@ -118,10 +119,13 @@ Future<void> pumpSignedIn(WidgetTester tester, FakeApi api) async {
       overrides: [
         api.providerOverride,
         FakeGoogleAuth(isAvailable: false).providerOverride,
+        FakePhotoStore().providerOverride,
       ],
       child: const PpdApp(),
     ),
   );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Mis hijos').first);
   await tester.pumpAndSettle();
 }
 
@@ -237,6 +241,11 @@ void main() {
     expect(find.textContaining('Dorsal 9 · Delantera'), findsOneWidget);
     expect(find.text('Mini Basket'), findsOneWidget);
 
+    await tester.scrollUntilVisible(
+      find.text('Desvincular a Ana'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tap(tester, find.text('Desvincular a Ana'));
     expect(find.text('¿Desvincular a Ana?'), findsOneWidget);
     await tap(tester, find.widgetWithText(TextButton, 'Desvincular'));

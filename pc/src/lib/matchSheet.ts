@@ -1,5 +1,5 @@
 // Lógica pura de la ficha del partido (sin React) para poder probarla con Vitest.
-import type { EventDetail, MatchAction, Position, RosterEntry, StatType } from './types'
+import type { EventDetail, MatchAction, Position, RosterEntry, ShootoutKick, StatType } from './types'
 
 export interface LineupRow {
   played: boolean
@@ -20,6 +20,8 @@ export interface SheetState {
   subs: Sub[]
   /** Acciones que esta pantalla no edita (notas, etc.): se conservan tal cual. */
   other: MatchAction[]
+  /** Penales: se abren con "Se fueron a penales" cuando el marcador está empatado. */
+  shootout: { on: boolean; them: number; kicks: ShootoutKick[] }
 }
 
 export function emptyRow(r?: Pick<RosterEntry, 'jersey_number' | 'position'>): LineupRow {
@@ -58,7 +60,11 @@ export function sheetFromEvent(ev: EventDetail, roster: RosterEntry[]): SheetSta
     }
   })
 
-  return { score_us: ev.score_us ?? 0, score_them: ev.score_them ?? 0, lineup, stats, subs, other }
+  const so = ev.shootout
+  return {
+    score_us: ev.score_us ?? 0, score_them: ev.score_them ?? 0, lineup, stats, subs, other,
+    shootout: { on: !!so, them: so?.score_them ?? 0, kicks: so?.kicks ?? [] },
+  }
 }
 
 /** Estadísticas que la PC no muestra en la ficha (lo pidió el colegio). Si ya existían, se conservan al guardar. */
@@ -143,12 +149,36 @@ export function scoredByPlayers(s: SheetState, statTypes: StatType[]): number {
   return s.stats.reduce((n, t) => (t.stat_code === 'own_goal' ? n : n + (pts.get(t.stat_code) ?? 0) * t.value), 0)
 }
 
+// ── Penales ──
+export const isTied = (s: SheetState) => s.score_us === s.score_them
+/** Penales anotados por nuestro equipo = marcador de penales nuestro. */
+export const shootoutUs = (s: SheetState) => (s.shootout?.kicks ?? []).filter((k) => k.scored).length
+export const kickCount = (s: SheetState, playerId: number, scored: boolean) =>
+  (s.shootout?.kicks ?? []).filter((k) => k.player_id === playerId && k.scored === scored).length
+
+export function kickPlus(s: SheetState, playerId: number, scored: boolean): SheetState {
+  return { ...s, shootout: { ...s.shootout, kicks: [...s.shootout.kicks, { player_id: playerId, scored }] } }
+}
+
+export function kickMinus(s: SheetState, playerId: number, scored: boolean): SheetState {
+  const kicks = [...s.shootout.kicks]
+  for (let i = kicks.length - 1; i >= 0; i--) {
+    if (kicks[i].player_id === playerId && kicks[i].scored === scored) {
+      kicks.splice(i, 1)
+      return { ...s, shootout: { ...s.shootout, kicks } }
+    }
+  }
+  return s
+}
+
 export interface SheetPayload {
   score_us: number
   score_them: number
   publish: boolean
   lineup: { player_id: number; is_starter: boolean; sport_position_id: number | null; jersey_number: number | null; minutes_played: number | null }[]
   actions: MatchAction[]
+  /** null = sin penales (o el marcador ya no está empatado). */
+  shootout: { score_us: number; score_them: number; kicks: ShootoutKick[] } | null
 }
 
 export function toPayload(s: SheetState, publish: boolean): SheetPayload {
@@ -170,7 +200,8 @@ export function toPayload(s: SheetState, publish: boolean): SheetPayload {
     ...s.other,
   ]
 
-  return { score_us: s.score_us, score_them: s.score_them, publish, lineup, actions }
+  const so = s.shootout?.on && isTied(s) ? { score_us: shootoutUs(s), score_them: s.shootout.them, kicks: s.shootout.kicks } : null
+  return { score_us: s.score_us, score_them: s.score_them, publish, lineup, actions, shootout: so }
 }
 
 // Borrador local mientras se edita (por si se pierde la señal en la cancha).
@@ -189,7 +220,10 @@ export function saveDraft(slug: string, eventId: number, state: SheetState): voi
 export function loadDraft(slug: string, eventId: number): Draft | null {
   try {
     const d = JSON.parse(localStorage.getItem(draftKey(slug, eventId)) ?? 'null') as Draft | null
-    return d?.state?.lineup ? d : null
+    if (!d?.state?.lineup) return null
+    // Borradores guardados antes de que existieran los penales
+    d.state.shootout ??= { on: false, them: 0, kicks: [] }
+    return d
   } catch {
     return null
   }

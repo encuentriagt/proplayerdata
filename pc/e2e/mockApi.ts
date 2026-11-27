@@ -196,6 +196,7 @@ export function mockApi(page: Page, role: MockRole = 'coach') {
         e.score_us = body.score_us
         e.score_them = body.score_them
         e.lineup = body.lineup
+        e.shootout = body.shootout ?? null
         e.actions = body.actions.map((a: any) => ({ type: 'stat', ...a }))
         if (body.publish) { e.status = 'finished'; e.result_published_at ??= new Date().toISOString() }
         const scored = body.actions.filter((a: any) => a.stat_code === 'goal').reduce((n: number, a: any) => n + (a.value ?? 1), 0)

@@ -144,6 +144,8 @@ export interface PcEvent {
   status: EventStatus
   score_us: number | null
   score_them: number | null
+  /** Penales (solo si el partido terminó empatado). Pendiente en la API. */
+  shootout?: Shootout | null
   result_published_at: string | null
   notes: string | null
   /** Borrador: no sale en la App ni avisa a nadie hasta publicarlo (published_at: null). */
@@ -175,6 +177,9 @@ export interface LineupEntry {
   jersey_number: number | null
   minutes_played: number | null
 }
+
+export interface ShootoutKick { player_id: number; scored: boolean }
+export interface Shootout { score_us: number; score_them: number; kicks: ShootoutKick[] }
 
 export interface EventDetail extends PcEvent {
   sport: Sport & { positions: Position[]; stat_types: StatType[] }

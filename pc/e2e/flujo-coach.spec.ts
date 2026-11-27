@@ -281,3 +281,52 @@ test('Ficha: cada gol del rival se le suma como gol en contra al portero (solo a
     { stat_code: 'goal', player_id: 15, value: 1 },
   ])
 })
+
+test('Ficha: si empatan, «Se fueron a penales» abre la sección de penales aparte', async ({ page }) => {
+  const api = mockApi(page)
+  await page.goto('/colegio-demo/login')
+  await page.getByLabel('Correo electrónico').fill('coach@demo.gt')
+  await page.getByLabel('Contraseña', { exact: true }).fill('Secreta12345')
+  await page.getByRole('button', { name: 'Ingresar' }).click()
+  await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
+  const id = await page.evaluate(async () => {
+    const d = new Date(Date.now() - 6 * 3600e3 - 864e5).toISOString().slice(0, 10)
+    const r = await fetch('/api/pc/orgs/colegio-demo/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team_id: 1, type: 'match', starts_at: `${d} 10:00`, opponent_name: 'Liceo Norte', publish: true,
+        callups: [{ player_id: 15, status: 'called' }, { player_id: 18, status: 'called' }] }) })
+    return (await r.json()).data.id
+  })
+  await page.goto(`/colegio-demo/eventos/${id}?tab=ficha`)
+
+  // 0–0 es empate: aparece el botón
+  const penales = page.getByRole('button', { name: 'Se fueron a penales' })
+  await expect(penales).toBeVisible()
+  await page.getByRole('button', { name: 'Agregar Gol a Ana López' }).first().click()
+  await expect(penales).toHaveCount(0)
+  await page.getByRole('button', { name: 'Sumar a Liceo Norte', exact: true }).click()
+  await penales.click()
+
+  const seccion = page.getByRole('region', { name: 'Penales' })
+  await seccion.getByRole('button', { name: 'Agregar Anotó a Ana López' }).click()
+  await seccion.getByRole('button', { name: 'Agregar Anotó a Luis Pérez' }).click()
+  await seccion.getByRole('button', { name: 'Agregar Falló a Luis Pérez' }).click()
+  await seccion.getByRole('button', { name: 'Sumar a Penales de Liceo Norte' }).click()
+  await expect(seccion.getByRole('status', { name: 'Penales de Nosotros' })).toHaveText('2')
+
+  // Si se rompe el empate, se avisa que no se guardarán
+  await page.getByRole('button', { name: 'Sumar a Liceo Norte', exact: true }).click()
+  await expect(seccion.getByText('El marcador ya no está empatado')).toBeVisible()
+  await page.getByRole('button', { name: 'Restar a Liceo Norte', exact: true }).click()
+
+  await page.getByRole('button', { name: 'Publicar resultado' }).click()
+  await expect(page.getByRole('dialog').getByText('Penales: 2–1')).toBeVisible()
+  await page.getByRole('button', { name: 'Publicar', exact: true }).click()
+  await expect(page.getByText('Resultado publicado. Se avisó a los padres.')).toBeVisible()
+  const sheet = api.calls.filter((c) => c.path.endsWith('/match-sheet')).at(-1)!
+  expect(sheet.body).toMatchObject({ score_us: 1, score_them: 1, shootout: { score_us: 2, score_them: 1,
+    kicks: [{ player_id: 15, scored: true }, { player_id: 18, scored: true }, { player_id: 18, scored: false }] } })
+
+  // Al volver, los penales siguen ahí
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Penales' }).getByRole('status', { name: 'Penales de Nosotros' })).toHaveText('2')
+})

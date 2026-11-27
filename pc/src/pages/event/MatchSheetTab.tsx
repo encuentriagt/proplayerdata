@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Minus, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Minus, Plus, Target, Trash2 } from 'lucide-react'
 import { useOrg } from '../../lib/org'
 import { usePcMutation, useRoster } from '../../lib/queries'
 import {
-  CONCEDED, clearDraft, emptyRow, goalkeeperFor, isGoalkeeper, loadDraft, rivalScore, saveDraft, sheetFromEvent, statCount, tapMinus, tapPlus, toPayload, visibleStatTypes,
+  CONCEDED, clearDraft, emptyRow, goalkeeperFor, isGoalkeeper, isTied, kickCount, kickMinus, kickPlus, loadDraft, shootoutUs, rivalScore, saveDraft, sheetFromEvent, statCount, tapMinus, tapPlus, toPayload, visibleStatTypes,
   type LineupRow, type SheetState,
 } from '../../lib/matchSheet'
 import { fmt } from '../../lib/dates'
@@ -244,6 +244,55 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
         </div>
       </section>
 
+      {/* Penales: aparte, solo si el partido terminó empatado */}
+      {isTied(state) && !state.shootout.on && (
+        <button type="button" className="btn-secondary w-full"
+          onClick={() => update((s) => ({ ...s, shootout: { ...s.shootout, on: true } }))}>
+          <Target className="size-5" aria-hidden /> Se fueron a penales
+        </button>
+      )}
+      {state.shootout.on && (
+        <section aria-labelledby="pen-h" className="card p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 id="pen-h" className="title text-2xl">Penales</h2>
+            <button type="button" className="btn-ghost text-sm text-err"
+              onClick={() => update((s) => ({ ...s, shootout: { on: false, them: 0, kicks: [] } }))}>
+              <Trash2 className="size-4" aria-hidden /> Quitar penales
+            </button>
+          </div>
+          {!isTied(state) ? (
+            <Alert tone="warning">El marcador ya no está empatado: los penales no se guardarán. Vuelva a empatar el marcador o quite los penales.</Alert>
+          ) : (
+            <>
+              <div className="flex items-start justify-center gap-2 sm:gap-10">
+                <ScoreAuto label="Nosotros" value={shootoutUs(state)} name="Penales de Nosotros" />
+                <span className="num mt-10 text-3xl text-muted" aria-hidden>–</span>
+                <ScoreInput label={event.opponent_name || 'Rival'} prefix="Penales" value={state.shootout.them}
+                  onStep={(d) => update((s) => ({ ...s, shootout: { ...s.shootout, them: Math.max(0, Math.min(99, s.shootout.them + d)) } }))}
+                  onChange={(v) => update((s) => ({ ...s, shootout: { ...s.shootout, them: Math.min(99, v) } }))} />
+              </div>
+              <p className="mt-2 mb-3 text-center text-xs text-muted">Los penales de su equipo se suman solos con los que marque como anotados.</p>
+              {playing.length === 0 ? <p className="text-sm text-muted">Marque arriba quién jugó para anotar sus penales.</p> : (
+                <ul className="divide-y divide-line">
+                  {playing.map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
+                      <span className="num w-7 shrink-0 text-center text-2xl">{row(p.id).jersey_number ?? '–'}</span>
+                      <span className="min-w-0 flex-1 truncate font-semibold">{p.full_name}</span>
+                      <div className="flex gap-4">
+                        <StatStepper label="Anotó" player={p.full_name} value={kickCount(state, p.id, true)}
+                          onMinus={() => update((s) => kickMinus(s, p.id, true))} onPlus={() => update((s) => kickPlus(s, p.id, true))} />
+                        <StatStepper label="Falló" player={p.full_name} value={kickCount(state, p.id, false)}
+                          onMinus={() => update((s) => kickMinus(s, p.id, false))} onPlus={() => update((s) => kickPlus(s, p.id, false))} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
       {/* Cambios (opcional) */}
       <section aria-labelledby="subs-h" className="card p-4">
         <div className="mb-2 flex items-center justify-between">
@@ -293,32 +342,36 @@ function Sheet({ event, roster, sport }: { event: EventDetail; roster: RosterEnt
           ? 'Si cambió el marcador, se avisará a los padres.'
           : 'Se enviará el resultado a los padres. ¿Desea continuar?'}
         <p className="mt-2 font-display text-3xl font-extrabold italic text-ink">{state.score_us}–{state.score_them}</p>
+        {state.shootout.on && isTied(state) && (
+          <p className="font-semibold text-ink">Penales: {shootoutUs(state)}–{state.shootout.them}</p>
+        )}
       </ConfirmDialog>
     </div>
   )
 }
 
 /** Marcador de nuestro equipo: solo lectura, se calcula con los goles de los jugadores. */
-function ScoreAuto({ label, value }: { label: string; value: number }) {
+function ScoreAuto({ label, value, name }: { label: string; value: number; name?: string }) {
   return (
     <div className="flex flex-col items-center">
       <span className="caps mb-2 max-w-36 truncate">{label}</span>
-      <output aria-label={`Marcador de ${label}`} aria-live="polite" className="num grid h-16 min-w-14 place-items-center text-6xl sm:min-w-20">{value}</output>
+      <output aria-label={name ?? `Marcador de ${label}`} aria-live="polite" className="num grid h-16 min-w-14 place-items-center text-6xl sm:min-w-20">{value}</output>
     </div>
   )
 }
 
-function ScoreInput({ label, value, onChange, onStep, primary = false }: { label: string; value: number; onChange: (v: number) => void; onStep: (d: 1 | -1) => void; primary?: boolean }) {
-  const id = `score-${label}`
+function ScoreInput({ label, value, onChange, onStep, primary = false, prefix }: { label: string; value: number; onChange: (v: number) => void; onStep: (d: 1 | -1) => void; primary?: boolean; prefix?: string }) {
+  const id = `score-${prefix ?? ''}${label}`
+  const aria = prefix ? `${prefix} de ${label}` : label
   return (
     <div className="flex flex-col items-center">
       <label htmlFor={id} className="caps mb-2 max-w-36 truncate">{label}</label>
       <div className="flex items-center gap-2 sm:gap-3">
-        <RoundButton kind="minus" label={`Restar a ${label}`} disabled={value <= 0} onClick={() => onStep(-1)} size="lg" />
+        <RoundButton kind="minus" label={`Restar a ${aria}`} disabled={value <= 0} onClick={() => onStep(-1)} size="lg" />
         <input id={id} type="number" inputMode="numeric" min={0} max={999} value={value}
           onChange={(e) => onChange(Math.min(999, Math.max(0, Number(e.target.value) || 0)))}
           className="num h-16 w-14 bg-transparent text-center text-6xl focus:outline-none sm:w-20" />
-        <RoundButton kind="plus" label={`Sumar a ${label}`} filled={primary} onClick={() => onStep(1)} size="lg" />
+        <RoundButton kind="plus" label={`Sumar a ${aria}`} filled={primary} onClick={() => onStep(1)} size="lg" />
       </div>
     </div>
   )

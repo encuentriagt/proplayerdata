@@ -1,4 +1,4 @@
-import { loadDraft, saveDraft, clearDraft, scoredByPlayers, sheetFromEvent, statCount, tapMinus, tapPlus, toPayload, visibleStatTypes, rivalScore, goalkeeperFor } from './matchSheet'
+import { loadDraft, saveDraft, clearDraft, scoredByPlayers, sheetFromEvent, statCount, tapMinus, tapPlus, toPayload, visibleStatTypes, rivalScore, goalkeeperFor, kickPlus, kickMinus, shootoutUs } from './matchSheet'
 import type { EventDetail, RosterEntry, StatType } from './types'
 
 const roster: RosterEntry[] = [
@@ -107,6 +107,18 @@ describe('ficha del partido', () => {
     expect(rivalScore(s, 1, statTypes, positions).stats).toEqual(s.stats)
   })
 
+  it('penales: solo se envían si el marcador está empatado; los nuestros se suman con los anotados', () => {
+    let s = { ...sheetFromEvent(event(), roster), score_us: 1, score_them: 1 }
+    expect(toPayload(s, true).shootout).toBeNull()
+    s = { ...s, shootout: { on: true, them: 3, kicks: [] } }
+    s = kickPlus(kickPlus(kickPlus(s, 15, true), 18, false), 18, true)
+    s = kickMinus(s, 18, false)
+    expect(shootoutUs(s)).toBe(2)
+    expect(toPayload(s, true).shootout).toEqual({ score_us: 2, score_them: 3, kicks: [{ player_id: 15, scored: true }, { player_id: 18, scored: true }] })
+    // Si el marcador deja de estar empatado, no se envían
+    expect(toPayload({ ...s, score_us: 2 }, true).shootout).toBeNull()
+  })
+
   it('la ficha no muestra asistencia, autogol ni atajada', () => {
     const codes = visibleStatTypes([...statTypes, { id: 9, code: 'save', name: 'Atajada', scores: 0 }]).map((t) => t.code)
     expect(codes).toContain('goal')
@@ -127,6 +139,7 @@ describe('ficha del partido', () => {
         { stat_code: 'goal', player_id: 15, value: 1 },
         { type: 'sub_in', player_id: 18, related_player_id: 15, minute: 40 },
       ],
+      shootout: null,
     })
   })
 

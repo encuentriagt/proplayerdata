@@ -25,21 +25,17 @@ export const GUARDIAN_RESPONSE: Record<GuardianResponse, { label: string; cls: s
   confirmed: { label: 'Confirmado', cls: 'bg-ok-bg text-ok' },
   declined: { label: 'No asistirá', cls: 'bg-err-bg text-err' },
 }
-// Asistencia: Asiste (A), No asiste con aviso (NA), Lesión (L), No justificado (NJ).
-// En la API: present, excused, injured, absent. "late" ya no se ofrece; los registros viejos se muestran como Asiste.
+// Asistencia: Asiste (A), No asiste con aviso (NA), Lesión (L), No justificado (NJ) y Llegó tarde (LT).
+// En la API: present, excused, injured, absent, late.
 // cls: relleno al elegir · outline: botón sin elegir (borde y letra del color) · soft: etiqueta del resumen.
 export const ATTENDANCE: Record<AttendanceStatus, { label: string; short: string; cls: string; outline: string; soft: string }> = {
   present: { label: 'Asiste', short: 'A', cls: 'bg-ok text-white', outline: 'border-ok/60 text-ok', soft: 'bg-ok text-white' },
   excused: { label: 'No asiste', short: 'NA', cls: 'bg-[#e6e4e3] text-ink', outline: 'border-line text-ink', soft: 'bg-[#e6e4e3] text-ink' },
   injured: { label: 'Lesión', short: 'L', cls: 'bg-ppd-star text-ink', outline: 'border-ppd-star/70 text-[#8a5208]', soft: 'bg-ppd-star text-ink' },
   absent: { label: 'No justificado', short: 'NJ', cls: 'bg-err text-white', outline: 'border-err/60 text-err', soft: 'bg-err text-white' },
-  late: { label: 'Asiste', short: 'A', cls: 'bg-ok text-white', outline: 'border-ok/60 text-ok', soft: 'bg-ok text-white' },
+  late: { label: 'Llegó tarde', short: 'LT', cls: 'bg-info-ink text-white', outline: 'border-ppd-cyan/60 text-info-ink', soft: 'bg-info-ink text-white' },
 }
-export const ATTENDANCE_ORDER: AttendanceStatus[] = ['present', 'excused', 'injured', 'absent']
-/** Registros anteriores con "late" se tratan como "present" (el jugador llegó). */
-export function normalizeAttendance(s: AttendanceStatus): AttendanceStatus {
-  return s === 'late' ? 'present' : s
-}
+export const ATTENDANCE_ORDER: AttendanceStatus[] = ['present', 'excused', 'injured', 'absent', 'late']
 export const TEAM_GENDER = { male: 'Masculino', female: 'Femenino', mixed: 'Mixto' } as const
 export const PLAYER_GENDER = { male: 'Masculino', female: 'Femenino', other: 'Otro' } as const
 export const ROLE_LABEL = { org_admin: 'Administrador', director: 'Director técnico', coach: 'Coach', guardian: 'Padre o madre' } as const

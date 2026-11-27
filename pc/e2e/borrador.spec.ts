@@ -155,7 +155,7 @@ test('Un partido guardado (publicado o borrador) aparece en Partidos, no solo en
   await expect(page.getByText('El rango máximo es de 120 días.')).toHaveCount(0)
 })
 
-test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nombre y al tocarlo se quita', async ({ page }) => {
+test('Asistencia: A · NA · L · NJ · LT; al elegir queda un solo botón con el nombre y al tocarlo se quita', async ({ page }) => {
   const api = mockApi(page)
   await entrar(page)
   await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
@@ -167,7 +167,7 @@ test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nomb
   await page.getByRole('tab', { name: 'Asistencia' }).click()
 
   const ana = page.getByRole('group', { name: 'Asistencia de Ana López' })
-  await expect(ana.getByRole('button')).toHaveText(['A', 'NA', 'L', 'NJ'])
+  await expect(ana.getByRole('button')).toHaveText(['A', 'NA', 'L', 'NJ', 'LT'])
 
   // Elegir Asiste: queda un solo botón "Asiste"
   await ana.getByRole('button', { name: 'Asiste', exact: true }).click()
@@ -175,7 +175,7 @@ test('Asistencia: A · NA · L · NJ; al elegir queda un solo botón con el nomb
   await expect(page.getByText('1 Asiste')).toBeVisible()
   // Tocarlo de nuevo: se quita y vuelven los 4
   await ana.getByRole('button', { name: /Asiste \(tocar para quitar\)/ }).click()
-  await expect(ana.getByRole('button')).toHaveText(['A', 'NA', 'L', 'NJ'])
+  await expect(ana.getByRole('button')).toHaveText(['A', 'NA', 'L', 'NJ', 'LT'])
   await expect(page.getByText('0 Asiste')).toBeVisible()
 
   await ana.getByRole('button', { name: 'Lesión' }).click()
@@ -359,4 +359,36 @@ test('Entreno recurrente: la serie debe empezar hoy o después (regla de la API)
   await page.getByRole('checkbox', { name: 'Se repite' }).check()
   await expect(page.getByText('La serie debe empezar hoy o después.')).toBeVisible()
   await expect(page.getByRole('button', { name: /^Crear .*entrenos$/ })).toBeDisabled()
+})
+
+test('Asistencia: Llegó tarde (LT) se guarda como late y se cuenta aparte', async ({ page }) => {
+  const api = mockApi(page)
+  await entrar(page)
+  await page.goto('/colegio-demo/eventos/nuevo?tipo=match')
+  await fechaHora(page, manana(), '10:00')
+  await page.getByLabel('Rival').fill('Colegio Sur')
+  await convocar(page)
+  await convocar(page, 'Luis Pérez')
+  await page.getByRole('button', { name: 'Crear partido y publicar' }).click()
+  await page.getByRole('tab', { name: 'Asistencia' }).click()
+
+  const ana = page.getByRole('group', { name: 'Asistencia de Ana López' })
+  await ana.getByRole('button', { name: 'Llegó tarde', exact: true }).click()
+  await expect(ana.getByRole('button')).toHaveText(['Llegó tarde'])
+  await page.getByRole('group', { name: 'Asistencia de Luis Pérez' }).getByRole('button', { name: 'Asiste', exact: true }).click()
+  await expect(page.getByText('1 Llegó tarde')).toBeVisible()
+  await expect(page.getByText('1 Asiste')).toBeVisible()
+  await expect(page.getByText('LT = llegó tarde')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Guardar y publicar asistencia' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
+  await expect(page.getByText('Asistencia guardada y publicada. Los padres ya la ven en la App.')).toBeVisible()
+  expect(api.calls.filter((c) => c.method === 'PUT' && c.path.endsWith('/attendance')).at(-1)?.body.records).toEqual([
+    { player_id: 15, status: 'late' }, { player_id: 18, status: 'present' },
+  ])
+
+  // Al volver a entrar, el registro guardado sigue como Llegó tarde
+  await page.reload()
+  await page.getByRole('tab', { name: 'Asistencia' }).click()
+  await expect(page.getByRole('group', { name: 'Asistencia de Ana López' }).getByRole('button')).toHaveText(['Llegó tarde'])
 })

@@ -64,6 +64,9 @@ test('admin: puede registrar un jugador sin equipo', async ({ page }) => {
   await page.getByRole('button', { name: 'Nuevo jugador' }).click()
   await expect(page.getByLabel('Equipo (opcional)')).toHaveValue('')
   await expect(page.getByRole('option', { name: 'Sin equipo por ahora' })).toHaveCount(1)
+  // Sin documento y género solo Masculino o Femenino
+  await expect(page.getByLabel(/Documento/)).toHaveCount(0)
+  await expect(page.getByLabel('Género').locator('option:not([disabled])')).toHaveText(['Masculino', 'Femenino'])
 })
 
 test('admin: asigna deportes y equipos a un director técnico', async ({ page }) => {

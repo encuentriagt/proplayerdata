@@ -14,7 +14,7 @@ interface Props {
   onClose: () => void
 }
 
-/** Datos mínimos del menor: nombre, apellidos, fecha de nacimiento, género, documento (opcional) y notas. */
+/** Datos mínimos del menor: nombre, apellidos, fecha de nacimiento, género (masculino o femenino) y notas. */
 export function PlayerFormDialog({ team, player, onClose }: Props) {
   const { slug, can } = useOrg()
   const teamOptional = can.create_players_without_team
@@ -24,8 +24,7 @@ export function PlayerFormDialog({ team, player, onClose }: Props) {
     first_name: player?.first_name ?? '',
     last_name: player?.last_name ?? '',
     birthdate: player?.birthdate ?? '',
-    gender: player?.gender ?? '',
-    document_number: player?.document_number ?? '',
+    gender: player?.gender === 'male' || player?.gender === 'female' ? player.gender : '',
     notes: player?.notes ?? '',
     team_id: team ? String(team.id) : '',
     jersey_number: '',
@@ -35,7 +34,7 @@ export function PlayerFormDialog({ team, player, onClose }: Props) {
   const base = () => ({
     first_name: f.first_name.trim(), last_name: f.last_name.trim(),
     birthdate: f.birthdate || null, gender: f.gender || null,
-    document_number: f.document_number.trim() || null, notes: f.notes.trim() || null,
+    notes: f.notes.trim() || null,
   })
 
   const create = usePcMutation<void, PlayerDetail>({
@@ -67,14 +66,11 @@ export function PlayerFormDialog({ team, player, onClose }: Props) {
           <TextField label="Apellidos" value={f.last_name} onChange={(e) => set('last_name', e.target.value)} required maxLength={80} error={err('last_name')} />
           <TextField label="Fecha de nacimiento" type="date" value={f.birthdate} onChange={(e) => set('birthdate', e.target.value)} error={err('birthdate')} />
           <SelectField label="Género" value={f.gender} onChange={(e) => set('gender', e.target.value)} error={err('gender')}>
-            <option value="">Sin indicar</option>
+            <option value="" disabled>Elija una opción</option>
             <option value="male">Masculino</option>
             <option value="female">Femenino</option>
-            <option value="other">Otro</option>
           </SelectField>
         </div>
-        <TextField label="Documento (opcional)" value={f.document_number} onChange={(e) => set('document_number', e.target.value)} maxLength={40}
-          hint="Solo si su institución lo requiere." error={err('document_number')} />
         <TextAreaField label="Notas (opcional)" value={f.notes} onChange={(e) => set('notes', e.target.value)} maxLength={2000} error={err('notes')} />
 
         {!player && (

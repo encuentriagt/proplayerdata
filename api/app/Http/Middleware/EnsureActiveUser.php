@@ -16,6 +16,9 @@ class EnsureActiveUser
     /** Rutas que se permiten mientras la contraseña temporal no se ha cambiado. */
     private const ALLOWED_WITH_TEMP_PASSWORD = ['auth.me', 'auth.logout', 'auth.password'];
 
+    /** Cuenta de padre sin correo verificado: solo verificar, reenviar el código, ver su sesión y salir. */
+    private const ALLOWED_UNVERIFIED = ['auth.me', 'auth.logout', 'app.auth.verify', 'app.auth.verify_resend'];
+
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
@@ -24,6 +27,10 @@ class EnsureActiveUser
             $user?->currentAccessToken()?->delete();
 
             return ApiError::response('unauthenticated', 'Su sesión no es válida o expiró. Inicie sesión de nuevo.', 401);
+        }
+
+        if ($user->isGuardianAccount() && ! $user->email_verified_at && ! in_array($request->route()?->getName(), self::ALLOWED_UNVERIFIED, true)) {
+            return ApiError::response('email_unverified', 'Verifique su correo con el código que le enviamos para continuar.', 403);
         }
 
         if ($user->must_change_password && ! in_array($request->route()?->getName(), self::ALLOWED_WITH_TEMP_PASSWORD, true)) {

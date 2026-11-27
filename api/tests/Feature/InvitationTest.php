@@ -86,7 +86,7 @@ class InvitationTest extends TestCase
         $t = $this->team($org);
         $admin = $this->member($org, 'a@x.test', 'org_admin');
         $hijo = $this->player($org, $t, 'Luis');
-        $this->makeUser('papa@x.test');
+        $this->guardian('papa@x.test');
 
         $token = $this->tokenFrom($this->as($admin)->postJson($this->base.'/invitations', ['email' => 'papa@x.test', 'role' => 'guardian', 'player_id' => $hijo->id])->json('data.invite_url'));
         $this->app['auth']->forgetGuards();

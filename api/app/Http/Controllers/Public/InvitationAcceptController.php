@@ -34,7 +34,7 @@ class InvitationAcceptController extends Controller
             'role' => $inv->role,
             'role_label' => InvitationService::ROLE_LABELS[$inv->role] ?? $inv->role,
             'email_masked' => self::mask($inv->email),
-            'user_exists' => User::withTrashed()->where('email', $inv->email)->exists(),
+            'user_exists' => User::withTrashed()->where('email', $inv->email)->where('account_type', self::accountType($inv))->exists(),
             'player_first_name' => $inv->player_id ? Player::find($inv->player_id)?->first_name : null,
             'organization' => $inv->organization->brandingPayload(),
         ]]);
@@ -47,7 +47,8 @@ class InvitationAcceptController extends Controller
             return ApiError::response('invitation_not_found', 'La invitación no existe o fue anulada.', 404);
         }
 
-        $existing = User::withTrashed()->where('email', $inv->email)->first();
+        // Invitación de padre → cuenta de padre; de staff → cuenta de staff (pueden compartir correo).
+        $existing = User::withTrashed()->where('email', $inv->email)->where('account_type', self::accountType($inv))->first();
 
         if ($existing) {
             $request->validate(['password' => ['required', 'string', 'max:200']]);
@@ -71,7 +72,7 @@ class InvitationAcceptController extends Controller
             $user = $existing;
             if (! $user) {
                 $user = new User(['name' => trim($request->string('name')), 'email' => $inv->email, 'password' => (string) $request->input('password')]);
-                $user->forceFill(['status' => 'active', 'email_verified_at' => now()])->save();
+                $user->forceFill(['status' => 'active', 'email_verified_at' => now(), 'account_type' => self::accountType($inv)])->save();
             }
 
             if ($inv->role === 'guardian') {
@@ -118,5 +119,10 @@ class InvitationAcceptController extends Controller
         [$u, $d] = explode('@', $email, 2) + [1 => ''];
 
         return mb_substr($u, 0, 2).str_repeat('*', max(1, mb_strlen($u) - 2)).'@'.$d;
+    }
+
+    private static function accountType(Invitation $inv): string
+    {
+        return $inv->role === 'guardian' ? User::GUARDIAN : User::STAFF;
     }
 }

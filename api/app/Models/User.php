@@ -56,6 +56,26 @@ class User extends Authenticatable
         return $this->hasMany(TeamStaff::class);
     }
 
+    /** staff: PC y Panel (login web). guardian: App de padres (login android/ios). Mismo correo puede existir en ambos. */
+    public const STAFF = 'staff';
+
+    public const GUARDIAN = 'guardian';
+
+    public function isGuardianAccount(): bool
+    {
+        return $this->account_type === self::GUARDIAN;
+    }
+
+    public function scopeGuardians($q)
+    {
+        return $q->where('account_type', self::GUARDIAN);
+    }
+
+    public function scopeStaff($q)
+    {
+        return $q->where('account_type', self::STAFF);
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';

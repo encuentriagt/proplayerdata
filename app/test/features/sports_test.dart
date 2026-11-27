@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_google.dart';
+import '../support/fake_links.dart';
 import '../support/fake_photos.dart';
 
 Map<String, dynamic> sport(int id, String code, String name) => {
@@ -161,6 +162,7 @@ Future<void> pumpSports(WidgetTester tester) async {
         sportsApi().providerOverride,
         FakeGoogleAuth(isAvailable: false).providerOverride,
         FakePhotoStore().providerOverride,
+        FakeLinkSource().providerOverride,
       ],
       child: const PpdApp(),
     ),

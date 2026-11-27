@@ -39,10 +39,35 @@ class InvitationsRepository {
     return _childId(res.data);
   });
 
+  /// ♻️ Acepta con el enlace del correo (sin contraseña).
+  Future<LinkedChild> acceptToken(String token, IdempotencyKey key) =>
+      guardApi(() async {
+        final res = await _dio.post<Object?>(
+          'app/invitations/accept-token',
+          data: {'token': token},
+          options: key.options,
+        );
+        final data = apiMap(res.data);
+        return LinkedChild(
+          childId: _childId(res.data),
+          firstName: data['child_first_name'] as String?,
+          organizationName: data['organization_name'] as String?,
+        );
+      });
+
   int? _childId(Object? body) {
     final id = apiMap(body)['child_id'];
     return id is int ? id : int.tryParse('$id');
   }
+}
+
+/// Resultado de vincular con el enlace.
+class LinkedChild {
+  const LinkedChild({this.childId, this.firstName, this.organizationName});
+
+  final int? childId;
+  final String? firstName;
+  final String? organizationName;
 }
 
 final invitationsRepositoryProvider = Provider<InvitationsRepository>(

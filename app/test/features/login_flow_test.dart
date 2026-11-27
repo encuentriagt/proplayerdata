@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_google.dart';
+import '../support/fake_links.dart';
 import '../support/fake_photos.dart';
 
 Future<void> pumpApp(
@@ -23,6 +24,7 @@ Future<void> pumpApp(
         api.providerOverride,
         (google ?? FakeGoogleAuth(isAvailable: false)).providerOverride,
         FakePhotoStore().providerOverride,
+        FakeLinkSource().providerOverride,
       ],
       child: const PpdApp(),
     ),

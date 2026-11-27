@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_google.dart';
+import '../support/fake_links.dart';
 import '../support/fake_photos.dart';
 
 /// Hoy a una hora dada, en ISO con la zona de Guatemala.
@@ -182,6 +183,7 @@ Future<void> pumpCalendar(WidgetTester tester, FakeApi api) async {
         api.providerOverride,
         FakeGoogleAuth(isAvailable: false).providerOverride,
         FakePhotoStore().providerOverride,
+        FakeLinkSource().providerOverride,
       ],
       child: const PpdApp(),
     ),

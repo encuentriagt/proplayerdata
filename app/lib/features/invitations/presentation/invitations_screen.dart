@@ -46,7 +46,7 @@ class _InvitationsScreenState extends ConsumerState<InvitationsScreen> {
       _keys.remove(inv.id);
       if (!mounted) return;
       refreshFamily(ref);
-      _show('Listo: ${inv.playerFirstName} quedó vinculado a su cuenta.');
+      _show('Listo: se vinculó a ${inv.playerFirstName} con su cuenta.');
     } on ApiException catch (e) {
       if (!e.isNetwork) _keys.remove(inv.id);
       if (!mounted) return;

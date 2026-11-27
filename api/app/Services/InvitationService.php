@@ -38,11 +38,35 @@ final class InvitationService
             'team_ids' => $teamIds ? array_values(array_unique(array_map('intval', $teamIds))) : null,
             'sport_ids' => $sportIds ? array_values(array_unique(array_map('intval', $sportIds))) : null,
             'token_hash' => hash('sha256', $token),
+            // Padres: código corto para escribir en la App (sin letras ni números confusos).
+            'code' => $role === 'guardian' ? self::newCode() : null,
             'expires_at' => now()->addDays((int) config('ppd.invitations.days_valid')),
             'created_by' => $by?->id,
         ]);
 
+        if ($role === 'guardian' && $playerId) {
+            $this->notifyExistingGuardian($inv);
+        }
+
         return [$inv, $token];
+    }
+
+    /** Si el padre ya tiene cuenta verificada con ese correo, le llega un aviso en la App (kind link_invitation). */
+    private function notifyExistingGuardian(Invitation $inv): void
+    {
+        $guardian = User::guardians()->where('email', $inv->email)->whereNotNull('email_verified_at')->where('status', 'active')->first();
+        if (! $guardian) {
+            return;
+        }
+        $child = \App\Models\Player::find($inv->player_id)?->first_name ?? 'su hijo o hija';
+        $org = $inv->organization()->value('name');
+        app(NotificationService::class)->notify(
+            [$guardian->id], 'link_invitation', "invitation:{$inv->id}",
+            'Nueva invitación',
+            "{$org} lo invita a seguir a {$child}. Acéptela en Invitaciones.",
+            ['invitation_id' => $inv->id, 'organization_id' => $inv->organization_id, 'organization_name' => $org, 'child_name' => $child],
+            $inv->organization_id, $inv->player_id,
+        );
     }
 
     public function url(Invitation $inv, string $token): string
@@ -67,6 +91,28 @@ final class InvitationService
                 Log::warning('No se pudo enviar la invitación', ['invitation_id' => $inv->id, 'error' => $e->getMessage()]);
             }
         });
+    }
+
+    public static function newCode(): string
+    {
+        $abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        do {
+            $raw = '';
+            for ($i = 0; $i < 8; $i++) {
+                $raw .= $abc[random_int(0, strlen($abc) - 1)];
+            }
+            $code = substr($raw, 0, 4).'-'.substr($raw, 4);
+        } while (Invitation::where('code', $code)->exists());
+
+        return $code;
+    }
+
+    /** "abcd 2345", "ABCD-2345" → "ABCD-2345". */
+    public static function normalizeCode(string $code): string
+    {
+        $c = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $code));
+
+        return strlen($c) === 8 ? substr($c, 0, 4).'-'.substr($c, 4) : $c;
     }
 
     public static function findByToken(string $token): ?Invitation

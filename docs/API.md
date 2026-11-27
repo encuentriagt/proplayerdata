@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.13 (2026-11-30)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.14 (2026-12-01)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -87,7 +87,7 @@ Ruteo sugerido tras el login: `memberships` no vacío → PC (si hay varias orga
 | GET | `/me/notifications` | Bandeja: `data[{id,kind,title,body,data,organization_id,player_id,read,created_at}]`, `meta.unread` |
 | POST | `/me/notifications/read` | `{ids?: [..]}` sin ids = todas |
 
-Tipos de aviso (`kind`): `callup`, `trainings`, `event_changed`, `event_cancelled`, `attendance`, `match_result` (padres) y `match_published` (staff que lo activó). El push trae en `data` (todo texto): `kind` y según el caso `event_id`, `player_id`, `team_id`, `status`, `series_id`, `count`. Canal Android: `general` (más adelante `emergencias`).
+Tipos de aviso (`kind`): `callup`, `trainings`, `event_changed`, `event_cancelled`, `attendance`, `match_result`, `link_invitation` (padres: nueva invitación de vínculo si ya tienen cuenta verificada con ese correo; `data`: `invitation_id, organization_id, organization_name, child_name`) y `match_published` (staff que lo activó). El push trae en `data` (todo texto): `kind` y según el caso `event_id`, `player_id`, `team_id`, `status`, `series_id`, `count`. Canal Android: `general` (más adelante `emergencias`).
 
 ---
 
@@ -220,7 +220,12 @@ El padre solo ve **a sus hijos** y **solo los datos de su hijo** (no los de otro
 
 | Método | Ruta | Notas |
 |---|---|---|
-| GET | `children` | `id, first_name, last_name, photo_url, organization{marca}, teams[{id,name,category,sport{code,name},jersey_number}], plan_level` → pintar la App con la marca de la organización del hijo seleccionado |
+| GET | `invitations` | **Vínculo padre-hijo.** Invitaciones pendientes enviadas al correo de la cuenta (no vencidas, ni aceptadas, ni rechazadas): `id, organization{id,name,crest_url}, player{first_name}, teams[{name, sport{code,name}}], expires_at` |
+| POST ♻️ | `invitations/{id}/accept` | Vincula al hijo (una sola vez por jugador, no por equipo: si después lo agregan a otro deporte, el padre lo ve sin otra invitación). Repetirlo responde igual. Errores: 404 `invitation_not_found` (no es de su correo), 410 `invitation_closed` (vencida, anulada o rechazada), 409 `invitation_used` (la aceptó otra cuenta). Responde `{ok, child_id}` |
+| POST | `invitations/{id}/decline` | Rechaza la invitación |
+| POST ♻️ | `invitations/redeem` | `{code}`: aceptar con el **código corto del correo** (`ABCD-2345`; acepta minúsculas, espacios o sin guion), p. ej. si la invitación llegó a otro correo. Mal → 422 `code_invalid`. Mismos errores y respuesta que `accept`. Límite 5/min |
+| DELETE | `children/{id}` | Desvincular a un hijo (lo decide el padre) |
+| GET | `children` | Todos los hijos vinculados, de todas las organizaciones (sin hijos: `data:[]`): `id, first_name, last_name, birthdate, photo_url, organization{id, name, slug, logo_url, crest_url, colors}, teams[{id, name, category, sport{id,code,name}, season{id,name}\|null, jersey_number, position{id,name}\|null}], plan_level`. La App no usa la marca para pintarse (siempre ProPlayer Data): solo muestra el nombre y escudo del colegio como dato |
 | GET | `children/{id}/events?from=&to=` | Eventos **publicados** de los equipos del hijo (los borradores no aparecen) con `callup{status,response}`. `meta.history_limited=true` si el plan recortó el pasado. Marcador `null` hasta que se publique |
 | GET | `children/{id}/events/{eventId}` | Detalle: `callup`, `attendance{status(present\|excused\|injured\|absent), note}`, `child_played{is_starter,minutes_played}`, `child_stats[{code,name,value}]`. Fuera del límite del plan: 403 `plan_limit` |
 | POST ♻️ | `children/{id}/events/{eventId}/callup-response` | `{response: confirmed\|declined}` antes del partido (`not_called`, `event_closed`) |

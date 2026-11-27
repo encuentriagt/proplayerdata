@@ -20,10 +20,7 @@ const limitText =
     'institución.';
 
 /// Hoy en Guatemala, sin hora.
-DateTime todayGt() {
-  final now = GuatemalaTime.toLocal(DateTime.now());
-  return DateTime(now.year, now.month, now.day);
-}
+DateTime todayGt() => GuatemalaTime.today();
 
 /// Calendario de todos los hijos: solo lo que tienen convocado.
 class CalendarScreen extends ConsumerStatefulWidget {

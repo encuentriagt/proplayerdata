@@ -22,9 +22,12 @@ void openEvent(BuildContext context, CalendarEvent e) {
 
 /// Fila de un evento en el calendario.
 class EventTile extends StatelessWidget {
-  const EventTile({super.key, required this.event});
+  const EventTile({super.key, required this.event, this.showDate = false});
 
   final CalendarEvent event;
+
+  /// Muestra el día además de la hora (listas que abarcan varios días).
+  final bool showDate;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +57,14 @@ class EventTile extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Column(
                     children: [
+                      if (showDate && start != null)
+                        Text(
+                          GuatemalaTime.shortDate(start),
+                          style: text.labelSmall?.copyWith(
+                            color: PpdColors.muted,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       Text(
                         start == null ? '--' : GuatemalaTime.time(start),
                         style: text.titleSmall?.copyWith(

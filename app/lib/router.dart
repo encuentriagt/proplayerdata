@@ -17,6 +17,8 @@ import 'features/children/presentation/child_detail_screen.dart';
 import 'features/children/presentation/home_screen.dart';
 import 'features/invitations/presentation/invitations_screen.dart';
 import 'features/invitations/presentation/redeem_code_screen.dart';
+import 'features/sports/presentation/sport_detail_screen.dart';
+import 'features/sports/presentation/sports_screen.dart';
 
 abstract final class Routes {
   static const splash = '/cargando';
@@ -26,6 +28,7 @@ abstract final class Routes {
   static const verifyEmail = '/verificar-correo';
   static const mustChange = '/cambiar-contrasena';
   static const home = '/';
+  static const sports = '/deportes';
   static const children = '/hijos';
   static const changePassword = '/contrasena';
   static const invitations = '/invitaciones';
@@ -98,6 +101,22 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: Routes.home,
                 builder: (_, _) => const CalendarScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.sports,
+                builder: (_, _) => const SportsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':code',
+                    builder: (_, state) => SportDetailScreen(
+                      sportCode: state.pathParameters['code'] ?? '',
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -17,10 +17,15 @@ class CalendarRepository {
   Future<CalendarPage> calendar({
     required DateTime from,
     required DateTime to,
+    int? sportId,
   }) => guardApi(() async {
     final res = await _dio.get<Object?>(
       'app/events',
-      queryParameters: {'from': _day.format(from), 'to': _day.format(to)},
+      queryParameters: {
+        'from': _day.format(from),
+        'to': _day.format(to),
+        'sport_id': ?sportId,
+      },
     );
     final body = res.data;
     final meta = body is Map && body['meta'] is Map ? body['meta'] as Map : {};

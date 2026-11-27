@@ -7,6 +7,7 @@ import '../../../core/time/guatemala_time.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/message_banner.dart';
 import '../../../core/widgets/sport_icon.dart';
+import '../../../core/widgets/stat_box.dart';
 import '../../children/application/children_providers.dart';
 import '../../children/data/children_models.dart';
 import '../../children/presentation/child_avatar.dart';
@@ -350,7 +351,7 @@ class _ChildData extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final s in d.stats!) _StatBox(name: s.name, value: s.value),
+              for (final s in d.stats!) StatBox(name: s.name, value: s.value),
             ],
           ),
         ] else if (d.event.isMatch && d.stats == null && !d.event.isCancelled)
@@ -410,35 +411,6 @@ class _Field extends StatelessWidget {
           ),
           if (note != null && note!.isNotEmpty)
             Text(note!, style: text.bodySmall),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatBox extends StatelessWidget {
-  const _StatBox({required this.name, required this.value});
-
-  final String name;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Container(
-      width: 96,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      decoration: BoxDecoration(
-        color: PpdColors.paper,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(
-            '$value',
-            style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          Text(name, style: text.bodySmall, textAlign: TextAlign.center),
         ],
       ),
     );

@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../features/invitations/application/invitations_providers.dart';
 
-/// Pestañas principales: Calendario y Mis hijos.
+/// Pestañas principales: Calendario, Deportes y Mis hijos.
 class MainShell extends ConsumerWidget {
   const MainShell({super.key, required this.shell});
 
@@ -24,6 +24,11 @@ class MainShell extends ConsumerWidget {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Calendario',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.sports_outlined),
+            selectedIcon: Icon(Icons.sports),
+            label: 'Deportes',
           ),
           NavigationDestination(
             icon: Badge(

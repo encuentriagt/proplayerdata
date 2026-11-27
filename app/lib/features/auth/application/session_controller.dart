@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/idempotency.dart';
 import '../../../core/storage/session_storage.dart';
+import '../../children/data/local_photo_store.dart';
 import '../data/auth_models.dart';
 import '../data/auth_repository.dart';
 import '../data/google_auth.dart';
@@ -177,8 +179,12 @@ class SessionController extends Notifier<SessionState> {
       _patch((p) => p.copyWith(user: change(p.user)));
 
   Future<void> _signOutLocally({String? notice}) async {
+    final photos = ref.read(localPhotoStoreProvider);
     await _storage.clear();
     state = SignedOut(notice: notice);
+    // Las fotos locales de los hijos no quedan en el teléfono. No bloquea
+    // el cierre de sesión si el almacenamiento tarda o falla.
+    unawaited(photos.clearAll().catchError((_) {}));
   }
 
   void _handleUnauthorized() {

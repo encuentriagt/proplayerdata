@@ -9,7 +9,10 @@ import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
 import 'features/auth/presentation/splash_screen.dart';
 import 'features/auth/presentation/verify_email_screen.dart';
-import 'features/home/home_screen.dart';
+import 'features/children/presentation/child_detail_screen.dart';
+import 'features/children/presentation/home_screen.dart';
+import 'features/invitations/presentation/invitations_screen.dart';
+import 'features/invitations/presentation/redeem_code_screen.dart';
 
 abstract final class Routes {
   static const splash = '/cargando';
@@ -20,6 +23,9 @@ abstract final class Routes {
   static const verifyEmail = '/verificar-correo';
   static const home = '/';
   static const changePassword = '/contrasena';
+  static const invitations = '/invitaciones';
+  static const redeemCode = '/codigo';
+  static String child(int id) => '/hijos/$id';
 }
 
 /// Decide a dónde ir según la sesión. Devuelve null si puede quedarse.
@@ -81,6 +87,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.changePassword,
         builder: (_, _) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: Routes.invitations,
+        builder: (_, _) => const InvitationsScreen(),
+      ),
+      GoRoute(
+        path: Routes.redeemCode,
+        builder: (_, _) => const RedeemCodeScreen(),
+      ),
+      GoRoute(
+        path: '/hijos/:id',
+        builder: (_, state) => ChildDetailScreen(
+          childId: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
+        ),
       ),
     ],
   );

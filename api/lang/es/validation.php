@@ -120,7 +120,7 @@ return [
         'mixed' => ':Attribute debe contener al menos una mayúscula y una minúscula.',
         'numbers' => ':Attribute debe contener al menos un número.',
         'symbols' => ':Attribute debe contener al menos un símbolo.',
-        'uncompromised' => 'Esta :attribute apareció en una filtración de datos. Elija otra.',
+        'uncompromised' => ':Attribute aparece en una filtración de datos conocida de internet, por eso no es segura. Elija otra.',
     ],
     'present' => 'Debe enviar :attribute.',
     'present_if' => 'Debe enviar :attribute cuando :other es :value.',

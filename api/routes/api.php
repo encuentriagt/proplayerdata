@@ -87,6 +87,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::prefix('app')->middleware('account:guardian')->group(function () {
         Route::post('auth/verify-email', [\App\Http\Controllers\App\GuardianAuthController::class, 'verifyEmail'])->middleware(['throttle:codes'])->name('app.auth.verify');
         Route::post('auth/verify-email/resend', [\App\Http\Controllers\App\GuardianAuthController::class, 'resend'])->middleware('throttle:email-resend')->name('app.auth.verify_resend');
+        Route::get('invitations', [\App\Http\Controllers\App\LinkController::class, 'index']);
+        Route::post('invitations/redeem', [\App\Http\Controllers\App\LinkController::class, 'redeem'])->middleware(['throttle:codes', 'idempotent']);
+        Route::post('invitations/{id}/accept', [\App\Http\Controllers\App\LinkController::class, 'accept'])->whereNumber('id')->middleware('idempotent');
+        Route::post('invitations/{id}/decline', [\App\Http\Controllers\App\LinkController::class, 'decline'])->whereNumber('id');
+        Route::delete('children/{player}', [\App\Http\Controllers\App\LinkController::class, 'unlink']);
         Route::get('children', [ChildController::class, 'index']);
         Route::get('children/{player}/events', [ChildController::class, 'events']);
         Route::get('children/{player}/events/{eventId}', [ChildController::class, 'event'])->whereNumber('eventId');

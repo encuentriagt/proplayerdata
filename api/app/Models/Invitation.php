@@ -9,7 +9,7 @@ class Invitation extends Model
 {
     protected $fillable = [
         'organization_id', 'email', 'role', 'player_id', 'team_ids', 'sport_ids', 'token_hash',
-        'expires_at', 'accepted_at', 'accepted_by', 'revoked_at', 'created_by',
+        'expires_at', 'accepted_at', 'accepted_by', 'revoked_at', 'created_by', 'code', 'declined_at',
     ];
 
     protected $hidden = ['token_hash'];
@@ -22,6 +22,7 @@ class Invitation extends Model
             'expires_at' => 'datetime',
             'accepted_at' => 'datetime',
             'revoked_at' => 'datetime',
+            'declined_at' => 'datetime',
         ];
     }
 

@@ -1,0 +1,61 @@
+name: Configurar correo (SMTP)
+
+# Escribe la configuración de correo en el .env del servidor usando el secreto MAIL_PASSWORD
+# (nunca se muestra) y envía un correo de prueba. Respaldo de .env antes de cambiarlo.
+on:
+  workflow_dispatch:
+    inputs:
+      probar_a:
+        description: 'Correo que recibe la prueba'
+        required: true
+        default: 'jorgeavilaguate@gmail.com'
+      host:
+        description: 'Servidor SMTP'
+        required: true
+        default: 'server292.web-hosting.com'
+      puerto:
+        description: 'Puerto (465 = SSL)'
+        required: true
+        default: '465'
+      usuario:
+        description: 'Cuenta que envía'
+        required: true
+        default: 'noreply@ppdguate.com'
+
+permissions:
+  contents: read
+
+jobs:
+  mail:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Preparar SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s' "$SSH_KEY" | tr -d ' \r\n\t' | base64 -d > ~/.ssh/deploy_key 2>/dev/null || printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Escribir configuración y probar
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          HOST_IN: ${{ inputs.host }}
+          PORT_IN: ${{ inputs.puerto }}
+          USER_IN: ${{ inputs.usuario }}
+          TO_IN: ${{ inputs.probar_a }}
+        run: |
+          if [ -z "$MAIL_PASSWORD" ]; then echo "::error::Falta el secreto MAIL_PASSWORD en GitHub."; exit 1; fi
+          for v in "$HOST_IN" "$PORT_IN" "$USER_IN" "$TO_IN"; do
+            case "$v" in *[!A-Za-z0-9@._-]*) echo "::error::Valor no permitido en las entradas."; exit 1;; esac
+          done
+          SSH="ssh -i $HOME/.ssh/deploy_key -p $SSH_PORT -o StrictHostKeyChecking=yes $SSH_USER@$SSH_HOST"
+          # La contraseña viaja por la entrada estándar del SSH (no por la línea de comandos).
+          printf '%s' "$MAIL_PASSWORD" | $SSH "cd ~/ppd-api && php ops/set-mail-env.php '$HOST_IN' '$PORT_IN' '$USER_IN'"
+          $SSH "cd ~/ppd-api && php artisan config:clear >/dev/null && php artisan config:cache >/dev/null && php artisan ppd:mail-test '$TO_IN'"

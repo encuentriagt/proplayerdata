@@ -54,12 +54,12 @@ HTML;
 <h2 style="margin-top:0">{$org}</h2>
 <p><strong>{$org}</strong> lo invita a seguir a <strong>{$child}</strong> en la App <strong>ProPlayer Data</strong>: calendario, convocatorias, asistencia y resultados.</p>
 <ol style="padding-left:20px;line-height:1.6">
-<li>Descargue la App ProPlayer Data y cree su cuenta con <strong>este mismo correo</strong>.</li>
-<li>La invitación aparecerá en la App, en <strong>Invitaciones</strong>. Acéptela.</li>
+<li>Instale la App <strong>ProPlayer Data</strong> y entre con su cuenta (con Google o con su correo).</li>
+<li>Toque <strong>«Abrir en la App»</strong> aquí abajo: el vínculo se hace solo, sin contraseña.</li>
 </ol>
-<p>Si creó su cuenta con otro correo, en la App elija <strong>«Tengo un código»</strong> y escriba:</p>
+<p>Si no se abre la App, en la App elija <strong>Invitaciones → «Tengo un código»</strong> y escriba:</p>
 <p style="text-align:center;font-size:28px;letter-spacing:4px;font-weight:bold;margin:20px 0">{$code}</p>
-<p style="text-align:center;margin:24px 0"><a href="{$url}" style="background:{$color};color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;display:inline-block">Aceptar invitación</a></p>
+<p style="text-align:center;margin:24px 0"><a href="{$url}" style="background:{$color};color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;display:inline-block">Abrir en la App</a></p>
 <p style="font-size:13px;color:#4a4644">La invitación vence en {$days} días. Si usted no esperaba este correo, puede ignorarlo.</p>
 </div></body></html>
 HTML;

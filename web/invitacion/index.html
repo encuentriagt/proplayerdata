@@ -6,12 +6,12 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.ppdguate.com; img-src 'self' https://api.ppdguate.com data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'">
-<title>Invitación · ppd</title>
+<title>Invitación · ProPlayer Data</title>
 <link rel="stylesheet" href="/assets/forms.css">
 </head>
 <body>
 <div class="wrap"><div class="card">
-  <div class="brand" id="brand"><strong>ppd</strong></div>
+  <div class="brand" id="brand"><strong>ProPlayer Data</strong></div>
 
   <div id="loading"><p>Cargando invitación…</p></div>
 
@@ -20,32 +20,19 @@
     <p id="invalid-msg">La invitación no existe, fue anulada o ya venció. Pida una nueva a su institución.</p>
   </div>
 
-  <form id="form" class="hidden" novalidate>
-    <h1 id="title">Acepte su invitación</h1>
+  <div id="open" class="hidden">
+    <h1>Acepte la invitación en la App</h1>
     <p id="intro"></p>
-    <div id="new-user">
-      <label for="name">Su nombre completo</label>
-      <input id="name" autocomplete="name" maxlength="150">
-      <label for="relationship">Parentesco (opcional)</label>
-      <input id="relationship" placeholder="Padre, madre, encargado…" maxlength="20">
+    <a id="open-app" class="btn" href="#">Abrir en la App ProPlayer Data</a>
+    <p class="hint">Al abrirse la App, entre con su cuenta (con Google o con su correo) y el vínculo se hará solo. No necesita contraseña aquí.</p>
+    <div id="code-box" class="hidden">
+      <p>¿No se abrió la App? Instálela, entre con su cuenta y en <strong>Invitaciones</strong> elija <strong>«Tengo un código»</strong>:</p>
+      <p class="code" id="code"></p>
     </div>
-    <label for="password" id="password-label">Cree una contraseña</label>
-    <input id="password" type="password" autocomplete="new-password" maxlength="200">
-    <div class="hint" id="password-hint">Mínimo 10 caracteres, con letras y números.</div>
-    <div id="confirm-box">
-      <label for="password2">Repita la contraseña</label>
-      <input id="password2" type="password" autocomplete="new-password" maxlength="200">
-    </div>
-    <div class="err" id="err" role="alert"></div>
-    <button id="send" type="submit">Aceptar invitación</button>
-  </form>
-
-  <div id="done" class="hidden">
-    <h1 class="ok">¡Listo!</h1>
-    <p id="done-msg"></p>
+    <a id="store" class="btn secondary" href="https://play.google.com/store/apps/details?id=com.ppdguate.app" rel="noopener">Descargar la App</a>
   </div>
 
-  <div class="foot">Powered by ppd</div>
+  <div class="foot">ProPlayer Data</div>
 </div></div>
 <script src="/assets/ppd.js"></script>
 <script src="/invitacion/invitacion.js"></script>

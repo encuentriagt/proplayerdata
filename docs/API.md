@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.17 (2026-12-02)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.18 (2026-12-02)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -227,6 +227,7 @@ El padre solo ve **a sus hijos** y **solo los datos de su hijo** (no los de otro
 | GET | `invitations` | **Vínculo padre-hijo.** Invitaciones pendientes enviadas al correo de la cuenta (no vencidas, ni aceptadas, ni rechazadas): `id, organization{id,name,crest_url}, player{first_name}, teams[{name, sport{code,name}}], expires_at` |
 | POST ♻️ | `invitations/{id}/accept` | Vincula al hijo (una sola vez por jugador, no por equipo: si después lo agregan a otro deporte, el padre lo ve sin otra invitación). Repetirlo responde igual. Errores: 404 `invitation_not_found` (no es de su correo), 410 `invitation_closed` (vencida, anulada o rechazada), 409 `invitation_used` (la aceptó otra cuenta). Responde `{ok, child_id}` |
 | POST | `invitations/{id}/decline` | Rechaza la invitación |
+| POST ♻️ | `invitations/accept-token` | `{token}` (48 caracteres): aceptar con el **enlace del correo**, **sin contraseña**, con la cuenta con la que el padre entró (Google o correo, cualquier correo). La App recibe el enlace `https://ppdguate.com/invitacion?token=…` (App Link) o `ppdguate://invitacion?token=…` (esquema propio): si no hay sesión, guarda el token, pide entrar o registrarse (y verificar el correo) y luego llama aquí. Mismos errores que `accept` (404 si el token no es válido). Responde `{ok, child_id, child_first_name, organization_name}` |
 | POST ♻️ | `invitations/redeem` | `{code}`: aceptar con el **código corto del correo** (`ABCD-2345`; acepta minúsculas, espacios o sin guion), p. ej. si la invitación llegó a otro correo. Mal → 422 `code_invalid`. Mismos errores y respuesta que `accept`. Límite 5/min |
 | DELETE | `children/{id}` | Desvincular a un hijo (lo decide el padre) |
 | GET | `children` | Todos los hijos vinculados, de todas las organizaciones (sin hijos: `data:[]`): `id, first_name, last_name, birthdate, photo_url, organization{id, name, slug, logo_url, crest_url, colors}, teams[{id, name, category, sport{id,code,name}, season{id,name}\|null, jersey_number, position{id,name}\|null}], plan_level`. La App no usa la marca para pintarse (siempre ProPlayer Data): solo muestra el nombre y escudo del colegio como dato |

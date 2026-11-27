@@ -169,7 +169,7 @@ export interface PcEvent {
 
 export type CallupStatus = 'called' | 'reserve'
 export type GuardianResponse = 'pending' | 'confirmed' | 'declined'
-/** 'injured' (Lesión) es nuevo; 'late' queda solo para registros anteriores (se muestra como Asiste). */
+/** Asiste, No asiste (con aviso), Lesión, No justificado y Llegó tarde. */
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused' | 'injured'
 
 export interface MatchAction {

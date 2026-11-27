@@ -37,18 +37,21 @@ class ChildController extends Controller
         $children = $user->children()->with('organization')->whereHas('organization', fn ($q) => $q->where('status', 'active'))->get();
 
         return response()->json(['data' => $children->map(function (Player $p) use ($user, $grant) {
-            $teams = TeamPlayer::with('team.sport')->where('player_id', $p->id)->where('active', true)->get()
+            $teams = TeamPlayer::with(['team.sport', 'team.season', 'position'])->where('player_id', $p->id)->where('active', true)->get()
                 ->filter(fn ($r) => $r->team)->map(fn ($r) => [
                     'id' => $r->team->id, 'name' => $r->team->name, 'category' => $r->team->category,
-                    'sport' => ['code' => $r->team->sport->code, 'name' => $r->team->sport->name],
+                    'sport' => ['id' => $r->team->sport->id, 'code' => $r->team->sport->code, 'name' => $r->team->sport->name],
+                    'season' => $r->team->season ? ['id' => $r->team->season->id, 'name' => $r->team->season->name] : null,
                     'jersey_number' => $r->jersey_number,
+                    'position' => $r->position ? ['id' => $r->position->id, 'name' => $r->position->name] : null,
                 ])->values();
             $level = $this->plans->levelFor($user, $p, $grant);
 
             return [
                 'id' => $p->id, 'first_name' => $p->first_name, 'last_name' => $p->last_name,
                 'photo_url' => $p->photoUrl(),
-                'organization' => $p->organization->brandingPayload(),
+                'organization' => ['id' => $p->organization->id] + $p->organization->brandingPayload(),
+                'birthdate' => $p->birthdate?->toDateString(),
                 'teams' => $teams,
                 'plan_level' => $level,
             ];

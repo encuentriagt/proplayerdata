@@ -36,6 +36,14 @@ export const ATTENDANCE: Record<AttendanceStatus, { label: string; short: string
   late: { label: 'Llegó tarde', short: 'LT', cls: 'bg-info-ink text-white', outline: 'border-ppd-cyan/60 text-info-ink', soft: 'bg-info-ink text-white' },
 }
 export const ATTENDANCE_ORDER: AttendanceStatus[] = ['present', 'excused', 'injured', 'absent', 'late']
+/** Penales en texto: "4–3 pen." (o null si no hubo). */
+export function penaltiesText(e: { shootout?: { score_us: number; score_them: number } | null }): string | null {
+  return e.shootout ? `${e.shootout.score_us}–${e.shootout.score_them} pen.` : null
+}
+/** Para lectores de pantalla: "Marcador 1 a 1, penales 4 a 3". */
+export function scoreLabel(e: { score_us: number | null; score_them: number | null; shootout?: { score_us: number; score_them: number } | null }): string {
+  return `Marcador ${e.score_us} a ${e.score_them}${e.shootout ? `, penales ${e.shootout.score_us} a ${e.shootout.score_them}` : ''}`
+}
 export const TEAM_GENDER = { male: 'Masculino', female: 'Femenino', mixed: 'Mixto' } as const
 export const PLAYER_GENDER = { male: 'Masculino', female: 'Femenino', other: 'Otro' } as const
 export const ROLE_LABEL = { org_admin: 'Administrador', director: 'Director técnico', coach: 'Coach', guardian: 'Padre o madre' } as const

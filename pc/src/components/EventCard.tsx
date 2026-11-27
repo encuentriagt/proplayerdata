@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
 import { capitalize, fmt } from '../lib/dates'
-import { CHIP, EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle } from '../lib/labels'
+import { CHIP, EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle, penaltiesText, scoreLabel } from '../lib/labels'
 import { useOrg } from '../lib/org'
 import type { PcEvent } from '../lib/types'
 
@@ -86,7 +86,10 @@ export function EventCard({ ev, showDate = true, showType = true, variant = 'lin
         )}
       </div>
       {finished && (
-        <p className="num shrink-0 text-4xl" aria-label={`Marcador ${ev.score_us} a ${ev.score_them}`}>{ev.score_us}–{ev.score_them}</p>
+        <div className="shrink-0 text-right" role="img" aria-label={scoreLabel(ev)}>
+          <p className="num text-4xl">{ev.score_us}–{ev.score_them}</p>
+          {ev.shootout && <p className="mt-1 text-xs font-semibold text-muted">{penaltiesText(ev)}</p>}
+        </div>
       )}
     </Link>
   )

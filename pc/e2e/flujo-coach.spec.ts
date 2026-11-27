@@ -329,4 +329,9 @@ test('Ficha: si empatan, «Se fueron a penales» abre la sección de penales apa
   // Al volver, los penales siguen ahí
   await page.reload()
   await expect(page.getByRole('region', { name: 'Penales' }).getByRole('status', { name: 'Penales de Nosotros' })).toHaveText('2')
+  // El marcador muestra los penales en el partido y en la lista
+  await expect(page.getByRole('img', { name: 'Marcador 1 a 1, penales 2 a 1' })).toBeVisible()
+  await expect(page.getByText('2–1 pen.')).toBeVisible()
+  await page.goto('/colegio-demo/partidos?ver=anteriores')
+  await expect(page.getByRole('img', { name: 'Marcador 1 a 1, penales 2 a 1' })).toBeVisible()
 })

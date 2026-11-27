@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CalendarX, MapPin, Pencil, Trash2 } from 'lucide-react'
 import { capitalize, fmt } from '../lib/dates'
-import { CHIP, EVENT_STATUS, EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle } from '../lib/labels'
+import { CHIP, EVENT_STATUS, EVENT_TYPE, EVENT_TYPE_COLOR, HOME_AWAY, eventTitle, penaltiesText, scoreLabel } from '../lib/labels'
 import { isPendingSheet } from '../components/EventCard'
 import { useOrg } from '../lib/org'
 import { useEvent, usePcMutation } from '../lib/queries'
@@ -112,7 +112,10 @@ export function EventDetailPage() {
             {e.location && <p className="flex items-center gap-1 text-muted"><MapPin className="size-4" aria-hidden />{e.location}</p>}
           </div>
           {e.status === 'finished' && e.score_us !== null && (
-            <p className="font-display text-5xl font-extrabold italic" aria-label={`Marcador ${e.score_us} a ${e.score_them}`}>{e.score_us}–{e.score_them}</p>
+            <div className="text-right" role="img" aria-label={scoreLabel(e)}>
+              <p className="font-display text-5xl font-extrabold italic">{e.score_us}–{e.score_them}</p>
+              {e.shootout && <p className="mt-1 text-sm font-semibold text-muted">{penaltiesText(e)}</p>}
+            </div>
           )}
         </div>
         {e.notes && <p className="mt-2 whitespace-pre-line text-sm text-black/70">{e.notes}</p>}

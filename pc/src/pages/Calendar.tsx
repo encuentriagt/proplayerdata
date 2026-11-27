@@ -7,7 +7,7 @@ import {
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { capitalize, nowGt, toGt, ymd } from '../lib/dates'
-import { EVENT_TYPE, EVENT_TYPE_COLOR, eventTitle } from '../lib/labels'
+import { EVENT_TYPE, EVENT_TYPE_COLOR, eventTitle, penaltiesText } from '../lib/labels'
 import { useOrg } from '../lib/org'
 import { useEvents } from '../lib/queries'
 import { useSport } from '../lib/sport'
@@ -151,7 +151,7 @@ function GridView({ events, from, to, anchor, compact, teamColor, showTeam }: { 
                       style={showTeam && teamColor.get(e.team_id) ? { borderLeft: `3px solid ${teamColor.get(e.team_id)}` } : undefined}
                       className={`block truncate rounded-md px-1.5 py-0.5 text-xs font-semibold ${EVENT_TYPE_COLOR[e.type]} ${e.status === 'cancelled' ? 'line-through opacity-50' : ''}`}>
                       {e.starts_at && !e.time_pending && format(toGt(e.starts_at), 'HH:mm')} {eventTitle(e)}
-                      {e.status === 'finished' && e.score_us !== null && ` · ${e.score_us}–${e.score_them}`}
+                      {e.status === 'finished' && e.score_us !== null && ` · ${e.score_us}–${e.score_them}${e.shootout ? ` (${penaltiesText(e)})` : ''}`}
                       {showTeam && e.team_name && <span className="block truncate font-normal opacity-80">{e.team_name}</span>}
                     </Link>
                   </li>

@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.14 (2026-12-01)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.15 (2026-12-01)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -133,7 +133,8 @@ Códigos y nombres de deporte en inglés (`soccer`/Soccer, `futsal`/Futsal, `bas
 ### Temporadas y equipos
 | Método | Ruta | Quién | Cuerpo |
 |---|---|---|---|
-| GET | `seasons` | todos | |
+| GET | `seasons` | todos | Cada temporada trae además el **ciclo** y el **avance**: `cycle` (`guatemalan` = empieza y termina en el mismo año · `american` = empieza en un año y termina en el siguiente), `cycle_label` («Ciclo guatemalteco» / «Ciclo americano»), `cycle_message` («Empieza y termina en 2026: es ciclo guatemalteco.»), `progress{status(upcoming\|in_progress\|finished), percent(0–100 entero; al menos 1 desde el primer día), percent_exact(1 decimal), days_total, days_elapsed(contando hoy), days_left}` con la fecha de Guatemala. Sin fechas: todo `null`. Ej.: 1 ene–31 dic → el 2 de enero 1 %, el 30 de junio 50 % (49.6) |
+| GET | `seasons/cycle?starts_on=&ends_on=` | todos | **Vista previa** para el formulario: al elegir las fechas, muestre `cycle_message` antes de guardar (misma regla). Fin antes del inicio → 422 |
 | POST ♻️ | `seasons` | admin | `{name, starts_on?, ends_on?, is_current?}` |
 | PATCH | `seasons/{id}` | admin | |
 | GET | `teams?sport_id=` | todos (según alcance) | cada equipo trae `can_manage` |

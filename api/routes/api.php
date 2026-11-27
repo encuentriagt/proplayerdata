@@ -113,6 +113,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::patch('positions/{positionId}', [\App\Http\Controllers\Pc\PositionController::class, 'update'])->whereNumber('positionId');
         Route::delete('positions/{positionId}', [\App\Http\Controllers\Pc\PositionController::class, 'destroy'])->whereNumber('positionId');
         Route::get('seasons', [SeasonController::class, 'index']);
+        Route::get('seasons/cycle', [SeasonController::class, 'cycle']);
         Route::post('seasons', [SeasonController::class, 'store'])->middleware('idempotent');
         Route::patch('seasons/{season}', [SeasonController::class, 'update']);
 

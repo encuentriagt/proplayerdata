@@ -51,7 +51,7 @@ class _RedeemCodeScreenState extends ConsumerState<RedeemCodeScreen> {
         const SnackBar(content: Text('Listo: su hijo quedó vinculado.')),
       );
       if (childId != null) {
-        context.pushReplacement('/hijos/$childId');
+        context.go('/hijos/$childId');
       } else {
         context.pop();
       }

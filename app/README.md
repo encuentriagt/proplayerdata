@@ -33,7 +33,7 @@ flutter test
 ```
 lib/
   core/       config, cliente HTTP (errores, idempotencia, 401), sesión segura, tema, fechas, widgets
-  features/   auth (login, crear cuenta, verificar correo, Google, contraseña olvidada y cambio), home…
+  features/   auth, children (Mis hijos, ficha, foto local), invitations, calendar (calendario y detalle)
   router.dart rutas y redirecciones según la sesión
 ```
 

@@ -63,7 +63,7 @@ void main() {
 
     await fillLogin(tester);
 
-    expect(find.text('Hola, Marta López.'), findsOneWidget);
+    expect(find.text('Hola, Marta'), findsOneWidget);
     final login = sent(api, 'auth/login');
     expect(login.headers['X-App-Platform'], isIn(['android', 'ios']));
     expect(bodyOf(login), {
@@ -140,7 +140,7 @@ void main() {
 
     await tester.enterText(field('Código de 6 dígitos'), '123456');
     await tapText(tester, 'Verificar');
-    expect(find.text('Hola, Marta López.'), findsOneWidget);
+    expect(find.text('Hola, Marta'), findsOneWidget);
   });
 
   testWidgets('contraseña olvidada con código', (tester) async {
@@ -196,7 +196,7 @@ void main() {
       'id_token': 'google-id-token',
     });
     expect(social.headers['X-App-Platform'], isIn(['android', 'ios']));
-    expect(find.text('Hola, Marta López.'), findsOneWidget);
+    expect(find.text('Hola, Marta'), findsOneWidget);
 
     // Al cerrar sesión también se cierra la de Google.
     await tester.tap(find.byTooltip('Opciones'));

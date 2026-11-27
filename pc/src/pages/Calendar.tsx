@@ -14,6 +14,7 @@ import { useSport } from '../lib/sport'
 import { SportSwitcher } from '../components/SportSwitcher'
 import type { EventType, PcEvent } from '../lib/types'
 import { EventCard } from '../components/EventCard'
+import { TeamPicker } from '../components/TeamPicker'
 import { Empty, ErrorAlert, PageHeader, Spinner } from '../components/ui'
 
 type View = 'mes' | 'semana' | 'lista'
@@ -24,7 +25,6 @@ export function Calendar() {
   const [params, setParams] = useSearchParams()
   const view = (params.get('vista') as View) || (window.matchMedia?.('(min-width: 768px)').matches ? 'mes' : 'lista')
   const anchor = params.get('fecha') ? parseISO(params.get('fecha')!) : nowGt()
-  const teamId = Number(params.get('equipo')) || undefined
   const type = (params.get('tipo') as EventType) || undefined
 
   const set = (patch: Record<string, string | undefined>) => {
@@ -40,8 +40,22 @@ export function Calendar() {
   }, [view, anchor])
 
   const sport = useSport()
+  // Equipos elegidos: ?equipos=1,2 (o ?equipo=1 de los enlaces viejos). Vacío = todos los equipos del deporte.
+  const teamIds = useMemo(() => {
+    const raw = params.get('equipos') ?? params.get('equipo') ?? ''
+    const ids = raw.split(',').map(Number).filter((n) => sport.teamIds.has(n))
+    return ids.length === sport.teamIds.size ? [] : ids
+  }, [params, sport.teamIds])
+  const teamId = teamIds.length === 1 ? teamIds[0] : undefined
   const events = useEvents({ from: ymd(from), to: ymd(to), team_id: teamId, type, sport_id: sport.selected?.id ?? -1 })
-  const shown = events.data ?? []
+  const shown = useMemo(() => {
+    const list = events.data ?? []
+    if (teamIds.length < 2) return list
+    const keep = new Set(teamIds)
+    return list.filter((e) => keep.has(e.team_id))
+  }, [events.data, teamIds])
+  const teamColor = useMemo(() => new Map(sport.teams.map((t) => [t.id, t.color])), [sport.teams])
+  const manyTeams = teamIds.length !== 1 && sport.teams.length > 1
 
   const move = (dir: 1 | -1) => {
     const d = view === 'semana' ? addWeeks(anchor, dir) : addMonths(anchor, dir)
@@ -72,12 +86,8 @@ export function Calendar() {
           <button className="btn-ghost px-2" onClick={() => move(1)} aria-label="Siguiente"><ChevronRight aria-hidden /></button>
         </div>
         <p className="font-semibold">{label}</p>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <select className="input min-h-10 w-auto py-1 text-sm" aria-label="Filtrar por equipo" value={teamId ?? ''}
-            onChange={(e) => set({ equipo: e.target.value || undefined })}>
-            <option value="">Todos los equipos</option>
-            {sport.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+        <div className="relative ml-auto flex flex-wrap gap-2 max-sm:w-full sm:static">
+          <TeamPicker teams={sport.teams} value={teamIds} onChange={(ids) => set({ equipos: ids.length ? ids.join(',') : undefined, equipo: undefined })} />
           <select className="input min-h-10 w-auto py-1 text-sm" aria-label="Filtrar por tipo" value={type ?? ''}
             onChange={(e) => set({ tipo: e.target.value || undefined })}>
             <option value="">Todos los tipos</option>
@@ -89,7 +99,7 @@ export function Calendar() {
       {events.isLoading ? <Spinner /> : events.isError ? <ErrorAlert error={events.error} /> : view === 'lista' ? (
         <ListView events={shown} />
       ) : (
-        <GridView events={shown} from={from} to={to} anchor={anchor} compact={view === 'mes'} />
+        <GridView events={shown} from={from} to={to} anchor={anchor} compact={view === 'mes'} teamColor={teamColor} showTeam={manyTeams} />
       )}
     </>
   )
@@ -115,7 +125,7 @@ function ListView({ events }: { events: PcEvent[] }) {
   )
 }
 
-function GridView({ events, from, to, anchor, compact }: { events: PcEvent[]; from: Date; to: Date; anchor: Date; compact: boolean }) {
+function GridView({ events, from, to, anchor, compact, teamColor, showTeam }: { events: PcEvent[]; from: Date; to: Date; anchor: Date; compact: boolean; teamColor: Map<number, string | null>; showTeam: boolean }) {
   const { slug } = useOrg()
   const days = eachDayOfInterval({ start: from, end: to })
   const today = nowGt()
@@ -137,10 +147,12 @@ function GridView({ events, from, to, anchor, compact }: { events: PcEvent[]; fr
               <ul className="space-y-1">
                 {list.map((e) => (
                   <li key={e.id}>
-                    <Link to={`/${slug}/eventos/${e.id}`} title={eventTitle(e)}
+                    <Link to={`/${slug}/eventos/${e.id}`} title={[e.team_name, eventTitle(e)].filter(Boolean).join(' · ')}
+                      style={showTeam && teamColor.get(e.team_id) ? { borderLeft: `3px solid ${teamColor.get(e.team_id)}` } : undefined}
                       className={`block truncate rounded-md px-1.5 py-0.5 text-xs font-semibold ${EVENT_TYPE_COLOR[e.type]} ${e.status === 'cancelled' ? 'line-through opacity-50' : ''}`}>
                       {e.starts_at && !e.time_pending && format(toGt(e.starts_at), 'HH:mm')} {eventTitle(e)}
                       {e.status === 'finished' && e.score_us !== null && ` · ${e.score_us}–${e.score_them}`}
+                      {showTeam && e.team_name && <span className="block truncate font-normal opacity-80">{e.team_name}</span>}
                     </Link>
                   </li>
                 ))}

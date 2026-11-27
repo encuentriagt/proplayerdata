@@ -62,7 +62,8 @@ class ChildController extends Controller
     public function events(Request $request, Player $player): JsonResponse
     {
         [$level, $limits] = $this->authorizeChild($request, $player);
-        $data = $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from']]);
+        $data = $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'sport_id' => ['nullable', 'integer'], 'team_id' => ['nullable', 'integer'], 'type' => ['nullable', Rule::in(['match', 'training', 'other'])]]);
         $from = CarbonImmutable::parse($data['from'] ?? now()->startOfMonth())->startOfDay();
         $to = CarbonImmutable::parse($data['to'] ?? $from->addDays(41))->endOfDay();
         if ($from->diffInDays($to) > 120) {
@@ -78,7 +79,10 @@ class ChildController extends Controller
         }
 
         $teamIds = TeamPlayer::where('player_id', $player->id)->pluck('team_id');
-        $events = Event::with('team:id,name')->published()->whereIn('team_id', $teamIds)
+        $events = Event::with('team:id,name,sport_id')->published()->whereIn('team_id', $teamIds)
+            ->when($data['team_id'] ?? null, fn ($q, $t) => $q->where('team_id', $t))
+            ->when($data['sport_id'] ?? null, fn ($q, $s) => $q->whereHas('team', fn ($t) => $t->where('sport_id', $s)))
+            ->when($data['type'] ?? null, fn ($q, $t) => $q->where('type', $t))
             ->whereBetween('starts_at', [$from, max($from, $to)])->orderBy('starts_at')->get();
         $callups = EventCallup::where('player_id', $player->id)->whereIn('event_id', $events->pluck('id'))->get()->keyBy('event_id');
 
@@ -88,6 +92,71 @@ class ChildController extends Controller
             ]))->values(),
             'meta' => ['plan_level' => $level, 'history_limited' => $limited],
         ]);
+    }
+
+    /**
+     * Calendario unificado: eventos publicados de TODOS los hijos (todas sus organizaciones) en un llamado.
+     * Un evento con dos hijos viene una sola vez, con children[] y child_ids[]. En Gratis, el pasado se
+     * limita por hijo (history_days de cada uno).
+     */
+    public function calendar(Request $request): JsonResponse
+    {
+        $data = $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'child_id' => ['nullable', 'integer'], 'sport_id' => ['nullable', 'integer'], 'type' => ['nullable', Rule::in(['match', 'training', 'other'])]]);
+        $from = CarbonImmutable::parse($data['from'] ?? now()->startOfMonth())->startOfDay();
+        $to = CarbonImmutable::parse($data['to'] ?? $from->addDays(41))->endOfDay();
+        if ($from->diffInDays($to) > 120) {
+            return ApiError::response('range_too_large', 'El rango máximo es de 120 días.', 422);
+        }
+        $user = $request->user();
+        $grant = $this->plans->activeGrant($user);
+        $children = $user->children()->with('organization')->whereHas('organization', fn ($q) => $q->where('status', 'active'))
+            ->when($data['child_id'] ?? null, fn ($q, $c) => $q->where('players.id', $c))->get();
+        if (! empty($data['child_id']) && $children->isEmpty()) {
+            throw new AuthorizationException;
+        }
+
+        // Por hijo: equipos y fecha mínima según su plan.
+        $limited = false;
+        $info = $children->mapWithKeys(function (Player $p) use ($user, $grant, $from, &$limited) {
+            $limits = $this->plans->limits($this->plans->levelFor($user, $p, $grant));
+            $min = $limits['history_days'] !== null ? CarbonImmutable::now()->subDays($limits['history_days'])->startOfDay() : null;
+            if ($min && $from->lt($min)) {
+                $limited = true;
+            }
+
+            return [$p->id => ['player' => $p, 'teams' => TeamPlayer::where('player_id', $p->id)->pluck('team_id')->all(), 'min' => $min]];
+        });
+        $teamIds = $info->flatMap(fn ($i) => $i['teams'])->unique()->values();
+
+        $events = Event::with(['team.sport', 'organization'])->published()->whereIn('team_id', $teamIds->all() ?: [0])
+            ->when($data['sport_id'] ?? null, fn ($q, $s) => $q->whereHas('team', fn ($t) => $t->where('sport_id', $s)))
+            ->when($data['type'] ?? null, fn ($q, $t) => $q->where('type', $t))
+            ->whereBetween('starts_at', [$from, max($from, $to)])->orderBy('starts_at')->limit(500)->get();
+        $callups = EventCallup::whereIn('event_id', $events->pluck('id'))->whereIn('player_id', $info->keys())->get()
+            ->groupBy(fn ($c) => $c->event_id.':'.$c->player_id);
+
+        $out = [];
+        foreach ($events as $e) {
+            $kids = $info->filter(fn ($i) => in_array($e->team_id, $i['teams']) && (! $i['min'] || $e->starts_at->gte($i['min'])));
+            if ($kids->isEmpty()) {
+                continue;
+            }
+            $out[] = array_merge($this->publicEvent($e), [
+                'team' => ['id' => $e->team->id, 'name' => $e->team->name],
+                'sport' => ['id' => $e->team->sport->id, 'code' => $e->team->sport->code, 'name' => $e->team->sport->name],
+                'organization' => ['id' => $e->organization->id, 'name' => $e->organization->name],
+                'child_ids' => $kids->keys()->values()->all(),
+                'children' => $kids->map(function ($i) use ($e, $callups) {
+                    $c = $callups->get($e->id.':'.$i['player']->id)?->first();
+
+                    return ['child_id' => $i['player']->id, 'first_name' => $i['player']->first_name,
+                        'callup' => $c ? ['status' => $c->status, 'response' => $c->guardian_response] : null];
+                })->values()->all(),
+            ]);
+        }
+
+        return response()->json(['data' => $out, 'meta' => ['history_limited' => $limited]]);
     }
 
     public function event(Request $request, Player $player, int $eventId): JsonResponse

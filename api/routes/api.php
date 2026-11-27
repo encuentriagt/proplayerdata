@@ -93,6 +93,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::post('invitations/{id}/decline', [\App\Http\Controllers\App\LinkController::class, 'decline'])->whereNumber('id');
         Route::delete('children/{player}', [\App\Http\Controllers\App\LinkController::class, 'unlink']);
         Route::get('children', [ChildController::class, 'index']);
+        Route::get('events', [ChildController::class, 'calendar']);
         Route::get('children/{player}/events', [ChildController::class, 'events']);
         Route::get('children/{player}/events/{eventId}', [ChildController::class, 'event'])->whereNumber('eventId');
         Route::post('children/{player}/events/{eventId}/callup-response', [ChildController::class, 'respondCallup'])->whereNumber('eventId')->middleware('idempotent');

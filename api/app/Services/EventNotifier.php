@@ -8,27 +8,49 @@ use App\Models\Player;
 use App\Models\PlayerEventStat;
 use App\Models\SportStatType;
 use App\Models\TeamPlayer;
+use Illuminate\Support\Facades\DB;
 
 /** Avisos a padres relacionados con actividades del equipo. Textos con trato de usted. */
 final class EventNotifier
 {
     public function __construct(private NotificationService $notifications) {}
 
-    /** Convocatoria: un aviso por jugador convocado (una sola vez por partido). */
+    /**
+     * Convocatoria: un aviso por padre y partido. Si dos hijos suyos quedan convocados al mismo partido,
+     * recibe UN aviso con ambos nombres. Cada hijo se avisa una sola vez por partido.
+     */
     public function callups(Event $event, array $playerIds): void
     {
         $event->loadMissing('team');
-        foreach (Player::whereIn('id', $playerIds)->get() as $player) {
-            $this->notifications->notify(
-                $this->guardiansOf([$player->id]),
+        $players = Player::whereIn('id', $playerIds)->get()->keyBy('id');
+        $byGuardian = GuardianPlayer::whereIn('player_id', $players->keys())
+            ->whereHas('user', fn ($q) => $q->where('status', 'active'))->get()->groupBy('user_id');
+        foreach ($byGuardian as $userId => $links) {
+            $kids = $links->pluck('player_id')->unique()->sort()->values();
+            // No repetir a un hijo ya avisado (p. ej. si se convocó antes por separado).
+            $kids = $kids->reject(fn ($pid) => DB::table('notification_logs')->where('user_id', $userId)->where('kind', 'callup')
+                ->where('ref_key', "event:{$event->id}:player:{$pid}")->exists())->values();
+            if ($kids->isEmpty()) {
+                continue;
+            }
+            $names = $kids->map(fn ($pid) => $players[$pid]->first_name)->all();
+            $who = count($names) === 1 ? $names[0].' fue convocado(a)' : implode(' y ', $names).' fueron convocados';
+            $sent = $this->notifications->notify(
+                [$userId],
                 'callup',
-                "event:{$event->id}:player:{$player->id}",
+                "event:{$event->id}:players:".$kids->implode(','),
                 'Convocatoria: '.$event->team->name,
-                "{$player->first_name} fue convocado(a) para {$event->displayTitle()} el ".$this->when($event).'.',
-                ['event_id' => $event->id, 'player_id' => $player->id, 'team_id' => $event->team_id],
+                "{$who} para {$event->displayTitle()} el ".$this->when($event).'.',
+                ['event_id' => $event->id, 'team_id' => $event->team_id, 'player_ids' => $kids->implode(','),
+                    'child_name' => implode(' y ', $names)] + (count($names) === 1 ? ['player_id' => $kids[0]] : []),
                 $event->organization_id,
-                $player->id,
+                count($names) === 1 ? $kids[0] : null,
             );
+            if ($sent) {
+                foreach ($kids as $pid) {
+                    DB::table('notification_logs')->insertOrIgnore(['user_id' => $userId, 'kind' => 'callup', 'ref_key' => "event:{$event->id}:player:{$pid}", 'sent_at' => now()]);
+                }
+            }
         }
     }
 

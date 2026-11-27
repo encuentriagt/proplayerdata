@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.15 (2026-12-01)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.16 (2026-12-01)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -87,7 +87,7 @@ Ruteo sugerido tras el login: `memberships` no vacío → PC (si hay varias orga
 | GET | `/me/notifications` | Bandeja: `data[{id,kind,title,body,data,organization_id,player_id,read,created_at}]`, `meta.unread` |
 | POST | `/me/notifications/read` | `{ids?: [..]}` sin ids = todas |
 
-Tipos de aviso (`kind`): `callup`, `trainings`, `event_changed`, `event_cancelled`, `attendance`, `match_result`, `link_invitation` (padres: nueva invitación de vínculo si ya tienen cuenta verificada con ese correo; `data`: `invitation_id, organization_id, organization_name, child_name`) y `match_published` (staff que lo activó). El push trae en `data` (todo texto): `kind` y según el caso `event_id`, `player_id`, `team_id`, `status`, `series_id`, `count`. Canal Android: `general` (más adelante `emergencias`).
+Tipos de aviso (`kind`): `callup`, `trainings`, `event_changed`, `event_cancelled`, `attendance`, `match_result`, `link_invitation` (padres: nueva invitación de vínculo si ya tienen cuenta verificada con ese correo; `data`: `invitation_id, organization_id, organization_name, child_name`) y `match_published` (staff que lo activó). El push trae en `data` (todo texto): `kind` y según el caso `event_id`, `player_id`, `team_id`, `status`, `series_id`, `count`. Canal Android: `general` (más adelante `emergencias`). **Desde v1.16** todo aviso trae además, cuando aplica: `organization_id`, `organization_name`, `player_id`, `child_name`, `team_id`, `team_name`, `sport_code` y `event_id`, para mostrar «Colegio A · Ana · Soccer». Los dispositivos son de la cuenta del padre: le llegan los avisos de todos sus hijos y colegios. **Convocatoria con dos hijos** al mismo partido: un solo aviso («Ana y Beto fueron convocados…») con `player_ids` (lista separada por comas) y sin `player_id`.
 
 ---
 
@@ -227,7 +227,8 @@ El padre solo ve **a sus hijos** y **solo los datos de su hijo** (no los de otro
 | POST ♻️ | `invitations/redeem` | `{code}`: aceptar con el **código corto del correo** (`ABCD-2345`; acepta minúsculas, espacios o sin guion), p. ej. si la invitación llegó a otro correo. Mal → 422 `code_invalid`. Mismos errores y respuesta que `accept`. Límite 5/min |
 | DELETE | `children/{id}` | Desvincular a un hijo (lo decide el padre) |
 | GET | `children` | Todos los hijos vinculados, de todas las organizaciones (sin hijos: `data:[]`): `id, first_name, last_name, birthdate, photo_url, organization{id, name, slug, logo_url, crest_url, colors}, teams[{id, name, category, sport{id,code,name}, season{id,name}\|null, jersey_number, position{id,name}\|null}], plan_level`. La App no usa la marca para pintarse (siempre ProPlayer Data): solo muestra el nombre y escudo del colegio como dato |
-| GET | `children/{id}/events?from=&to=` | Eventos **publicados** de los equipos del hijo (los borradores no aparecen) con `callup{status,response}`. `meta.history_limited=true` si el plan recortó el pasado. Marcador `null` hasta que se publique |
+| GET | `events?from=&to=&child_id=&sport_id=&type=` | **Calendario unificado**: eventos publicados de **todos** los hijos (todas sus organizaciones) en un llamado (máx. 120 días, 500 eventos). Cada evento como en el calendario por hijo + `team{id,name}`, `sport{id,code,name}`, `organization{id,name}`, `child_ids[]` y `children[{child_id, first_name, callup{status,response}\|null}]`. **Un evento con dos hijos viene una sola vez** con ambos. Gratis: el pasado se limita por hijo (`meta.history_limited`). `child_id` ajeno → 403 |
+| GET | `children/{id}/events?from=&to=&sport_id=&team_id=&type=` | Eventos **publicados** de los equipos del hijo (los borradores no aparecen) con `callup{status,response}`. `meta.history_limited=true` si el plan recortó el pasado. Marcador `null` hasta que se publique |
 | GET | `children/{id}/events/{eventId}` | Detalle: `callup`, `attendance{status(present\|excused\|injured\|absent), note}`, `child_played{is_starter,minutes_played}`, `child_stats[{code,name,value}]`. Fuera del límite del plan: 403 `plan_limit` |
 | POST ♻️ | `children/{id}/events/{eventId}/callup-response` | `{response: confirmed\|declined}` antes del partido (`not_called`, `event_closed`) |
 | GET | `children/{id}/stats?team_id=` | `by_sport[{sport_id, matches, minutes, stats[{code,name,value}]}]`, `attendance{present,excused,injured,absent}` (solo actividades publicadas). `meta.limited` en Gratis |

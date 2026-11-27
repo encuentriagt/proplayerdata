@@ -104,11 +104,13 @@ Al cambiar de hijo o volver a la App, refresque. Sin conexión: muestre lo últi
 
 ---
 
-## 7. Enlaces de invitación y restablecer contraseña
+## 7. Enlace de vinculación (sin contraseña)
 
-Hoy los padres aceptan la invitación y restablecen la contraseña en la web: `https://ppdguate.com/invitacion?token=` y `https://ppdguate.com/restablecer?token=`. Más adelante la App abrirá esos enlaces directamente (App Links / Universal Links). Para eso el agente de backend publicará `assetlinks.json` y `apple-app-site-association` en ppdguate.com; usted le pasará en su PR el **SHA-256 del certificado de firma de Android** y el **Team ID de Apple** cuando existan. Mientras tanto, la App solo ofrece **iniciar sesión**.
-
----
+Decisión del dueño: el enlace del correo **abre la App y vincula solo**, sin pedir contraseña (el padre pudo crear su cuenta con Google).
+- Registre en Android el esquema **`ppdguate://invitacion?token=…`** (intent-filter con `scheme="ppdguate" host="invitacion"`) y, cuando exista la firma, el App Link verificado **`https://ppdguate.com/invitacion?token=…`** (`autoVerify`). Pase en su PR el **SHA-256** del certificado de firma para publicar `assetlinks.json`.
+- La página `https://ppdguate.com/invitacion` ya no pide contraseña: abre la App con `intent://invitacion?token=…#Intent;scheme=ppdguate;package=com.ppdguate.app;…` y, si no está instalada, lleva a Google Play; también muestra el código corto.
+- Al recibir el enlace: si hay sesión verificada → `POST /app/invitations/accept-token {token}` y muestre «Ana quedó vinculada a su cuenta». Si no hay sesión → guarde el token (memoria segura), pida entrar o registrarse y verificar el correo, y al terminar llame a `accept-token`. Errores: 404, 409 `invitation_used`, 410 `invitation_closed` (muestre `error.message`).
+- Restablecer contraseña: se hace dentro de la App con código (`/app/auth/password/forgot` y `/reset`).
 
 ## 8. Cuenta para probar
 

@@ -65,6 +65,22 @@ class LinkController extends Controller
         return $this->link($request, $inv);
     }
 
+    /**
+     * Aceptar con el enlace del correo (la App lo recibe al abrirse: https://ppdguate.com/invitacion?token=…
+     * o ppdguate://invitacion?token=…). Vincula con la cuenta con la que el padre entró, sin pedir contraseña
+     * (puede haberla creado con Google). El token es secreto y de un solo uso, como el código corto.
+     */
+    public function acceptToken(Request $request): JsonResponse
+    {
+        $data = $request->validate(['token' => ['required', 'string', 'size:48', 'alpha_num']]);
+        $inv = InvitationService::findByToken($data['token']);
+        if (! $inv || $inv->role !== 'guardian') {
+            return ApiError::response('invitation_not_found', 'El enlace de invitación no es válido. Pida uno nuevo a la institución.', 404);
+        }
+
+        return $this->link($request, $inv);
+    }
+
     /** El padre deja de seguir a un hijo (lo puede volver a vincular con una nueva invitación). */
     public function unlink(Request $request, Player $player): JsonResponse
     {
@@ -107,7 +123,10 @@ class LinkController extends Controller
         }
         Audit::log('invitation.accepted', $inv, ['via' => 'app'], $inv->organization_id, $user->id);
 
-        return response()->json(['data' => ['ok' => true, 'child_id' => (int) $inv->player_id]]);
+        $player = Player::with('organization')->find($inv->player_id);
+
+        return response()->json(['data' => ['ok' => true, 'child_id' => (int) $inv->player_id,
+            'child_first_name' => $player?->first_name, 'organization_name' => $player?->organization?->name]]);
     }
 
     private function pending()

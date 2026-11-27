@@ -30,7 +30,9 @@ class InvitationAcceptController extends Controller
         }
 
         return response()->json(['data' => [
-            'status' => $inv->accepted_at ? 'accepted' : ($inv->expires_at->isPast() ? 'expired' : 'pending'),
+            'status' => $inv->accepted_at ? 'accepted' : ($inv->declined_at ? 'declined' : ($inv->expires_at->isPast() ? 'expired' : 'pending')),
+            // Solo invitaciones de padre: el código corto para "Tengo un código" en la App (quien tiene el enlace ya puede usarlo).
+            'code' => $inv->role === 'guardian' && ! $inv->accepted_at ? $inv->code : null,
             'role' => $inv->role,
             'role_label' => InvitationService::ROLE_LABELS[$inv->role] ?? $inv->role,
             'email_masked' => self::mask($inv->email),

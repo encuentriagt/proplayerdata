@@ -98,4 +98,34 @@ class GuardianLinkTest extends TestCase
         $this->as($mama)->postJson("/api/app/invitations/{$sofiInv}/accept")->assertStatus(410)->assertJsonPath('error.code', 'invitation_closed');
         $this->assertSame(['Luis'], collect($this->as($mama)->getJson('/api/app/children')->json('data'))->pluck('first_name')->all());
     }
+
+    public function test_enlace_del_correo_vincula_sin_contrasena_con_cualquier_cuenta(): void
+    {
+        Mail::fake();
+        $org = $this->makeOrg();
+        $t = $this->team($org);
+        $admin = $this->member($org, 'a@x.test', 'org_admin');
+        $ana = $this->player($org, $t, 'Ana');
+        $url = $this->invite($admin, 'papa@colegio.test', $ana->id)->json('data.invite_url');
+        $token = substr($url, strpos($url, 'token=') + 6);
+
+        // La vista previa pública trae el código (para "Tengo un código") y no pide nada más.
+        $this->getJson('/api/public/invitations/'.$token)->assertOk()->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.code', Invitation::where('player_id', $ana->id)->value('code'));
+
+        // Padre que entró con Google, con OTRO correo y sin contraseña: la App manda el token del enlace.
+        $g = $this->guardian('papa@gmail.com', ['password_set' => false]);
+        $this->app['auth']->forgetGuards();
+        $this->as($g)->postJson('/api/app/invitations/accept-token', ['token' => str_repeat('a', 48)])->assertNotFound();
+        $this->as($g)->postJson('/api/app/invitations/accept-token', ['token' => $token])->assertOk()
+            ->assertJsonPath('data.child_id', $ana->id)->assertJsonPath('data.child_first_name', 'Ana')->assertJsonPath('data.organization_name', $org->name);
+        $this->as($g)->postJson('/api/app/invitations/accept-token', ['token' => $token])->assertOk(); // repetir: igual
+        $this->as($g)->getJson('/api/app/children')->assertJsonPath('data.0.first_name', 'Ana');
+        $this->getJson('/api/public/invitations/'.$token)->assertJsonPath('data.status', 'accepted')->assertJsonPath('data.code', null);
+
+        // Otra cuenta ya no puede usar ese enlace.
+        $otro = $this->guardian('otro@x.test');
+        $this->app['auth']->forgetGuards();
+        $this->as($otro)->postJson('/api/app/invitations/accept-token', ['token' => $token])->assertStatus(409)->assertJsonPath('error.code', 'invitation_used');
+    }
 }

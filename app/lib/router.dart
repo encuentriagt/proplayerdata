@@ -6,8 +6,9 @@ import 'features/auth/application/session_controller.dart';
 import 'features/auth/presentation/change_password_screen.dart';
 import 'features/auth/presentation/forgot_password_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
-import 'features/auth/presentation/not_guardian_screen.dart';
+import 'features/auth/presentation/register_screen.dart';
 import 'features/auth/presentation/splash_screen.dart';
+import 'features/auth/presentation/verify_email_screen.dart';
 import 'features/home/home_screen.dart';
 
 abstract final class Routes {
@@ -15,7 +16,8 @@ abstract final class Routes {
   static const login = '/ingresar';
   static const forgot = '/olvide-contrasena';
   static const mustChange = '/cambiar-contrasena';
-  static const notGuardian = '/solo-padres';
+  static const register = '/crear-cuenta';
+  static const verifyEmail = '/verificar-correo';
   static const home = '/';
   static const changePassword = '/contrasena';
 }
@@ -23,25 +25,26 @@ abstract final class Routes {
 /// Decide a dónde ir según la sesión. Devuelve null si puede quedarse.
 @visibleForTesting
 String? redirectFor(SessionState session, String location) {
-  const public = {Routes.login, Routes.forgot};
+  const public = {Routes.login, Routes.forgot, Routes.register};
   switch (session) {
     case SessionLoading():
       return location == Routes.splash ? null : Routes.splash;
     case SignedOut():
       return public.contains(location) ? null : Routes.login;
     case SignedIn(:final profile):
+      if (profile.mustVerifyEmail) {
+        return location == Routes.verifyEmail ? null : Routes.verifyEmail;
+      }
       if (profile.mustChangePassword) {
         return location == Routes.mustChange ? null : Routes.mustChange;
-      }
-      if (!profile.isGuardian) {
-        return location == Routes.notGuardian ? null : Routes.notGuardian;
       }
       const blocked = {
         Routes.splash,
         Routes.login,
         Routes.forgot,
+        Routes.register,
         Routes.mustChange,
-        Routes.notGuardian,
+        Routes.verifyEmail,
       };
       return blocked.contains(location) ? Routes.home : null;
   }
@@ -69,9 +72,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.mustChange,
         builder: (_, _) => const ChangePasswordScreen(mandatory: true),
       ),
+      GoRoute(path: Routes.register, builder: (_, _) => const RegisterScreen()),
       GoRoute(
-        path: Routes.notGuardian,
-        builder: (_, _) => const NotGuardianScreen(),
+        path: Routes.verifyEmail,
+        builder: (_, _) => const VerifyEmailScreen(),
       ),
       GoRoute(path: Routes.home, builder: (_, _) => const HomeScreen()),
       GoRoute(

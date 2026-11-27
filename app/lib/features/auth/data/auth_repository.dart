@@ -14,6 +14,22 @@ Map<String, dynamic> _payload(Object? body) {
   return body is Map ? Map<String, dynamic>.from(body) : <String, dynamic>{};
 }
 
+/// Mensaje de éxito de la API, si lo trae.
+String? _message(Object? body) {
+  if (body is! Map) return null;
+  final msg = body['message'] ?? _payload(body)['message'];
+  return msg is String ? msg : null;
+}
+
+Options _platform([Options? base]) {
+  final options = base ?? Options();
+  return options.copyWith(
+    headers: {...?options.headers, 'X-App-Platform': Env.platform},
+  );
+}
+
+enum SocialProvider { google, apple }
+
 class AuthRepository {
   AuthRepository(this._dio);
 
@@ -26,9 +42,62 @@ class AuthRepository {
     final res = await _dio.post<Object?>(
       'auth/login',
       data: {'email': email.trim(), 'password': password},
-      options: Options(headers: {'X-App-Platform': Env.platform}),
+      options: _platform(),
     );
     return LoginResult.fromJson(_payload(res.data));
+  });
+
+  /// ♻️ Crea la cuenta de padre. Responde como el login, con
+  /// `must_verify_email: true`, y la API manda un código al correo.
+  Future<LoginResult> register({
+    required String name,
+    required String email,
+    String? phone,
+    required String password,
+    required String passwordConfirmation,
+    required IdempotencyKey key,
+  }) => guardApi(() async {
+    final res = await _dio.post<Object?>(
+      'app/auth/register',
+      data: {
+        'name': name.trim(),
+        'email': email.trim(),
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+      options: _platform(key.options),
+    );
+    return LoginResult.fromJson(_payload(res.data));
+  });
+
+  /// Crear cuenta o iniciar sesión con Google o Apple.
+  Future<LoginResult> social({
+    required SocialProvider provider,
+    required String idToken,
+    String? nonce,
+    String? name,
+  }) => guardApi(() async {
+    final res = await _dio.post<Object?>(
+      'app/auth/social',
+      data: {
+        'provider': provider.name,
+        'id_token': idToken,
+        'nonce': ?nonce,
+        'name': ?name,
+      },
+      options: _platform(),
+    );
+    return LoginResult.fromJson(_payload(res.data));
+  });
+
+  Future<void> verifyEmail(String code) => guardApi(
+    () => _dio.post<Object?>('app/auth/verify-email', data: {'code': code}),
+  );
+
+  Future<String?> resendVerification() => guardApi(() async {
+    final res = await _dio.post<Object?>('app/auth/verify-email/resend');
+    return _message(res.data);
   });
 
   Future<SessionProfile> me() => guardApi(() async {
@@ -56,19 +125,35 @@ class AuthRepository {
     ),
   );
 
-  /// Siempre responde lo mismo, exista o no el correo.
+  /// Manda un código al correo (siempre responde lo mismo, exista o no).
   Future<String?> forgotPassword(String email) => guardApi(() async {
     final res = await _dio.post<Object?>(
-      'auth/password/forgot',
+      'app/auth/password/forgot',
       data: {'email': email.trim()},
     );
-    final body = res.data;
-    if (body is Map) {
-      final msg = body['message'] ?? _payload(body)['message'];
-      if (msg is String) return msg;
-    }
-    return null;
+    return _message(res.data);
   });
+
+  /// ♻️ Crea una contraseña nueva con el código del correo.
+  /// Cierra todas las sesiones: después hay que iniciar sesión.
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+    required IdempotencyKey key,
+  }) => guardApi(
+    () => _dio.post<Object?>(
+      'app/auth/password/reset',
+      data: {
+        'email': email.trim(),
+        'code': code.trim(),
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+      options: key.options,
+    ),
+  );
 }
 
 final authRepositoryProvider = Provider<AuthRepository>(

@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/idempotency.dart';
 import '../../../core/widgets/form_page.dart';
+import '../../../core/widgets/loading_button.dart';
 import '../../../core/widgets/message_banner.dart';
 import '../../../core/widgets/password_field.dart';
 import '../application/session_controller.dart';
 import '../data/auth_repository.dart';
+import 'validators.dart';
 
 /// Cambio de contraseña. Si [mandatory], el usuario no puede salir de aquí
 /// (contraseña temporal) salvo cerrando sesión.
@@ -19,17 +21,6 @@ class ChangePasswordScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<ChangePasswordScreen> createState() =>
       _ChangePasswordScreenState();
-}
-
-/// Mínimo 10 caracteres, con letras y números (regla de la API).
-String? validateNewPassword(String? value) {
-  final v = value ?? '';
-  if (v.length < 10) return 'Use al menos 10 caracteres.';
-  if (!RegExp(r'[A-Za-zÁÉÍÓÚáéíóúÑñ]').hasMatch(v) ||
-      !RegExp(r'\d').hasMatch(v)) {
-    return 'Use letras y números.';
-  }
-  return null;
 }
 
 class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
@@ -131,7 +122,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     errorText: error?.fieldError('password'),
                     autofillHints: const [AutofillHints.newPassword],
                     onChanged: _edited,
-                    validator: validateNewPassword,
+                    validator: Validators.newPassword,
                   ),
                   const SizedBox(height: 16),
                   PasswordField(
@@ -156,15 +147,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 24),
-          FilledButton(
-            onPressed: _sending ? null : _submit,
-            child: _sending
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  )
-                : const Text('Guardar contraseña'),
+          LoadingButton(
+            label: 'Guardar contraseña',
+            loading: _sending,
+            onPressed: _submit,
           ),
           if (widget.mandatory) ...[
             const SizedBox(height: 8),

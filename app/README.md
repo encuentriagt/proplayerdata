@@ -13,7 +13,12 @@ flutter pub get
 dart run build_runner build --delete-conflicting-outputs   # modelos freezed/json
 flutter run                                                 # usa https://api.ppdguate.com/api
 flutter run --dart-define=API_URL=https://otra.api/api      # otra API
+flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<web client ID>   # muestra «Continuar con Google»
 ```
+
+«Continuar con Google» solo aparece si se pasa `GOOGLE_SERVER_CLIENT_ID` (el *web client ID* del proyecto;
+no es secreto). En Google Cloud debe existir además un cliente OAuth **Android** con el paquete
+`com.ppdguate.app` y el SHA-1 de cada firma (la de depuración de cada PC y la de publicación).
 
 ## Revisar antes del PR (lo mismo que el CI "App (Flutter)")
 
@@ -28,7 +33,7 @@ flutter test
 ```
 lib/
   core/       config, cliente HTTP (errores, idempotencia, 401), sesión segura, tema, fechas, widgets
-  features/   auth (login, recuperar y cambiar contraseña), home…
+  features/   auth (login, crear cuenta, verificar correo, Google, contraseña olvidada y cambio), home…
   router.dart rutas y redirecciones según la sesión
 ```
 

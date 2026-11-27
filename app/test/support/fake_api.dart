@@ -59,28 +59,42 @@ Map<String, dynamic> apiError(String code, String message, [Map? fields]) => {
 
 Map<String, dynamic> profileJson({
   bool mustChange = false,
-  bool guardian = true,
+  bool mustVerify = false,
+  bool passwordSet = true,
 }) => {
   'user': {
     'id': 7,
     'name': 'Marta López',
     'email': 'marta@example.com',
+    'account_type': 'guardian',
+    'phone': null,
     'must_change_password': mustChange,
+    'email_verified': !mustVerify,
+    'password_set': passwordSet,
+    'linked': passwordSet ? <String>[] : ['google'],
     'is_super_admin': false,
   },
   'memberships': <Object>[],
-  'is_guardian': guardian,
+  'is_guardian': true,
+  'must_verify_email': mustVerify,
   'admin_totp': null,
 };
 
 Map<String, dynamic> loginJson({
   bool mustChange = false,
-  bool guardian = true,
+  bool mustVerify = false,
+  bool passwordSet = true,
+  bool? created,
 }) => {
   'data': {
     'token': 'tok-123',
     'token_type': 'Bearer',
     'expires_at': '2026-12-26T09:00:00-06:00',
-    ...profileJson(mustChange: mustChange, guardian: guardian),
+    ...profileJson(
+      mustChange: mustChange,
+      mustVerify: mustVerify,
+      passwordSet: passwordSet,
+    ),
+    'created': ?created,
   },
 };

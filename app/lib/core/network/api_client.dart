@@ -12,6 +12,9 @@ class ApiEvents {
 
   /// 403 `password_change_required`: llevar al cambio de contraseña.
   void Function()? onPasswordChangeRequired;
+
+  /// 403 `email_unverified`: llevar a la verificación del correo.
+  void Function()? onEmailUnverified;
 }
 
 final apiEventsProvider = Provider<ApiEvents>((ref) => ApiEvents());
@@ -50,6 +53,8 @@ Dio buildDio({
           events.onUnauthorized?.call();
         } else if (error.code == 'password_change_required') {
           events.onPasswordChangeRequired?.call();
+        } else if (error.code == 'email_unverified') {
+          events.onEmailUnverified?.call();
         }
         handler.reject(
           DioException(

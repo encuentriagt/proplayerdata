@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/idempotency.dart';
 import '../../../core/storage/session_storage.dart';
 import '../data/auth_models.dart';
 import '../data/auth_repository.dart';
+import '../data/google_auth.dart';
 
 sealed class SessionState {
   const SessionState();
@@ -40,7 +42,11 @@ class SessionController extends Notifier<SessionState> {
   SessionState build() {
     final events = ref.read(apiEventsProvider);
     events.onUnauthorized = _handleUnauthorized;
-    events.onPasswordChangeRequired = _handlePasswordChangeRequired;
+    events.onPasswordChangeRequired = () =>
+        _patchUser((u) => u.copyWith(mustChangePassword: true));
+    events.onEmailUnverified = () => _patch(
+      (p) => p.mustVerifyEmail ? p : p.copyWith(mustVerifyEmail: true),
+    );
     Future.microtask(restore);
     return const SessionLoading();
   }
@@ -66,28 +72,65 @@ class SessionController extends Notifier<SessionState> {
 
   Future<void> refreshProfile() async {
     final profile = await _repo.me();
-    await _storage.writeProfile(jsonEncode(profile.toJson()));
-    state = SignedIn(profile);
+    await _save(profile);
   }
 
   /// Lanza [ApiException] para que la pantalla muestre el error.
   Future<void> login({required String email, required String password}) async {
-    final result = await _repo.login(email: email, password: password);
-    await _storage.writeToken(result.token);
-    await _storage.writeProfile(jsonEncode(result.profile.toJson()));
-    state = SignedIn(result.profile);
+    await _signIn(await _repo.login(email: email, password: password));
+  }
+
+  Future<void> register({
+    required String name,
+    required String email,
+    String? phone,
+    required String password,
+    required String passwordConfirmation,
+    required IdempotencyKey key,
+  }) async {
+    await _signIn(
+      await _repo.register(
+        name: name,
+        email: email,
+        phone: phone,
+        password: password,
+        passwordConfirmation: passwordConfirmation,
+        key: key,
+      ),
+    );
+  }
+
+  /// «Continuar con Google». Devuelve false si el usuario canceló.
+  /// Lanza [GoogleAuthException] o [ApiException].
+  Future<bool> continueWithGoogle() async {
+    final idToken = await ref.read(googleAuthProvider).idToken();
+    if (idToken == null) return false;
+    await _signIn(
+      await _repo.social(provider: SocialProvider.google, idToken: idToken),
+    );
+    return true;
+  }
+
+  /// Tras ingresar el código correcto.
+  Future<void> emailVerified() async {
+    _patch(
+      (p) => p.copyWith(
+        mustVerifyEmail: false,
+        user: p.user.copyWith(emailVerified: true),
+      ),
+    );
+    await _persistCurrent();
+    try {
+      await refreshProfile();
+    } on ApiException {
+      // Se queda con el perfil local; se refresca al volver a abrir.
+    }
   }
 
   /// Tras cambiar la contraseña: la API ya no exige el cambio.
   Future<void> passwordChanged() async {
-    final current = state;
-    if (current is SignedIn) {
-      final profile = current.profile.copyWith(
-        user: current.profile.user.copyWith(mustChangePassword: false),
-      );
-      await _storage.writeProfile(jsonEncode(profile.toJson()));
-      state = SignedIn(profile);
-    }
+    _patchUser((u) => u.copyWith(mustChangePassword: false));
+    await _persistCurrent();
     try {
       await refreshProfile();
     } on ApiException {
@@ -101,8 +144,37 @@ class SessionController extends Notifier<SessionState> {
     } on ApiException {
       // Aunque falle la red, la sesión local se cierra.
     }
+    await ref.read(googleAuthProvider).signOut();
     await _signOutLocally();
   }
+
+  Future<void> _signIn(LoginResult result) async {
+    await _storage.writeToken(result.token);
+    await _save(result.profile);
+  }
+
+  Future<void> _save(SessionProfile profile) async {
+    await _storage.writeProfile(jsonEncode(profile.toJson()));
+    state = SignedIn(profile);
+  }
+
+  Future<void> _persistCurrent() async {
+    final current = state;
+    if (current is SignedIn) {
+      await _storage.writeProfile(jsonEncode(current.profile.toJson()));
+    }
+  }
+
+  void _patch(SessionProfile Function(SessionProfile) change) {
+    final current = state;
+    if (current is SignedIn) {
+      final next = change(current.profile);
+      if (next != current.profile) state = SignedIn(next);
+    }
+  }
+
+  void _patchUser(AuthUser Function(AuthUser) change) =>
+      _patch((p) => p.copyWith(user: change(p.user)));
 
   Future<void> _signOutLocally({String? notice}) async {
     await _storage.clear();
@@ -112,17 +184,6 @@ class SessionController extends Notifier<SessionState> {
   void _handleUnauthorized() {
     if (state is SignedIn) {
       _signOutLocally(notice: expiredNotice);
-    }
-  }
-
-  void _handlePasswordChangeRequired() {
-    final current = state;
-    if (current is SignedIn && !current.profile.mustChangePassword) {
-      state = SignedIn(
-        current.profile.copyWith(
-          user: current.profile.user.copyWith(mustChangePassword: true),
-        ),
-      );
     }
   }
 

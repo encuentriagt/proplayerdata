@@ -9,6 +9,7 @@ import '../../../core/widgets/loading_button.dart';
 import '../../../core/widgets/message_banner.dart';
 import '../../../core/widgets/password_field.dart';
 import '../../../core/widgets/proplayer_logo.dart';
+import '../../invitations/presentation/pending_link_banner.dart';
 import '../application/session_controller.dart';
 import '../data/google_auth.dart';
 import 'validators.dart';
@@ -100,6 +101,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           style: text.bodyMedium,
         ),
         const SizedBox(height: 24),
+        const PendingLinkBanner(
+          'Para vincular a su hijo, inicie sesión o cree su cuenta. Se vinculará al entrar.',
+        ),
         if (notice != null && bannerText == null) ...[
           MessageBanner(notice, kind: BannerKind.info),
           const SizedBox(height: 16),

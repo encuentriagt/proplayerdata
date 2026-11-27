@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -10,6 +11,7 @@ import '../../../core/widgets/org_crest.dart';
 import '../../../core/widgets/sport_icon.dart';
 import '../../invitations/application/invitations_providers.dart';
 import '../application/children_providers.dart';
+import '../application/local_photos.dart';
 import '../data/children_models.dart';
 import '../data/children_repository.dart';
 import 'child_avatar.dart';
@@ -60,6 +62,67 @@ class _ChildDetail extends ConsumerStatefulWidget {
 class _ChildDetailState extends ConsumerState<_ChildDetail> {
   bool _unlinking = false;
 
+  Future<void> _photoOptions() async {
+    final child = widget.child;
+    final hasLocal = ref.read(localPhotosProvider).containsKey(child.id);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(
+                'La foto se guarda solo en este teléfono. No se envía a '
+                'nadie.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Tomar foto'),
+              onTap: () => Navigator.pop(context, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de la galería'),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            if (hasLocal)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Quitar foto'),
+                onTap: () => Navigator.pop(context, 'remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    final photos = ref.read(localPhotosProvider.notifier);
+    try {
+      switch (choice) {
+        case 'camera':
+          await photos.pick(child.id, ImageSource.camera);
+        case 'gallery':
+          await photos.pick(child.id, ImageSource.gallery);
+        case 'remove':
+          await photos.remove(child.id);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No se pudo usar la cámara o la galería. Revise los permisos de '
+            'la App.',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _unlink() async {
     final child = widget.child;
     final ok = await showDialog<bool>(
@@ -88,6 +151,10 @@ class _ChildDetailState extends ConsumerState<_ChildDetail> {
     setState(() => _unlinking = true);
     try {
       await ref.read(childrenRepositoryProvider).unlink(child.id);
+      await ref
+          .read(localPhotosProvider.notifier)
+          .remove(child.id)
+          .catchError((_) {});
       if (!mounted) return;
       refreshFamily(ref);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -112,7 +179,34 @@ class _ChildDetailState extends ConsumerState<_ChildDetail> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
       children: [
-        Center(child: ChildAvatar(child: child, radius: 48)),
+        Center(
+          child: Semantics(
+            button: true,
+            label: 'Cambiar la foto de ${child.firstName}',
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _photoOptions,
+              child: Stack(
+                children: [
+                  ChildAvatar(child: child, radius: 48),
+                  const Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: PpdColors.star,
+                      child: Icon(
+                        Icons.photo_camera,
+                        size: 18,
+                        color: PpdColors.ink,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
         Text(
           child.fullName,

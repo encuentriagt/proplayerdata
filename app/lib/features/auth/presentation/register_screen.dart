@@ -7,6 +7,7 @@ import '../../../core/widgets/form_page.dart';
 import '../../../core/widgets/loading_button.dart';
 import '../../../core/widgets/message_banner.dart';
 import '../../../core/widgets/password_field.dart';
+import '../../invitations/presentation/pending_link_banner.dart';
 import '../application/session_controller.dart';
 import 'validators.dart';
 
@@ -82,6 +83,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           style: text.bodyLarge,
         ),
         const SizedBox(height: 24),
+        const PendingLinkBanner(
+          'Al crear su cuenta y verificar su correo, se vinculará a su hijo.',
+        ),
         if (error != null && error.fields.isEmpty) ...[
           MessageBanner(error.message),
           const SizedBox(height: 16),

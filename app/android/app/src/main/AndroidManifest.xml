@@ -25,6 +25,23 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Los enlaces los maneja la App (app_links), no el router de Flutter. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
+            <!-- Enlace de vinculación desde la página web: ppdguate://invitacion?token=… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ppdguate" android:host="invitacion" />
+            </intent-filter>
+            <!-- App Link verificado: https://ppdguate.com/invitacion?token=…
+                 (requiere https://ppdguate.com/.well-known/assetlinks.json con el SHA-256 de la firma). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="ppdguate.com" android:path="/invitacion" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -26,9 +26,15 @@ trait BuildsOrgs
         return $u->refresh();
     }
 
+    /** Cuenta de padre (App), con correo verificado. */
+    protected function guardian(string $email, array $attrs = []): User
+    {
+        return $this->makeUser($email, array_merge(['account_type' => User::GUARDIAN, 'email_verified_at' => now()], $attrs));
+    }
+
     protected function member(Organization $org, string $email, string $role): User
     {
-        $u = User::where('email', $email)->first() ?? $this->makeUser($email);
+        $u = User::staff()->where('email', $email)->first() ?? $this->makeUser($email);
         $org->members()->create(['user_id' => $u->id, 'role' => $role, 'status' => 'active']);
 
         return $u;

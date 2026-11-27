@@ -24,10 +24,10 @@ class StaffAlertsTest extends TestCase
         $coach = $this->member($org, 'c@x.test', 'coach');
         $this->assign($team, $coach);
         $ana = $this->player($org, $team, 'Ana');
-        $papa = $this->makeUser('p@x.test');
+        $papa = $this->guardian('p@x.test');
         \App\Models\GuardianPlayer::create(['user_id' => $papa->id, 'player_id' => $ana->id]);
         $beto = $this->player($org, $team, 'Beto');
-        $mamaBeto = $this->makeUser('m@x.test');
+        $mamaBeto = $this->guardian('m@x.test');
         \App\Models\GuardianPlayer::create(['user_id' => $mamaBeto->id, 'player_id' => $beto->id]);
         $super = $this->makeUser('s@x.test', ['is_super_admin' => true]);
         $st = $this->withHeaders(['X-App-Platform' => 'web'])->postJson('/api/auth/login', ['email' => 's@x.test', 'password' => 'ClaveSegura2026'])->json('data.token');

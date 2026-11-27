@@ -87,7 +87,7 @@ class CreateOrganization extends Command
                 'color_on_primary' => $data['on_primary'],
             ]);
 
-            $user = User::withTrashed()->where('email', $data['admin_email'])->lockForUpdate()->first();
+            $user = User::withTrashed()->staff()->where('email', $data['admin_email'])->lockForUpdate()->first();
 
             if (! $user) {
                 $tempPassword = self::temporaryPassword();

@@ -27,7 +27,7 @@ class PlansAndAppTest extends TestCase
         $ana = $this->player($org, $team, 'Ana');
         $luis = $this->player($org, $team, 'Luis');
         $otro = $this->player($org, $team, 'Otro');
-        $papa = $this->makeUser('papa@x.test');
+        $papa = $this->guardian('papa@x.test');
         GuardianPlayer::create(['user_id' => $papa->id, 'player_id' => $ana->id]);
         GuardianPlayer::create(['user_id' => $papa->id, 'player_id' => $luis->id]);
 
@@ -82,7 +82,7 @@ class PlansAndAppTest extends TestCase
     public function test_cupo_e_idempotencia_de_planes(): void
     {
         ['org' => $org, 'admin' => $admin, 'ana' => $ana] = $this->escenario();
-        $mama = $this->makeUser('mama@x.test');
+        $mama = $this->guardian('mama@x.test');
         GuardianPlayer::create(['user_id' => $mama->id, 'player_id' => $ana->id]);
 
         $this->as($admin)->postJson($this->base.'/plans', ['email' => 'papa@x.test', 'plan' => 'premium'])->assertCreated();
@@ -158,9 +158,9 @@ class PlansAndAppTest extends TestCase
         $this->assertTrue(User::withTrashed()->find($papa->id)->trashed());
 
         // El correo queda libre para registrarse de nuevo.
-        $this->makeUser('papa@x.test');
+        $this->guardian('papa@x.test');
 
-        // El admin de una organización no se borra solo.
-        $this->as($admin)->deleteJson('/api/app/account', ['password' => 'ClaveSegura2026'])->assertStatus(409);
+        // Una cuenta de staff no usa las rutas de la App.
+        $this->as($admin)->deleteJson('/api/app/account', ['password' => 'ClaveSegura2026'])->assertForbidden();
     }
 }

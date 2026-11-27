@@ -24,7 +24,7 @@ class EventsTest extends TestCase
         $this->assign($team, $coach);
         $ana = $this->player($org, $team, 'Ana');
         $beto = $this->player($org, $team, 'Beto');
-        $papa = $this->makeUser('papa@x.test');
+        $papa = $this->guardian('papa@x.test');
         GuardianPlayer::create(['user_id' => $papa->id, 'player_id' => $ana->id, 'verified_at' => now()]);
 
         return compact('org', 'team', 'otro', 'coach', 'ana', 'beto', 'papa');

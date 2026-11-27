@@ -22,6 +22,13 @@ Slogan: "En vivo" (es solo marca: **no hay registro de partido en tiempo real**)
 
 ---
 
+**Decisiones del dueño para la App (2026-11-27):**
+- La App es **solo para padres**. Coaches, admins y super admin no entran (usan la PC y el Panel).
+- **Cuentas de padre separadas** del staff (`users.account_type`): el mismo correo puede ser staff y padre, con contraseñas y sesiones independientes. El padre **se registra solo en la App** y verifica su correo con un código. La cuenta de padre no pertenece a ninguna organización: se relaciona con ellas solo por sus hijos.
+- **Sin marca blanca en la App**: siempre se ve como **ProPlayer Data** (`com.ppdguate.app`). La marca de cada colegio se sigue usando en la PC.
+- **Android primero**, después iOS.
+- Un padre puede tener **varios hijos en varias organizaciones**, y cada hijo varios deportes o equipos: todo converge en **una sola cuenta** (un calendario, una bandeja y avisos de todas las organizaciones).
+
 ## 2. Roles y permisos (v1.4)
 
 | Rol | Dónde entra | Ve | Puede |

@@ -35,7 +35,7 @@ class CreateSuperAdmin extends Command
             return self::FAILURE;
         }
 
-        $user = User::withTrashed()->where('email', $email)->first();
+        $user = User::withTrashed()->staff()->where('email', $email)->first();
         $temp = null;
 
         if (! $user) {

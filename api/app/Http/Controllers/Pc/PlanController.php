@@ -42,7 +42,7 @@ class PlanController extends Controller
             'note' => ['nullable', 'string', 'max:200'],
         ]);
 
-        $user = User::where('email', Str::lower(trim($data['email'])))->first();
+        $user = User::guardians()->where('email', Str::lower(trim($data['email'])))->first();
         $isGuardianHere = $user && GuardianPlayer::where('user_id', $user->id)
             ->whereHas('player', fn ($q) => $q->where('organization_id', $organization->id))->exists();
         if (! $isGuardianHere) {

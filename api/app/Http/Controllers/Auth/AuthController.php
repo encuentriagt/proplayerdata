@@ -191,6 +191,8 @@ class AuthController extends Controller
             'phone' => $user->phone,
             'account_type' => $user->account_type,
             'email_verified' => $user->email_verified_at !== null,
+            'password_set' => (bool) ($user->password_set ?? true),
+            'linked' => array_values(array_filter(['google' => $user->google_sub ? 'google' : null, 'apple' => $user->apple_sub ? 'apple' : null])),
             'must_change_password' => (bool) $user->must_change_password,
             'is_super_admin' => (bool) $user->is_super_admin,
         ];

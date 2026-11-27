@@ -29,5 +29,12 @@ return [
     ],
 
     // Plataformas aceptadas en el encabezado X-App-Platform.
+    // Inicio de sesión con Google y Apple (solo App de padres). Son identificadores públicos, no secretos.
+    // GOOGLE: IDs de cliente OAuth aceptados como "aud" (el "web client" usado como serverClientId en Android, y el de iOS).
+    'social' => [
+        'google_client_ids' => array_values(array_filter(explode(',', (string) env('GOOGLE_CLIENT_IDS', '')))),
+        'apple_client_ids' => array_values(array_filter(explode(',', (string) env('APPLE_CLIENT_IDS', 'com.ppdguate.app')))),
+    ],
+
     'platforms' => ['web', 'android', 'ios'],
 ];

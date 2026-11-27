@@ -64,6 +64,7 @@ Route::prefix('auth')->group(function () {
 // ---- App de padres: registro y contraseña (sin sesión) ----
 Route::prefix('app/auth')->group(function () {
     Route::post('register', [\App\Http\Controllers\App\GuardianAuthController::class, 'register'])->middleware(['throttle:register', 'idempotent']);
+    Route::post('social', [\App\Http\Controllers\App\GuardianAuthController::class, 'social'])->middleware('throttle:social');
     Route::post('password/forgot', [\App\Http\Controllers\App\GuardianAuthController::class, 'forgot'])->middleware('throttle:codes');
     Route::post('password/reset', [\App\Http\Controllers\App\GuardianAuthController::class, 'reset'])->middleware(['throttle:codes', 'idempotent']);
 });

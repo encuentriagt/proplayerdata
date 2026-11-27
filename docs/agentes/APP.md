@@ -36,6 +36,7 @@ Usted trabaja **solo en la carpeta `app/`**. No toque `api/`, `pc/`, `web/`, `do
 - **Flutter estable** (Dart 3), Android mínimo **API 24**, iOS mínimo **15**.
 - Estado: **Riverpod**. Navegación: **go_router**. HTTP: **dio** (con interceptores). Modelos: `freezed` + `json_serializable`.
 - Sesión: **flutter_secure_storage** (Keychain / Keystore). Nunca `SharedPreferences` para el token.
+- Google y Apple: **google_sign_in** (con `serverClientId` = el *web client ID* del proyecto) y **sign_in_with_apple** (con `nonce`; envíe el nombre la primera vez). La App manda el `id_token` a `POST /app/auth/social`; nunca guarda llaves.
 - Push: **firebase_messaging** + **flutter_local_notifications** (canal Android `general`; más adelante `emergencias`).
 - Fechas: `intl` con locale **`es`** y zona **America/Guatemala** (la API manda ISO 8601 con zona).
 - Imágenes: `cached_network_image` **solo para logos y escudos** (públicos). Las fotos de jugadores **no se cachean en disco** (URL firmada de 15 min).
@@ -69,7 +70,7 @@ Usted trabaja **solo en la carpeta `app/`**. No toque `api/`, `pc/`, `web/`, `do
 
 | Pantalla | API |
 |---|---|
-| Inicio de sesión (correo y contraseña). Una cuenta de staff recibe `invalid_credentials` | `POST /auth/login` |
+| Inicio de sesión (correo y contraseña) y botones **«Continuar con Google»** y **«Continuar con Apple»** (en iOS, Apple es obligatorio si hay Google). Una cuenta de staff recibe `invalid_credentials` | `POST /auth/login`, `POST /app/auth/social` |
 | Cambiar contraseña (obligatoria si `must_change_password`) | `POST /auth/password` |
 | **Registro** del padre y **verificación del correo** con código (pantalla obligatoria si `must_verify_email`). Contraseña olvidada con código | `POST /app/auth/register`, `/app/auth/verify-email`, `/app/auth/verify-email/resend`, `/app/auth/password/forgot` y `/reset` |
 | **Mis hijos** (selector arriba si hay más de uno; cambia la marca) | `GET /app/children` |

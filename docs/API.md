@@ -1,6 +1,6 @@
 # ppd — API (referencia para los agentes de la PC, el Panel y la App)
 
-Base: `https://api.ppdguate.com/api` · Versión del documento: 1.19 (2026-12-03)
+Base: `https://api.ppdguate.com/api` · Versión del documento: 1.20 (2026-12-04)
 Fuente de verdad del diseño: `docs/ARQUITECTURA.md`. Este archivo describe **cómo llamar** a la API.
 
 ---
@@ -155,6 +155,7 @@ Códigos y nombres de deporte en inglés (`soccer`/Soccer, `futsal`/Futsal, `bas
 | GET | `players?team_id=&search=` | todos (coach: de sus equipos) | paginado 50 |
 | POST ♻️ | `players` | admin; coach/director con `team_id` de su equipo | `{first_name, last_name, birthdate?, gender?(male\|female), document_number?, notes?, team_id?, jersey_number?, sport_position_id?}` |
 | GET | `players/{id}` | quien lo ve | incluye `teams`, `guardians` (correo solo para admin), `document_number`, `notes` |
+| GET / PUT ♻️ | `players/{id}/evaluation?sport_id=` | ver: quien ve al jugador; editar: admin, o coach/director de un equipo del jugador en ese deporte | **Evaluación del coach** (radar 0–100). GET → `{sport_id, attributes[{code,name,value}]\|null, updated_at, catalog[{code,name}], can_edit}`. PUT `{sport_id, attributes:{attitude, speed, technique, physical, tactics}}` (los 5, enteros 0–100); reemplaza la anterior. Jugador sin equipo de ese deporte → 422. Atributos: Actitud, Velocidad, Técnica, Físico, Táctica |
 | PATCH | `players/{id}` | quien lo ve | |
 | DELETE | `players/{id}` | admin | |
 | POST | `players/{id}/photo` | quien lo ve | multipart `photo` (jpg/png/webp, máx. 3 MB) |
@@ -235,6 +236,7 @@ El padre solo ve **a sus hijos** y **solo los datos de su hijo** (no los de otro
 | DELETE | `children/{id}` | Desvincular a un hijo (lo decide el padre) |
 | GET | `children` | Todos los hijos vinculados, de todas las organizaciones (sin hijos: `data:[]`): `id, first_name, last_name, birthdate, photo_url, organization{id, name, slug, logo_url, crest_url, colors}, teams[{id, name, category, sport{id,code,name}, season{id,name}\|null, jersey_number, position{id,name}\|null}], plan_level`. La App no usa la marca para pintarse (siempre ProPlayer Data): solo muestra el nombre y escudo del colegio como dato |
 | GET | `events?from=&to=&child_id=&sport_id=&type=` | **Calendario unificado** (cada evento trae `shootout{score_us,score_them}\|null`): eventos publicados de **todos** los hijos (todas sus organizaciones) en un llamado (máx. 120 días, 500 eventos). Cada evento como en el calendario por hijo + `team{id,name}`, `sport{id,code,name}`, `organization{id,name}`, `child_ids[]` y `children[{child_id, first_name, callup{status,response}\|null}]`. **Un evento con dos hijos viene una sola vez** con ambos. Gratis: el pasado se limita por hijo (`meta.history_limited`). `child_id` ajeno → 403 |
+| GET | `children/{id}/evaluation?sport_id=` | Evaluación del coach del hijo en ese deporte: `{sport_id, attributes[{code,name,value}]\|null, updated_at}` (null = aún no evaluado) |
 | GET | `children/{id}/events?from=&to=&sport_id=&team_id=&type=` | Eventos **publicados** de los equipos del hijo (los borradores no aparecen) con `callup{status,response}`. `meta.history_limited=true` si el plan recortó el pasado. Marcador `null` hasta que se publique |
 | GET | `children/{id}/events/{eventId}` | Detalle: `callup`, `attendance{status(present\|excused\|injured\|absent\|late), note}`, `child_played{is_starter,minutes_played}`, `child_stats[{code,name,value}]`, `shootout{score_us,score_them}\|null` (sin los cobros de otros jugadores) y `child_shootout{taken, scored}\|null` (penales de su hijo) y `child_timeline[{minute, period, type(stat\|sub_in\|sub_out), stat_code, stat_name, value}]` (minuto a minuto de su hijo; vacío hasta publicar el resultado). Fuera del límite del plan: 403 `plan_limit` |
 | POST ♻️ | `children/{id}/events/{eventId}/callup-response` | `{response: confirmed\|declined}` antes del partido (`not_called`, `event_closed`) |

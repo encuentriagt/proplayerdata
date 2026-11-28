@@ -127,7 +127,7 @@ Future<void> pumpSignedIn(WidgetTester tester, FakeApi api) async {
     ),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Mis hijos').first);
+  await tester.tap(find.text('Atletas').first);
   await tester.pumpAndSettle();
 }
 
@@ -163,10 +163,10 @@ void main() {
     final family = FamilyApi();
     await pumpSignedIn(tester, family.api);
 
-    expect(find.text('Hola, Marta'), findsOneWidget);
+    expect(find.text('ATLETAS'), findsOneWidget);
     expect(find.text('Tiene 1 invitación pendiente'), findsOneWidget);
     expect(find.text('Ana López'), findsOneWidget);
-    expect(find.text('Colegio A'), findsOneWidget);
+    expect(find.textContaining('Colegio A'), findsOneWidget);
     expect(find.text('Soccer'), findsOneWidget);
     expect(find.text('Basketball'), findsOneWidget);
   });
@@ -188,7 +188,7 @@ void main() {
 
     await tap(tester, find.byTooltip('Atrás'));
     expect(find.text('Luis López'), findsOneWidget);
-    expect(find.text('Colegio B'), findsOneWidget);
+    expect(find.textContaining('Colegio B'), findsOneWidget);
     expect(find.text('Tiene 1 invitación pendiente'), findsNothing);
   });
 
@@ -214,8 +214,8 @@ void main() {
     final family = FamilyApi();
     await pumpSignedIn(tester, family.api);
 
-    await tap(tester, find.byTooltip('Opciones'));
-    await tap(tester, find.text('Tengo un código'));
+    // Botón «Tengo un código» de la pestaña Atletas.
+    await tap(tester, find.widgetWithText(OutlinedButton, 'Tengo un código'));
 
     final field = find.widgetWithText(TextFormField, 'Código de vinculación');
     await tester.enterText(field, 'zzzz-9999');
@@ -229,7 +229,8 @@ void main() {
     expect(redeem.headers['Idempotency-Key'], isNotEmpty);
 
     // Abre la ficha del hijo recién vinculado.
-    expect(find.text('Sofía López'), findsOneWidget);
+    expect(find.text('SOFÍA'), findsOneWidget);
+    expect(find.text('LÓPEZ'), findsOneWidget);
     expect(find.text('Colegio C'), findsOneWidget);
   });
 
@@ -258,7 +259,7 @@ void main() {
       ),
       isTrue,
     );
-    expect(find.text('Hola, Marta'), findsOneWidget);
+    expect(find.text('ATLETAS'), findsOneWidget);
     expect(find.text('Ana López'), findsNothing);
   });
 

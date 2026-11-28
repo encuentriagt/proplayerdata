@@ -73,6 +73,27 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/
+    - assets/sports/
+
+  # Tipografías de la línea gráfica (licencia OFL, ver assets/fonts/OFL.txt).
+  fonts:
+    - family: Saira
+      fonts:
+        - asset: assets/fonts/Saira-Regular.ttf
+        - asset: assets/fonts/Saira-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Saira-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Saira-Bold.ttf
+          weight: 700
+    - family: SairaExtraCondensed
+      fonts:
+        - asset: assets/fonts/SairaExtraCondensed-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/SairaExtraCondensed-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/SairaExtraCondensed-ExtraBold.ttf
+          weight: 800
 
   # To add assets to your application, add an assets section, like this:
   # assets:

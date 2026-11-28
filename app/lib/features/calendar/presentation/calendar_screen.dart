@@ -5,6 +5,7 @@ import '../../../core/theme/brand_colors.dart';
 import '../../../core/time/guatemala_time.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/home_actions.dart';
+import '../../../core/widgets/v3.dart';
 import '../../../core/widgets/message_banner.dart';
 import '../../../core/widgets/sport_icon.dart';
 import '../../children/application/children_providers.dart';
@@ -73,56 +74,56 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final dayEvents = onDay(_selected);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Calendario'),
-        actions: const [HomeActions()],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 32),
-          children: [
-            _Filters(children: children, filter: filter),
-            Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              child: MonthGrid(
-                month: month,
-                selected: _selected,
-                today: todayGt(),
-                markers: (day) => onDay(day).map(eventColor).toList(),
-                onSelect: (day) => setState(() => _selected = day),
-                onMonthChange: (delta) => setState(() {
-                  _focused = DateTime(month.year, month.month + delta);
-                  final today = todayGt();
-                  _selected =
-                      today.year == _focused.year &&
-                          today.month == _focused.month
-                      ? today
-                      : _focused;
-                }),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 32),
+            children: [
+              const BigTitle('Calendario', trailing: HomeActions()),
+              _Filters(children: children, filter: filter),
+              Card(
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                child: MonthGrid(
+                  month: month,
+                  selected: _selected,
+                  today: todayGt(),
+                  markers: (day) => onDay(day).map(eventColor).toList(),
+                  onSelect: (day) => setState(() => _selected = day),
+                  onMonthChange: (delta) => setState(() {
+                    _focused = DateTime(month.year, month.month + delta);
+                    final today = todayGt();
+                    _selected =
+                        today.year == _focused.year &&
+                            today.month == _focused.month
+                        ? today
+                        : _focused;
+                  }),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: switch (page) {
-                AsyncError(:final error) when page.value == null => ErrorView(
-                  error: error,
-                  onRetry: () => ref.invalidate(calendarMonthProvider(month)),
-                ),
-                AsyncLoading() when page.value == null => const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                _ => _DayList(
-                  day: _selected,
-                  events: dayEvents,
-                  historyLimited: page.value?.historyLimited ?? false,
-                  noChildren: children.isEmpty,
-                ),
-              },
-            ),
-          ],
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: switch (page) {
+                  AsyncError(:final error) when page.value == null => ErrorView(
+                    error: error,
+                    onRetry: () => ref.invalidate(calendarMonthProvider(month)),
+                  ),
+                  AsyncLoading() when page.value == null => const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  _ => _DayList(
+                    day: _selected,
+                    events: dayEvents,
+                    historyLimited: page.value?.historyLimited ?? false,
+                    noChildren: children.isEmpty,
+                  ),
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

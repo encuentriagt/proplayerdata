@@ -200,19 +200,19 @@ void main() {
     tester,
   ) async {
     await pumpSports(tester);
-    expect(find.text('Soccer'), findsOneWidget);
-    expect(find.text('Basketball'), findsOneWidget);
-    expect(find.text('Baseball'), findsOneWidget);
-    expect(find.text('Colegio A · Sub-12 A'), findsOneWidget);
-    expect(find.text('Colegio B · Sub-10 B'), findsOneWidget);
-    expect(find.text('Colegio B · Pequeñas Ligas'), findsOneWidget);
+    expect(find.text('SOCCER'), findsOneWidget);
+    expect(find.text('BASKETBALL'), findsOneWidget);
+    expect(find.text('BASEBALL'), findsOneWidget);
+    expect(find.textContaining('Colegio A · Sub-12 A'), findsOneWidget);
+    expect(find.textContaining('Colegio B · Sub-10 B'), findsOneWidget);
+    expect(find.textContaining('Colegio B · Pequeñas Ligas'), findsOneWidget);
   });
 
   testWidgets('fútbol: partidos de los dos hijos, entrenos y estadísticas', (
     tester,
   ) async {
     await pumpSports(tester);
-    await tap(tester, find.text('Soccer'));
+    await tap(tester, find.text('SOCCER'));
 
     // Partidos: próximo de Ana (colegio A) y reciente de Beto (colegio B).
     expect(find.text('Sub-12 A vs Tigres'), findsOneWidget);

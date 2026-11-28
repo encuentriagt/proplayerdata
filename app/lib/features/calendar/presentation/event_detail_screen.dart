@@ -14,7 +14,7 @@ import '../../children/presentation/child_avatar.dart';
 import '../application/calendar_providers.dart';
 import '../data/event_models.dart';
 import 'calendar_screen.dart' show limitText;
-import 'event_tile.dart' show eventColor;
+import 'result_hero.dart';
 
 /// Detalle de un evento: datos generales y, por cada hijo convocado,
 /// convocatoria, asistencia, minutos y estadísticas.
@@ -41,6 +41,8 @@ class EventDetailScreen extends ConsumerWidget {
             childEventProvider((childId: childIds.first, eventId: eventId)),
           );
     final event = preview ?? firstDetail?.value?.event;
+    final detail = firstDetail?.value;
+    final showHero = event != null && event.isMatch && event.hasResult;
 
     return Scaffold(
       appBar: AppBar(title: Text(event?.typeLabel ?? 'Actividad')),
@@ -51,10 +53,24 @@ class EventDetailScreen extends ConsumerWidget {
           }
         },
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
           children: [
+            if (showHero)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: ResultHero(
+                    event: event,
+                    shootoutUs: detail?.shootoutUs,
+                    shootoutThem: detail?.shootoutThem,
+                  ),
+                ),
+              )
+            else
+              const SizedBox(height: 16),
             if (event != null)
-              _Header(event: event, children: children)
+              _Header(event: event, children: children, showScore: !showHero)
             else if (firstDetail is AsyncError)
               ErrorView(
                 error: firstDetail!.error!,
@@ -85,10 +101,17 @@ class EventDetailScreen extends ConsumerWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.event, required this.children});
+  const _Header({
+    required this.event,
+    required this.children,
+    this.showScore = true,
+  });
 
   final CalendarEvent event;
   final List<Child> children;
+
+  /// Falso cuando el resultado ya se muestra en grande arriba.
+  final bool showScore;
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +143,7 @@ class _Header extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(sportIcon(sportCode), color: eventColor(e)),
+                SportBadge(code: sportCode, size: 32),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -146,10 +169,10 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 8),
               const MessageBanner('Esta actividad se canceló.'),
             ],
-            if (e.hasResult) ...[
+            if (e.hasResult && showScore) ...[
               const SizedBox(height: 12),
               _Score(event: e, teamName: teamName),
-            ] else if (e.isMatch && !e.isCancelled) ...[
+            ] else if (e.isMatch && !e.isCancelled && !e.hasResult) ...[
               const SizedBox(height: 8),
               Text(
                 'El resultado aparece cuando el coach publica la ficha.',

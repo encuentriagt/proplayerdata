@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/time/guatemala_time.dart';
 import '../../children/application/children_providers.dart';
 import '../data/calendar_repository.dart';
 import '../data/event_models.dart';
@@ -77,6 +78,28 @@ final calendarFilterProvider =
     NotifierProvider<CalendarFilterController, CalendarFilter>(
       CalendarFilterController.new,
     );
+
+/// Próximos eventos en que algún hijo está convocado (hoy y 30 días más),
+/// del más cercano al más lejano. Incluye los de hoy que ya empezaron.
+final upcomingEventsProvider = FutureProvider<List<CalendarEvent>>((ref) async {
+  if (ref.watch(currentUserIdProvider) == null) return const [];
+  final today = GuatemalaTime.today();
+  final page = await ref
+      .watch(calendarRepositoryProvider)
+      .calendar(from: today, to: today.add(const Duration(days: 30)));
+  // `start` es la hora de pared de Guatemala marcada como UTC.
+  final dayStart = DateTime.utc(today.year, today.month, today.day);
+  final list = page.events
+      .where((e) => e.calledChildren.isNotEmpty && !e.isCancelled)
+      .where((e) => e.start == null || !e.start!.isBefore(dayStart))
+      .toList();
+  list.sort((a, b) {
+    final x = a.start, y = b.start;
+    if (x == null || y == null) return x == null ? 1 : -1;
+    return x.compareTo(y);
+  });
+  return list;
+});
 
 /// Detalle de un evento para un hijo.
 final childEventProvider =

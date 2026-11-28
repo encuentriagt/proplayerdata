@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/brand_colors.dart';
+import '../../../core/theme/typography.dart';
 import '../../../core/time/guatemala_time.dart';
 import '../../../core/widgets/sport_icon.dart';
 import '../data/event_models.dart';
@@ -67,17 +68,11 @@ class EventTile extends StatelessWidget {
                         ),
                       Text(
                         start == null ? '--' : GuatemalaTime.time(start),
-                        style: text.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: PpdType.headline(20, italic: false, height: 1),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 6),
-                      Icon(
-                        sportIcon(e.sport?.code ?? ''),
-                        size: 20,
-                        color: PpdColors.muted,
-                      ),
+                      const SizedBox(height: 8),
+                      SportBadge(code: e.sport?.code ?? '', size: 40),
                     ],
                   ),
                 ),

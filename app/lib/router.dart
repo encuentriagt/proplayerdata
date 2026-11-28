@@ -15,6 +15,10 @@ import 'features/calendar/presentation/calendar_screen.dart';
 import 'features/calendar/presentation/event_detail_screen.dart';
 import 'features/children/presentation/child_detail_screen.dart';
 import 'features/children/presentation/home_screen.dart';
+import 'features/home/presentation/inicio_screen.dart';
+import 'features/notifications/data/notifications_repository.dart';
+import 'features/notifications/presentation/injury_alert_screen.dart';
+import 'features/notifications/presentation/notifications_screen.dart';
 import 'features/invitations/presentation/invitations_screen.dart';
 import 'features/invitations/presentation/redeem_code_screen.dart';
 import 'features/sports/presentation/sport_detail_screen.dart';
@@ -28,6 +32,9 @@ abstract final class Routes {
   static const verifyEmail = '/verificar-correo';
   static const mustChange = '/cambiar-contrasena';
   static const home = '/';
+  static const calendar = '/calendario';
+  static const notifications = '/avisos';
+  static const alert = '/alerta';
   static const sports = '/deportes';
   static const children = '/hijos';
   static const changePassword = '/contrasena';
@@ -100,6 +107,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.home,
+                builder: (_, _) => const InicioScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.calendar,
                 builder: (_, _) => const CalendarScreen(),
               ),
             ],
@@ -117,6 +132,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.notifications,
+                builder: (_, _) => const NotificationsScreen(),
               ),
             ],
           ),
@@ -149,6 +172,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               .toList(),
           preview: state.extra is CalendarEvent
               ? state.extra! as CalendarEvent
+              : null,
+        ),
+      ),
+      GoRoute(
+        path: Routes.alert,
+        builder: (_, state) => InjuryAlertScreen(
+          notification: state.extra is AppNotification
+              ? state.extra! as AppNotification
               : null,
         ),
       ),

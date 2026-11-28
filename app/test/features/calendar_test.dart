@@ -189,6 +189,9 @@ Future<void> pumpCalendar(WidgetTester tester, FakeApi api) async {
     ),
   );
   await tester.pumpAndSettle();
+  // Inicio es la primera pestaña; el calendario es la segunda.
+  await tester.tap(find.text('Calendario').first);
+  await tester.pumpAndSettle();
 }
 
 Future<void> tap(WidgetTester tester, Finder finder) async {

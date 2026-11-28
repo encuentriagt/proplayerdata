@@ -159,6 +159,15 @@ class ChildController extends Controller
         return response()->json(['data' => $out, 'meta' => ['history_limited' => $limited]]);
     }
 
+    /** Evaluación del coach (radar 0–100) del hijo en un deporte. Sin evaluación: attributes null. */
+    public function evaluation(Request $request, Player $player): JsonResponse
+    {
+        $this->authorizeChild($request, $player);
+        $data = $request->validate(['sport_id' => ['required', 'integer']]);
+
+        return response()->json(['data' => \App\Support\Evaluation::payload($player->id, (int) $data['sport_id'])]);
+    }
+
     public function event(Request $request, Player $player, int $eventId): JsonResponse
     {
         [$level, $limits] = $this->authorizeChild($request, $player);

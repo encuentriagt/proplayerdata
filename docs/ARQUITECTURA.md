@@ -247,6 +247,8 @@ Repositorio `encuentriagt/proplayerdata` (monorepo): `web/`, `api/`, `pc/`, `adm
 
 **Temporadas: ciclo y avance** (decisión del dueño, 2026-11-26): si empieza y termina en el mismo año es **ciclo guatemalteco**; si empieza en un año y termina en el siguiente, **ciclo americano**. La API lo calcula de las fechas y también el porcentaje de avance (barra en la PC).
 
+**Decisiones del dueño (2026-11-27):** sin marcador en vivo (solo resultado final); nombres de deportes en inglés en todo (PC y App); **evaluación del coach** (radar 0–100: actitud, velocidad, técnica, físico, táctica) por jugador y deporte; logros tipo videojuego: no por ahora. **Lesión**: aviso urgente siempre (canal `emergencias`), la App lo repite cada minuto hasta «Enterado» (sin tareas programadas en el servidor).
+
 ## 13. Módulo de emergencia (se construye después; el diseño lo contempla desde ya)
 
 **Objetivo**: si un coach/director activa una emergencia sobre un jugador (lesión, accidente, malestar), TODOS sus padres/encargados vinculados reciben avisos push insistentes hasta que alguien confirme.

@@ -95,6 +95,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::delete('children/{player}', [\App\Http\Controllers\App\LinkController::class, 'unlink']);
         Route::get('children', [ChildController::class, 'index']);
         Route::get('events', [ChildController::class, 'calendar']);
+        Route::get('children/{player}/evaluation', [ChildController::class, 'evaluation']);
         Route::get('children/{player}/events', [ChildController::class, 'events']);
         Route::get('children/{player}/events/{eventId}', [ChildController::class, 'event'])->whereNumber('eventId');
         Route::post('children/{player}/events/{eventId}/callup-response', [ChildController::class, 'respondCallup'])->whereNumber('eventId')->middleware('idempotent');
@@ -136,6 +137,8 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::get('players', [PlayerController::class, 'index']);
         Route::post('players', [PlayerController::class, 'store'])->middleware('idempotent');
         Route::get('players/{player}', [PlayerController::class, 'show']);
+        Route::get('players/{player}/evaluation', [\App\Http\Controllers\Pc\EvaluationController::class, 'show']);
+        Route::put('players/{player}/evaluation', [\App\Http\Controllers\Pc\EvaluationController::class, 'update'])->middleware('idempotent');
         Route::patch('players/{player}', [PlayerController::class, 'update']);
         Route::delete('players/{player}', [PlayerController::class, 'destroy']);
         Route::post('players/{player}/photo', [PlayerController::class, 'photo'])->middleware('throttle:codes');

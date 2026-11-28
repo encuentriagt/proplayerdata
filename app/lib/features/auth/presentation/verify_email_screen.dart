@@ -7,6 +7,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/form_page.dart';
 import '../../../core/widgets/loading_button.dart';
 import '../../../core/widgets/message_banner.dart';
+import '../../invitations/presentation/pending_link_banner.dart';
 import '../application/session_controller.dart';
 import '../data/auth_repository.dart';
 import 'code_field.dart';
@@ -137,6 +138,9 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
             style: text.bodyLarge,
           ),
           const SizedBox(height: 24),
+          const PendingLinkBanner(
+            'Al verificar su correo, se vinculará a su hijo.',
+          ),
           if (_info != null) ...[
             MessageBanner(_info!, kind: BannerKind.info),
             const SizedBox(height: 16),

@@ -10,6 +10,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../support/fake_api.dart';
 import '../support/fake_google.dart';
+import '../support/fake_links.dart';
+import '../support/fake_photos.dart';
 
 Future<void> pumpApp(
   WidgetTester tester,
@@ -21,6 +23,8 @@ Future<void> pumpApp(
       overrides: [
         api.providerOverride,
         (google ?? FakeGoogleAuth(isAvailable: false)).providerOverride,
+        FakePhotoStore().providerOverride,
+        FakeLinkSource().providerOverride,
       ],
       child: const PpdApp(),
     ),
@@ -63,7 +67,7 @@ void main() {
 
     await fillLogin(tester);
 
-    expect(find.text('Hola, Marta'), findsOneWidget);
+    expect(find.text('Calendario'), findsWidgets);
     final login = sent(api, 'auth/login');
     expect(login.headers['X-App-Platform'], isIn(['android', 'ios']));
     expect(bodyOf(login), {
@@ -140,7 +144,7 @@ void main() {
 
     await tester.enterText(field('Código de 6 dígitos'), '123456');
     await tapText(tester, 'Verificar');
-    expect(find.text('Hola, Marta'), findsOneWidget);
+    expect(find.text('Calendario'), findsWidgets);
   });
 
   testWidgets('contraseña olvidada con código', (tester) async {
@@ -196,7 +200,7 @@ void main() {
       'id_token': 'google-id-token',
     });
     expect(social.headers['X-App-Platform'], isIn(['android', 'ios']));
-    expect(find.text('Hola, Marta'), findsOneWidget);
+    expect(find.text('Calendario'), findsWidgets);
 
     // Al cerrar sesión también se cierra la de Google.
     await tester.tap(find.byTooltip('Opciones'));

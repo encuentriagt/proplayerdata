@@ -48,10 +48,10 @@ class _RedeemCodeScreenState extends ConsumerState<RedeemCodeScreen> {
       if (!mounted) return;
       refreshFamily(ref);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Listo: su hijo quedó vinculado.')),
+        const SnackBar(content: Text('Listo: se vinculó a su hijo.')),
       );
       if (childId != null) {
-        context.pushReplacement('/hijos/$childId');
+        context.go('/hijos/$childId');
       } else {
         context.pop();
       }

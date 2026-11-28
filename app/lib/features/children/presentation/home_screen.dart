@@ -3,7 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/brand_colors.dart';
+import '../../../core/theme/typography.dart';
+import '../../../core/time/guatemala_time.dart';
 import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/home_actions.dart';
 import '../../../core/widgets/org_crest.dart';
 import '../../../core/widgets/sport_icon.dart';
 import '../../auth/application/session_controller.dart';
@@ -13,7 +16,7 @@ import '../application/children_providers.dart';
 import '../data/children_models.dart';
 import 'child_avatar.dart';
 
-/// Inicio: invitaciones pendientes y «Mis hijos».
+/// Pestaña Atletas: invitaciones pendientes y los hijos vinculados.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -49,77 +52,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final session = ref.watch(sessionControllerProvider);
     final profile = session is SignedIn ? session.profile : null;
-    final firstName = (profile?.user.name ?? '').split(' ').first;
     final children = ref.watch(childrenProvider);
     final pending = ref.watch(invitationsProvider).value?.length ?? 0;
-    final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ProPlayer Data'),
-        actions: [
-          IconButton(
-            tooltip: 'Invitaciones',
-            onPressed: () => context.push('/invitaciones'),
-            icon: Badge(
-              isLabelVisible: pending > 0,
-              label: Text('$pending'),
-              child: const Icon(Icons.mail_outline),
-            ),
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Opciones',
-            onSelected: (value) {
-              switch (value) {
-                case 'code':
-                  context.push('/codigo');
-                case 'password':
-                  context.push('/contrasena');
-                case 'logout':
-                  ref.read(sessionControllerProvider.notifier).logout();
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'code', child: Text('Tengo un código')),
-              PopupMenuItem(
-                value: 'password',
-                child: Text('Cambiar contraseña'),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+            children: [
+              Padding(
+                padding: EdgeInsets.zero,
+                child: Row(
+                  children: [
+                    const Expanded(child: _Title()),
+                    const HomeActions(),
+                  ],
+                ),
               ),
-              PopupMenuItem(value: 'logout', child: Text('Cerrar sesión')),
-            ],
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-          children: [
-            Text(
-              'Hola, $firstName',
-              style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-            if (pending > 0) ...[
-              _InvitationsBanner(count: pending),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton(
+                  onPressed: () => context.push('/codigo'),
+                  child: const Text('Tengo un código'),
+                ),
+              ),
               const SizedBox(height: 16),
+              if (pending > 0) ...[
+                _InvitationsBanner(count: pending),
+                const SizedBox(height: 16),
+              ],
+              switch (children) {
+                AsyncData(:final value) when value.isEmpty => _NoChildren(
+                  email: profile?.user.email ?? '',
+                  hasInvitations: pending > 0,
+                ),
+                AsyncData(:final value) => _ChildrenList(children: value),
+                AsyncError(:final error) => ErrorView(
+                  error: error,
+                  onRetry: () => ref.invalidate(childrenProvider),
+                ),
+                _ => const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              },
             ],
-            switch (children) {
-              AsyncData(:final value) when value.isEmpty => _NoChildren(
-                email: profile?.user.email ?? '',
-                hasInvitations: pending > 0,
-              ),
-              AsyncData(:final value) => _ChildrenList(children: value),
-              AsyncError(:final error) => ErrorView(
-                error: error,
-                onRetry: () => ref.invalidate(childrenProvider),
-              ),
-              _ => const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            },
-          ],
+          ),
         ),
       ),
     );
@@ -161,6 +142,19 @@ class _InvitationsBanner extends StatelessWidget {
   }
 }
 
+class _Title extends StatelessWidget {
+  const _Title();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 16, bottom: 8),
+    child: Semantics(
+      header: true,
+      child: Text('ATLETAS', style: PpdType.headline(56, color: PpdColors.ink)),
+    ),
+  );
+}
+
 class _ChildrenList extends StatelessWidget {
   const _ChildrenList({required this.children});
 
@@ -170,19 +164,12 @@ class _ChildrenList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Mis hijos',
-          style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        for (final child in children) _ChildCard(child: child),
-      ],
+      children: [for (final child in children) _ChildCard(child: child)],
     );
   }
 }
 
+/// Portada del atleta: color de su deporte, silueta, nombre y foto.
 class _ChildCard extends StatelessWidget {
   const _ChildCard({required this.child});
 
@@ -190,60 +177,113 @@ class _ChildCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/hijos/${child.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final team = child.teams.firstOrNull;
+    final code = team?.sport.code ?? 'soccer';
+    final p = sportPalette(code);
+    final kicker = [
+      if (team?.jerseyNumber != null) '#${team!.jerseyNumber}',
+      ?team?.position?.name,
+    ].join(' · ');
+    final age = child.ageOn(GuatemalaTime.today());
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Semantics(
+        button: true,
+        label: child.fullName,
+        child: InkWell(
+          onTap: () => context.push('/hijos/${child.id}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ChildAvatar(child: child),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Container(
+                height: 172,
+                clipBehavior: Clip.hardEdge,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(.4, -.4),
+                    radius: 1.1,
+                    colors: [p.main, p.deep],
+                  ),
+                ),
+                child: Stack(
                   children: [
-                    Text(
-                      child.fullName,
-                      style: text.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                    Positioned(
+                      right: 90,
+                      top: -10,
+                      child: Opacity(
+                        opacity: .45,
+                        child: SportSilhouette(
+                          code: code,
+                          color: Colors.white,
+                          size: 190,
+                          fade: true,
+                          mirror: true,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        OrgCrest(url: child.organization.crestUrl, size: 18),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            child.organization.name,
-                            style: text.bodyMedium?.copyWith(
-                              color: PpdColors.muted,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    Positioned(
+                      right: 16,
+                      bottom: 16,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 4),
                         ),
-                      ],
+                        child: ChildAvatar(child: child, radius: 46),
+                      ),
                     ),
-                    if (child.sports.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
+                    Positioned(
+                      left: 16,
+                      right: 130,
+                      bottom: 14,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          for (final s in child.sports)
-                            SportChip(code: s.code, name: s.name),
+                          if (kicker.isNotEmpty)
+                            Text(
+                              kicker.toUpperCase(),
+                              style: PpdType.label(color: p.onMain),
+                            ),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              child.fullName,
+                              style: PpdType.headline(
+                                44,
+                                color: p.onMain,
+                              ).copyWith(height: 1),
+                            ),
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: PpdColors.muted),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: PpdColors.ink)),
+                ),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    OrgCrest(url: child.organization.crestUrl, size: 18),
+                    Text(
+                      [
+                        if (age != null) '$age años',
+                        child.organization.name,
+                      ].join(' · '),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    for (final s in child.sports)
+                      SportChip(code: s.code, name: s.name),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

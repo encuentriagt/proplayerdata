@@ -46,25 +46,26 @@ final class NotificationService
         $data = $this->enrich($data, $organizationId, $playerId);
         // FCM solo acepta textos en "data".
         $payload = array_map(fn ($v) => is_scalar($v) || $v === null ? (string) $v : json_encode($v), array_merge($data, ['kind' => $kind]));
-        foreach (array_chunk($fresh, 200) as $chunk) {
-            UserNotification::insert(array_map(fn ($uid) => [
+        // Un registro por usuario: su id viaja en el push (notification_id) para marcar leído o "Enterado".
+        $ids = [];
+        foreach ($fresh as $uid) {
+            $ids[$uid] = DB::table('user_notifications')->insertGetId([
                 'user_id' => $uid, 'organization_id' => $organizationId, 'player_id' => $playerId,
                 'kind' => $kind, 'title' => mb_substr($title, 0, 150), 'body' => mb_substr($body, 0, 500),
                 'data' => json_encode($payload), 'created_at' => $now,
-            ], $chunk));
+            ]);
         }
 
         $sender = $this->sender;
-        app()->terminating(function () use ($fresh, $title, $body, $payload, $channel, $sender) {
+        app()->terminating(function () use ($ids, $title, $body, $payload, $channel, $sender) {
             try {
-                $devices = Device::whereIn('user_id', $fresh)->get(['id', 'fcm_token']);
-                if ($devices->isEmpty()) {
-                    return;
-                }
-                $results = $sender->send($devices->pluck('fcm_token')->all(), $title, $body, $payload, $channel);
-                $invalid = array_keys(array_filter($results, fn ($r) => $r === 'invalid'));
-                if ($invalid) {
-                    Device::whereIn('token_hash', array_map(fn ($t) => hash('sha256', $t), $invalid))->delete();
+                $devices = Device::whereIn('user_id', array_keys($ids))->get(['id', 'user_id', 'fcm_token'])->groupBy('user_id');
+                foreach ($devices as $uid => $list) {
+                    $results = $sender->send($list->pluck('fcm_token')->all(), $title, $body, $payload + ['notification_id' => (string) $ids[$uid]], $channel);
+                    $invalid = array_keys(array_filter($results, fn ($r) => $r === 'invalid'));
+                    if ($invalid) {
+                        Device::whereIn('token_hash', array_map(fn ($t) => hash('sha256', $t), $invalid))->delete();
+                    }
                 }
             } catch (\Throwable $e) {
                 Log::warning('No se pudo enviar push', ['error' => $e->getMessage()]);

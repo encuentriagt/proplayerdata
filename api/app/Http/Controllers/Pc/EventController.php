@@ -88,8 +88,12 @@ class EventController extends Controller
             'player_id' => $c->player_id, 'player_name' => $c->player?->fullName(), 'status' => $c->status,
             'guardian_response' => $c->guardian_response, 'responded_at' => $c->responded_at?->toIso8601String(),
         ])->values();
+        // Lesión: si algún padre ya tocó "Enterado" en la App.
+        $acks = \App\Models\UserNotification::where('kind', 'injury')->where('data->event_id', (string) $event->id)
+            ->whereNotNull('acked_at')->get(['player_id', 'acked_at'])->groupBy('player_id');
         $data['attendance'] = $event->attendances->map(fn ($a) => [
             'player_id' => $a->player_id, 'player_name' => $a->player?->fullName(), 'status' => $a->status, 'note' => $a->note,
+            'injury_acked_at' => $a->status === 'injured' ? $acks->get($a->player_id)?->min('acked_at')?->toIso8601String() : null,
         ])->values();
         $data['lineup'] = $event->lineup->map(fn ($l) => [
             'player_id' => $l->player_id, 'player_name' => $l->player?->fullName(), 'is_starter' => $l->is_starter,
@@ -402,8 +406,9 @@ class EventController extends Controller
         });
 
         $notified = 0;
-        if ($changed && $event->type === 'match' && ! $event->isDraft()) {
-            $notified = $this->notifier->attendance($event, $changed);
+        if ($changed) {
+            // Lesión: siempre (partido o entreno, publicado o borrador). Lo demás: solo en partidos publicados.
+            $notified = $this->notifier->attendance($event, $changed, ! ($event->type === 'match' && ! $event->isDraft()));
         }
         Audit::log('event.attendance_saved', $event, ['count' => count($data['records']), 'changed' => count($changed)], $organization->id);
 

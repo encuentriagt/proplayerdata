@@ -60,4 +60,15 @@ class MeController extends Controller
 
         return response()->json(['data' => ['updated' => $q->update(['read_at' => now()])]]);
     }
+
+    /** "Enterado" de un aviso urgente (lesión): lo marca leído y confirmado. Repetirlo responde igual. */
+    public function ack(Request $request, int $id): JsonResponse
+    {
+        $n = UserNotification::where('user_id', $request->user()->id)->findOrFail($id);
+        if (! $n->acked_at) {
+            $n->forceFill(['acked_at' => now(), 'read_at' => $n->read_at ?? now()])->save();
+        }
+
+        return response()->json(['data' => $n->payload()]);
+    }
 }

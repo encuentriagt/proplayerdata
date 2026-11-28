@@ -155,20 +155,36 @@ final class EventNotifier
      * Asistencia de un partido publicado: un aviso por jugador a sus padres ("Ana: Asiste").
      * Si se corrige, solo avisa a quienes les cambió el estado; volver a un estado anterior también avisa.
      */
-    public function attendance(Event $event, array $playerIds): int
+    public function attendance(Event $event, array $playerIds, bool $onlyInjuries = false): int
     {
         $event->loadMissing('team');
         $labels = ['present' => 'Asiste', 'excused' => 'No asiste (con aviso)', 'injured' => 'Lesión', 'absent' => 'No asiste (sin justificar)', 'late' => 'Llegó tarde'];
         $rows = \App\Models\Attendance::with('player')->where('event_id', $event->id)->whereIn('player_id', $playerIds)->get();
         $sent = 0;
         foreach ($rows as $a) {
-            if (! $a->player || ! isset($labels[$a->status])) {
+            if (! $a->player || ! isset($labels[$a->status]) || ($onlyInjuries && $a->status !== 'injured')) {
                 continue;
             }
             $prefix = "event:{$event->id}:att:{$a->player_id}:";
             // Borra el registro de avisos de otros estados para que, si vuelve a cambiar, se avise de nuevo.
-            \Illuminate\Support\Facades\DB::table('notification_logs')->where('kind', 'attendance')
+            \Illuminate\Support\Facades\DB::table('notification_logs')->whereIn('kind', ['attendance', 'injury'])
                 ->where('ref_key', 'like', $prefix.'%')->where('ref_key', '!=', $prefix.$a->status)->delete();
+            if ($a->status === 'injured') {
+                // Urgente: prioridad alta, canal "emergencias"; la App lo repite cada minuto hasta "Enterado".
+                $sent += $this->notifications->notify(
+                    $this->guardiansOf([$a->player_id]),
+                    'injury',
+                    $prefix.'injured',
+                    'Lesión: '.$a->player->first_name,
+                    "{$a->player->first_name} se lesionó en {$event->displayTitle()}.".($a->note ? ' Nota del coach: '.$a->note : ' Comuníquese con el coach.'),
+                    ['event_id' => $event->id, 'player_id' => $a->player_id, 'team_id' => $event->team_id, 'status' => 'injured', 'note' => (string) $a->note],
+                    $event->organization_id,
+                    $a->player_id,
+                    'emergencias',
+                );
+
+                continue;
+            }
             $sent += $this->notifications->notify(
                 $this->guardiansOf([$a->player_id]),
                 'attendance',

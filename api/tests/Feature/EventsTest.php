@@ -130,19 +130,30 @@ class EventsTest extends TestCase
             'publish' => false, 'callups' => [['player_id' => $ana->id]],
         ])->json('data.id');
 
-        // En borrador: se guarda sin avisar.
-        $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'injured'], ['player_id' => $beto->id, 'status' => 'present']]])
-            ->assertOk()->assertJsonPath('data.notified', 0);
+        $inj = fn () => UserNotification::where('user_id', $papa->id)->where('kind', 'injury');
+        // En borrador: la asistencia normal no avisa, pero la LESIÓN sí (urgente).
+        $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'injured', 'note' => 'Tobillo'], ['player_id' => $beto->id, 'status' => 'present']]])
+            ->assertOk()->assertJsonPath('data.notified', 1);
         $this->assertSame(0, $q()->count());
-        // Al publicar se avisa la asistencia que ya había.
+        $this->assertSame('Ana se lesionó en Sub-12 vs X. Nota del coach: Tobillo', $inj()->value('body'));
+        $this->assertSame('Tobillo', $inj()->first()->data['note']);
+        // Al publicar no se repite la lesión.
         $this->as($coach)->postJson($this->base."/events/{$id}/publish")->assertOk();
-        $this->assertSame(['Ana: Lesión.'], $q()->pluck('body')->all());
+        $this->assertSame(0, $q()->count());
+        $this->assertSame(1, $inj()->count());
 
         // Guardar igual no repite; corregir avisa solo al que cambió.
         $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'injured']]])->assertJsonPath('data.notified', 0);
         $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'present']]])->assertJsonPath('data.notified', 1);
         $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'injured']]])->assertJsonPath('data.notified', 1);
-        $this->assertSame(3, $q()->count());
+        $this->assertSame([1, 2], [$q()->count(), $inj()->count()]);
+
+        // "Enterado" del padre: lo ve el coach en la PC.
+        $nid = $inj()->latest('id')->value('id');
+        $this->as($coach)->getJson($this->base."/events/{$id}")->assertJsonPath('data.attendance.0.injury_acked_at', null);
+        $this->as($papa)->postJson("/api/me/notifications/{$nid}/ack")->assertOk()->assertJsonPath('data.read', true);
+        $this->assertNotNull(collect($this->as($coach)->getJson($this->base."/events/{$id}")->json('data.attendance'))->firstWhere('player_id', $ana->id)['injury_acked_at']);
+        $this->as($coach)->postJson("/api/me/notifications/{$nid}/ack")->assertNotFound();
 
         // status null quita la marca; "late" ya no se acepta.
         $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $beto->id, 'status' => null]]])->assertOk();
@@ -150,7 +161,11 @@ class EventsTest extends TestCase
         // "Llegó tarde" (late) vuelve a existir: avisa y cuenta aparte.
         $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'late']]])->assertJsonPath('data.notified', 1);
         $this->assertSame('Ana: Llegó tarde.', $q()->latest('id')->value('body'));
-        $this->as($papa)->getJson("/api/app/children/{$ana->id}/stats")->assertJsonPath('data.attendance.late', 1);
+        // Lesión en un entreno también avisa.
+        $tr = $this->as($coach)->postJson($this->base.'/events', ['team_id' => $team->id, 'type' => 'training', 'starts_at' => now()->subHour()->toDateTimeString(), 'publish' => true, 'callups' => [['player_id' => $ana->id]]])->json('data.id');
+        $this->as($coach)->putJson($this->base."/events/{$tr}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'injured']]])->assertJsonPath('data.notified', 1);
+        $this->as($coach)->putJson($this->base."/events/{$tr}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'late']]])->assertJsonPath('data.notified', 0);
+        $this->as($papa)->getJson("/api/app/children/{$ana->id}/stats")->assertJsonPath('data.attendance.late', 2);
         $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'injured']]])->assertOk();
         $this->as($coach)->putJson($this->base."/events/{$id}/attendance", ['records' => [['player_id' => $ana->id, 'status' => 'tarde']]])->assertStatus(422);
 
@@ -341,7 +356,8 @@ class EventsTest extends TestCase
 
         // App: marcador de penales sin los cobros ajenos; penales y gol en contra del hijo.
         $app = $this->as($papa)->getJson("/api/app/children/{$ana->id}/events/{$id}")->assertOk()
-            ->assertJsonPath('data.shootout', ['score_us' => 2, 'score_them' => 1])->assertJsonPath('data.child_shootout', ['taken' => 2, 'scored' => 2]);
+            ->assertJsonPath('data.shootout', ['score_us' => 2, 'score_them' => 1])->assertJsonPath('data.child_shootout', ['taken' => 2, 'scored' => 2])
+            ->assertJsonPath('data.child_timeline.0.stat_code', 'goal')->assertJsonPath('data.child_timeline.0.type', 'stat');
         $this->as($papa)->getJson('/api/app/events?from='.now()->subDay()->toDateString())->assertJsonPath('data.0.shootout.score_us', 2);
         $this->as($papa)->getJson("/api/app/children/{$beto->id}/events/{$id}")->assertStatus(403);
 

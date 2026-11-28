@@ -12,7 +12,7 @@ class UserNotification extends Model
 
     protected function casts(): array
     {
-        return ['data' => 'array', 'read_at' => 'datetime'];
+        return ['data' => 'array', 'read_at' => 'datetime', 'acked_at' => 'datetime'];
     }
 
     public function payload(): array
@@ -20,7 +20,7 @@ class UserNotification extends Model
         return [
             'id' => $this->id, 'kind' => $this->kind, 'title' => $this->title, 'body' => $this->body,
             'data' => $this->data, 'organization_id' => $this->organization_id, 'player_id' => $this->player_id,
-            'read' => $this->read_at !== null, 'created_at' => $this->created_at?->toIso8601String(),
+            'read' => $this->read_at !== null, 'acked_at' => $this->acked_at?->toIso8601String(), 'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
 }

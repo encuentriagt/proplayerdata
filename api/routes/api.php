@@ -81,6 +81,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::delete('me/devices', [MeController::class, 'removeDevice']);
     Route::get('me/notifications', [MeController::class, 'notifications']);
     Route::post('me/notifications/read', [MeController::class, 'markRead']);
+    Route::post('me/notifications/{id}/ack', [MeController::class, 'ack'])->whereNumber('id');
 
     // ---- App de padres ----
     Route::prefix('app')->middleware('account:guardian')->group(function () {

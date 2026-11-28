@@ -63,8 +63,9 @@ class NotificationTest extends TestCase
         $this->assertCount(0, $fake->sent); // todavía no: sale al terminar la petición
 
         $this->app->terminate();
-        $this->assertCount(1, $fake->sent);
+        $this->assertCount(2, $fake->sent); // un envío por usuario, con su notification_id
         $this->assertSame('1', $fake->sent[0]['data']['event_id']);
+        $this->assertSame((string) UserNotification::where('user_id', $a->id)->value('id'), $fake->sent[0]['data']['notification_id']);
         $this->assertSame(1, Device::count()); // el token inválido se borró
 
         $this->as($a)->getJson('/api/me/notifications')->assertOk()->assertJsonPath('meta.unread', 1)->assertJsonPath('data.0.title', 'Resultado');

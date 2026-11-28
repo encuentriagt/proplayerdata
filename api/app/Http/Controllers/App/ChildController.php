@@ -176,6 +176,17 @@ class ChildController extends Controller
             'callup' => $callup ? ['status' => $callup->status, 'response' => $callup->guardian_response] : null,
             'attendance' => $att ? ['status' => $att->status, 'note' => $att->note] : null,
             'child_played' => $lineup ? ['is_starter' => $lineup->is_starter, 'minutes_played' => $lineup->minutes_played] : null,
+            // Minuto a minuto del hijo (solo con resultado publicado): goles, asistencias, tarjetas, cambios…
+            'child_timeline' => $event->result_published_at ? \App\Models\MatchAction::with('statType')->where('event_id', $event->id)
+                ->where(fn ($q) => $q->where('player_id', $player->id)->orWhere(fn ($r) => $r->where('related_player_id', $player->id)->whereIn('type', ['sub_in', 'sub_out'])))
+                ->whereIn('type', ['stat', 'sub_in', 'sub_out'])
+                ->orderByRaw('period IS NULL, period')->orderByRaw('minute IS NULL, minute')->orderBy('id')->get()
+                ->map(fn ($a) => [
+                    'minute' => $a->minute, 'period' => $a->period,
+                    // sub_in con related = a quien reemplazó; si el hijo es el related de un sub_in, él salió.
+                    'type' => $a->type === 'stat' ? 'stat' : (($a->player_id === $player->id) === ($a->type === 'sub_in') ? 'sub_in' : 'sub_out'),
+                    'stat_code' => $a->statType?->code, 'stat_name' => $a->statType?->name, 'value' => $a->value,
+                ])->values() : [],
             'child_shootout' => $event->result_published_at && $event->shootout_us !== null ? (function () use ($event, $player) {
                 $mine = collect($event->shootout_kicks ?? [])->where('player_id', $player->id);
 
